@@ -1,0 +1,49 @@
+name: moose_core
+description: Core architecture for modular Flutter e-commerce applications with plugin-based architecture, repository pattern, and configurable UI sections.
+version: 1.1.0
+repository: https://github.com/greymooseinc/moose_core
+issue_tracker: https://github.com/greymooseinc/moose_core/issues
+documentation: https://github.com/greymooseinc/moose_core/blob/main/README.md
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management - BLoC pattern is core to architecture
+  flutter_bloc: ^9.1.0
+  equatable: ^2.0.5
+
+  # Networking - ApiClient dependency
+  dio: ^5.4.0
+
+  # Local Storage - Cache system dependency
+  shared_preferences: ^2.2.2
+
+  # Utils
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  mockito: ^5.4.0
+  build_runner: ^2.4.6
+
+topics:
+  - ecommerce
+  - architecture
+  - plugin
+  - repository-pattern
+  - bloc
+  - modular
+
+platforms:
+  android:
+  ios:
+  web:
+  windows:
+  macos:
+  linux:

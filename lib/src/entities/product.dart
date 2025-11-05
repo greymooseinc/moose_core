@@ -1,0 +1,262 @@
+import 'package:equatable/equatable.dart';
+import 'product_attribute.dart';
+import 'product_variation.dart';
+import 'product_section.dart';
+
+class Product extends Equatable {
+  final String id;
+  final String name;
+  final List<ProductSection> sections;
+  final double price;
+  final double? regularPrice;
+  final double? salePrice;
+  final bool onSale;
+  final String? sku;
+  final List<String> images;
+  final bool inStock;
+  final int stockQuantity;
+  final String stockStatus;
+  final List<String> categories;
+  final List<String> tags;
+  final String type;
+  final bool featured;
+  final double? averageRating;
+  final int? ratingCount;
+  final String? permalink;
+  final DateTime? dateCreated;
+  final DateTime? dateModified;
+  final Map<String, dynamic>? metadata;
+  final List<ProductAttribute> attributes;
+  final List<ProductVariation> variations;
+  final Map<String, String> defaultAttributes;
+
+  const Product({
+    required this.id,
+    required this.name,
+    this.sections = const [],
+    required this.price,
+    this.regularPrice,
+    this.salePrice,
+    this.onSale = false,
+    this.sku,
+    required this.images,
+    required this.inStock,
+    required this.stockQuantity,
+    this.stockStatus = 'instock',
+    this.categories = const [],
+    this.tags = const [],
+    this.type = 'simple',
+    this.featured = false,
+    this.averageRating,
+    this.ratingCount,
+    this.permalink,
+    this.dateCreated,
+    this.dateModified,
+    this.metadata,
+    this.attributes = const [],
+    this.variations = const [],
+    this.defaultAttributes = const {},
+  });
+
+  Product copyWith({
+    String? id,
+    String? name,
+    List<ProductSection>? sections,
+    double? price,
+    double? regularPrice,
+    double? salePrice,
+    bool? onSale,
+    String? sku,
+    List<String>? images,
+    bool? inStock,
+    int? stockQuantity,
+    String? stockStatus,
+    List<String>? categories,
+    List<String>? tags,
+    String? type,
+    bool? featured,
+    double? averageRating,
+    int? ratingCount,
+    String? permalink,
+    DateTime? dateCreated,
+    DateTime? dateModified,
+    Map<String, dynamic>? metadata,
+    List<ProductAttribute>? attributes,
+    List<ProductVariation>? variations,
+    Map<String, String>? defaultAttributes,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sections: sections ?? this.sections,
+      price: price ?? this.price,
+      regularPrice: regularPrice ?? this.regularPrice,
+      salePrice: salePrice ?? this.salePrice,
+      onSale: onSale ?? this.onSale,
+      sku: sku ?? this.sku,
+      images: images ?? this.images,
+      inStock: inStock ?? this.inStock,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      stockStatus: stockStatus ?? this.stockStatus,
+      categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
+      type: type ?? this.type,
+      featured: featured ?? this.featured,
+      averageRating: averageRating ?? this.averageRating,
+      ratingCount: ratingCount ?? this.ratingCount,
+      permalink: permalink ?? this.permalink,
+      dateCreated: dateCreated ?? this.dateCreated,
+      dateModified: dateModified ?? this.dateModified,
+      metadata: metadata ?? this.metadata,
+      attributes: attributes ?? this.attributes,
+      variations: variations ?? this.variations,
+      defaultAttributes: defaultAttributes ?? this.defaultAttributes,
+    );
+  }
+
+  Product copyWithMetadata(Map<String, dynamic> newMetadata) {
+    return Product(
+      id: id,
+      name: name,
+      sections: sections,
+      price: price,
+      regularPrice: regularPrice,
+      salePrice: salePrice,
+      onSale: onSale,
+      sku: sku,
+      images: images,
+      inStock: inStock,
+      stockQuantity: stockQuantity,
+      stockStatus: stockStatus,
+      categories: categories,
+      tags: tags,
+      type: type,
+      featured: featured,
+      averageRating: averageRating,
+      ratingCount: ratingCount,
+      permalink: permalink,
+      dateCreated: dateCreated,
+      dateModified: dateModified,
+      metadata: {
+        ...?metadata,
+        ...newMetadata,
+      },
+      attributes: attributes,
+      variations: variations,
+      defaultAttributes: defaultAttributes,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'sections': sections.map((s) => s.toJson()).toList(),
+      'price': price,
+      'regular_price': regularPrice,
+      'sale_price': salePrice,
+      'on_sale': onSale,
+      'sku': sku,
+      'images': images,
+      'in_stock': inStock,
+      'stock_quantity': stockQuantity,
+      'stock_status': stockStatus,
+      'categories': categories,
+      'tags': tags,
+      'type': type,
+      'featured': featured,
+      'average_rating': averageRating,
+      'rating_count': ratingCount,
+      'permalink': permalink,
+      'date_created': dateCreated?.toIso8601String(),
+      'date_modified': dateModified?.toIso8601String(),
+      'metadata': metadata,
+      'attributes': attributes.map((a) => a.toJson()).toList(),
+      'variations': variations.map((v) => v.toJson()).toList(),
+      'default_attributes': defaultAttributes,
+    };
+  }
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      sections: (json['sections'] as List<dynamic>?)
+              ?.map((s) => ProductSection.fromJson(s as Map<String, dynamic>))
+              .toList() ??
+          [],
+      price: (json['price'] is String)
+          ? double.tryParse(json['price']) ?? 0.0
+          : (json['price'] as num?)?.toDouble() ?? 0.0,
+      regularPrice: json['regular_price'] != null
+          ? (json['regular_price'] is String
+              ? double.tryParse(json['regular_price'])
+              : (json['regular_price'] as num?)?.toDouble())
+          : null,
+      salePrice: json['sale_price'] != null
+          ? (json['sale_price'] is String
+              ? double.tryParse(json['sale_price'])
+              : (json['sale_price'] as num?)?.toDouble())
+          : null,
+      onSale: json['on_sale'] ?? false,
+      sku: json['sku'],
+      images: (json['images'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      inStock: json['in_stock'] ?? true,
+      stockQuantity: json['stock_quantity'] ?? 0,
+      stockStatus: json['stock_status'] ?? 'instock',
+      categories: (json['categories'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      tags: (json['tags'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      type: json['type'] ?? 'simple',
+      featured: json['featured'] ?? false,
+      averageRating: json['average_rating'] != null
+          ? (json['average_rating'] is String
+              ? double.tryParse(json['average_rating'])
+              : (json['average_rating'] as num?)?.toDouble())
+          : null,
+      ratingCount: json['rating_count'],
+      permalink: json['permalink'],
+      dateCreated: json['date_created'] != null
+          ? DateTime.tryParse(json['date_created'])
+          : null,
+      dateModified: json['date_modified'] != null
+          ? DateTime.tryParse(json['date_modified'])
+          : null,
+      metadata: json['metadata'] as Map<String, dynamic>?,
+      attributes: (json['attributes'] as List<dynamic>?)
+              ?.map((a) => ProductAttribute.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
+      variations: (json['variations'] as List<dynamic>?)
+              ?.map((v) => ProductVariation.fromJson(v as Map<String, dynamic>))
+              .toList() ??
+          [],
+      defaultAttributes: _parseDefaultAttributes(json['default_attributes']),
+    );
+  }
+
+  static Map<String, String> _parseDefaultAttributes(dynamic defaultAttributesJson) {
+    if (defaultAttributesJson == null) return {};
+    if (defaultAttributesJson is Map<String, dynamic>) {
+      return defaultAttributesJson.map((key, value) => MapEntry(key, value.toString()));
+    }
+
+    return {};
+  }
+
+  @override
+  List<Object?> get props => [id, name, price, inStock];
+
+  @override
+  String toString() {
+    return 'Product(id: $id, name: $name, price: \$$price, inStock: $inStock)';
+  }
+}

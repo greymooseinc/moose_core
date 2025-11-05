@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(dir:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"cd 'c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app'; flutter analyze 2>&1 | Select-String 'lib\\\\' | Select-String 'error' | Select-Object -First 10\":*)",
+      "Bash(powershell -Command \"cd 'c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app'; flutter analyze 2>&1 | Select-String 'error -' | Select-String 'lib' | Select-Object -First 5\":*)",
+      "Bash(powershell -Command \"cd ''c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app''; flutter analyze 2>&1 | Select-String ''issues found''\")",
+      "Bash(powershell -Command \"cd 'c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app'; flutter analyze 2>&1 | Select-String 'uri_does_not_exist' | Select-Object -First 5\":*)",
+      "Bash(powershell -Command \"cd 'c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app'; flutter analyze 2>&1 | Select-String 'error -' | Select-String 'lib\\\\' | Select-Object -First 5\":*)",
+      "Bash(powershell -Command \"cd ''c:\\Users\\MadushaKumarasiri\\source\\repos\\flutter_shopping_app''; flutter analyze 2>&1 | Select-String ''depend_on_referenced_packages''\")",
+      "Bash(powershell:*)",
+      "Bash(flutter test:*)",
+      "Bash(find:*)",
+      "Bash(Select-String -Pattern \"cart|error|warning\" -Context 0,1)",
+      "Bash(Select-Object -First 30)",
+      "Bash(Select-String \"error\" -Context 2)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
