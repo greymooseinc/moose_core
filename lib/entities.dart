@@ -54,6 +54,7 @@ export 'src/entities/user.dart';
 
 // Common entities
 export 'src/entities/paginated_result.dart';
+export 'src/entities/plugin_config.dart';
 export 'src/entities/push_notification.dart';
 export 'src/entities/section_config.dart';
 export 'src/entities/user_interaction.dart';

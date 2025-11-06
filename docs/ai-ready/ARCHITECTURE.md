@@ -461,7 +461,7 @@ final value = ConfigManager().get('plugins:products:perPage');
 final value = ConfigManager().get('plugins:products:perPage', defaultValue: 10);
 
 // Get nested object
-final cache = ConfigManager().get('plugins:products:cache');
+final cache = ConfigManager().get('plugins:products:settings:cache');
 ```
 
 ### Access in FeatureSection

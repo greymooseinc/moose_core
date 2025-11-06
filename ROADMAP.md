@@ -1,130 +1,270 @@
-# 🛍️ Shopping Cart App – Product Roadmap (Checklist)
+# 🛍️ Moose Core – Product Roadmap
 
 ## 📅 Overview
-A structured roadmap for developing a general-purpose Shopping Cart mobile application.  
-This document outlines feature milestones, priorities, and timelines across phases.
+A structured roadmap for developing **moose_core**: a Flutter-based shopping app framework designed for AI agents.
+This framework enables AI agents to understand, build, and customize ecommerce applications through a plugin-based architecture with comprehensive AI-ready documentation.
 
 ---
 
-## 🚀 Phase 1: MVP (Minimum Viable Product)
-**Goal:** Launch a functional shopping experience with core cart & checkout features.
+## 🎯 Vision
+**"Enable AI agents to build complete shopping applications from natural language descriptions"**
 
-### 🔹 Core Features
-- [x] **User Registration & Login**
-  - [x] Email/password authentication
-  - [x] Social login (Google, Apple, Facebook)
-- [x] **Product Catalog**
-  - [x] Product list and grid view
-  - [x] Product detail view with images and description
-  - [x] Category and subcategory filters
-- [x] **Search & Filtering**
-  - [x] Keyword search
-  - [x] Price range filters
-  - [x] Sort by price, popularity, newest
-- [x] **Shopping Cart**
-  - [x] Add, update, remove items
-  - [x] Quantity controls
-  - [x] Real-time cart total calculation
-- [x] **Checkout Flow**
-  - [x] Address entry & selection
-  - [x] Order summary
-  - [x] Payment method selection (Cash on Delivery or Test Gateway)
-- [x] **Order Confirmation**
-  - [x] Order placed screen
-  - [x] Confirmation email or push notification
-
-### 🧱 Technical Foundation
-- [x] Flutter mobile app (iOS & Android)
-- [x] Node.js / NestJS backend (REST API)
-- [x] MongoDB or PostgreSQL database
-- [x] Firebase / Google Cloud for push notifications
-- [x] Image hosting (e.g., Cloudinary, Firebase Storage)
+The framework provides:
+- Platform-agnostic core entities and business logic
+- Plugin-based modular architecture
+- Backend adapters (WooCommerce, Shopify, etc.)
+- Configuration-driven UI sections
+- Comprehensive AI-ready documentation
 
 ---
 
-## 🌱 Phase 2: Growth
-**Goal:** Improve usability, analytics, and retention.
+## 🚀 Phase 1: Foundation (Current)
+**Goal:** Establish core architecture and AI-agent-friendly patterns.
 
-### 🔹 User Experience
-- [ ] Wishlist / Favorites
-- [ ] Recently viewed items
-- [ ] Product ratings and reviews
-- [ ] Smart recommendations (“You may also like”)
+### 🔹 Core Architecture
+- [x] **Entity System**
+  - [x] Platform-agnostic domain entities
+  - [x] CoreEntity base class with extensions support
+  - [x] Comprehensive entity documentation
+  - [x] Type-safe entity serialization
+- [x] **Plugin System**
+  - [x] FeaturePlugin base class
+  - [x] Plugin lifecycle management (registration, initialization)
+  - [x] Plugin configuration with active/inactive support
+  - [x] Settings management per plugin
+  - [x] Route registration and merging
+- [x] **Configuration Management**
+  - [x] Environment-based configuration (environment.json)
+  - [x] Nested configuration access (ConfigManager)
+  - [x] Plugin-level configuration
+  - [x] Section-level configuration with active flags
 
-### 🔹 Checkout & Payments
-- [ ] Stripe, PayPal, Apple Pay, and Google Pay integrations
-- [ ] Address auto-complete (Google Places API)
-- [ ] Order tracking page
-- [ ] Invoice generation (PDF)
+### 🔹 Widget & Section System
+- [x] **Widget Registry**
+  - [x] Dynamic widget registration
+  - [x] Configuration-driven section building
+  - [x] Active/inactive section filtering
+- [x] **Section Configuration**
+  - [x] SectionConfig entity
+  - [x] Settings support for each section
+  - [x] Active flag for conditional rendering
 
-### 🔹 Marketing & Retention
-- [ ] Discount codes / coupons
-- [ ] Push notifications for promotions
-- [ ] Email marketing integration (Mailchimp / SendGrid)
-- [ ] Abandoned cart reminders
+### 🔹 Backend Adapters
+- [x] **Adapter Architecture**
+  - [x] Repository pattern with adapters
+  - [x] WooCommerce adapter implementation
+  - [x] Shopify adapter implementation
+  - [x] Platform-agnostic service layer
+- [x] **Data Mappers**
+  - [x] Backend-to-entity mapping
+  - [x] Entity-to-backend mapping
+  - [x] Extensions field for platform-specific data
 
-### 🔹 Analytics
-- [ ] Sales dashboard (total revenue, orders, AOV)
-- [ ] User engagement analytics
-- [ ] Product popularity tracking
-
----
-
-## 💎 Phase 3: Advanced / Enterprise
-**Goal:** Add personalization, scalability, and advanced commerce capabilities.
-
-### 🔹 Personalization & AI
-- [ ] AI-powered product recommendations
-- [ ] Personalized discounts
-- [ ] Smart search (semantic, typo-tolerant)
-
-### 🔹 Multi-Channel & Expansion
-- [ ] Multi-vendor marketplace support
-- [ ] Multi-language & multi-currency support
-- [ ] Integration with Shopify / WooCommerce / Magento APIs
-
-### 🔹 Customer Engagement
-- [ ] Live chat / chatbot integration
-- [ ] Loyalty program & reward points
-- [ ] Referral system
-
----
-
-## 🧩 Phase 4: Operations & Maintenance
-**Goal:** Ensure reliability, monitoring, and scalability.
-
-### 🔹 DevOps & CI/CD
-- [ ] Automated testing (unit, integration, UI)
-- [ ] CI/CD pipeline (GitHub Actions, Firebase App Distribution)
-- [ ] Cloud infrastructure (AWS / GCP / Azure)
-- [ ] Error tracking (Sentry / Firebase Crashlytics)
-
-### 🔹 Security & Compliance
-- [ ] Secure payment processing (PCI compliance)
-- [ ] Data encryption at rest & in transit
-- [ ] GDPR / CCPA compliance
-- [ ] Role-based access control (Admin, Vendor, Customer)
+### 🔹 AI-Ready Documentation
+- [x] **Documentation Structure**
+  - [x] ARCHITECTURE.md - System overview
+  - [x] PLUGIN_SYSTEM.md - Plugin development guide
+  - [x] ENTITY_EXTENSIONS.md - Extensions field usage
+  - [x] Comprehensive code examples
+  - [x] Best practices and anti-patterns
 
 ---
 
-## 🗺️ Release Timeline (Example)
-| Phase | Target Release | Status |
-|-------|----------------|--------|
-| Phase 1 – MVP | Q1 2026 | 🟢 In Progress |
-| Phase 2 – Growth | Q2 2026 | ⚪ Planned |
-| Phase 3 – Advanced | Q3–Q4 2026 | ⚪ Planned |
-| Phase 4 – Ops & Maintenance | Continuous | ⚪ Ongoing |
+## 🌱 Phase 2: Enhanced AI Integration (Q1 2026)
+**Goal:** Improve AI agent understanding and code generation capabilities.
+
+### 🔹 Documentation Enhancements
+- [ ] **Schema Documentation**
+  - [ ] JSON schema definitions for all entities
+  - [ ] Configuration schema with validation rules
+  - [ ] API contract documentation
+- [ ] **Code Generation Guides**
+  - [ ] Plugin scaffolding templates
+  - [ ] Common pattern libraries
+  - [ ] Migration guides for version updates
+- [ ] **Interactive Examples**
+  - [ ] Runnable code snippets
+  - [ ] Visual architecture diagrams
+  - [ ] Decision trees for common scenarios
+
+### 🔹 Enhanced Registries
+- [ ] **Hook System Documentation**
+  - [ ] Complete hook catalog
+  - [ ] Hook execution flow diagrams
+  - [ ] Plugin communication patterns
+- [ ] **Action Registry Enhancement**
+  - [ ] Custom action patterns
+  - [ ] Deep linking support
+  - [ ] Navigation action standardization
+- [ ] **Event Bus Documentation**
+  - [ ] Event catalog and schemas
+  - [ ] Cross-plugin communication examples
+  - [ ] Event-driven architecture patterns
+
+### 🔹 Testing Infrastructure
+- [ ] **Test Utilities**
+  - [ ] Mock adapters for testing
+  - [ ] Plugin testing framework
+  - [ ] Configuration test helpers
+- [ ] **Example Tests**
+  - [ ] Unit test examples
+  - [ ] Integration test patterns
+  - [ ] Widget test templates
 
 ---
 
-## 📘 Future Enhancements
-- [ ] Voice-assisted shopping
-- [ ] AR product preview
-- [ ] In-store pickup & local delivery
-- [ ] Subscriptions / recurring orders
-- [ ] Marketplace analytics dashboard
+## 💎 Phase 3: Advanced Features (Q2 2026)
+**Goal:** Add sophisticated ecommerce capabilities and AI-assisted customization.
+
+### 🔹 Advanced Commerce Features
+- [ ] **Product Variants System**
+  - [ ] Complex variant relationships
+  - [ ] Variant selection UI components
+  - [ ] Inventory tracking per variant
+- [ ] **Advanced Filtering**
+  - [ ] Faceted search support
+  - [ ] Dynamic filter generation
+  - [ ] Filter preset management
+- [ ] **Promotions Engine**
+  - [ ] Discount rule configuration
+  - [ ] Bundle/combo deals
+  - [ ] Loyalty points integration
+
+### 🔹 AI-Assisted Customization
+- [ ] **Visual Component Library**
+  - [ ] Pre-built section components
+  - [ ] Theme system with presets
+  - [ ] Customizable UI patterns
+- [ ] **Smart Configuration**
+  - [ ] Configuration validation
+  - [ ] Suggested settings based on use case
+  - [ ] Performance optimization hints
+- [ ] **Code Analysis Tools**
+  - [ ] Plugin dependency analysis
+  - [ ] Performance profiling utilities
+  - [ ] Code quality metrics
+
+### 🔹 Multi-Backend Support
+- [ ] **Additional Adapters**
+  - [ ] BigCommerce adapter
+  - [ ] Magento adapter
+  - [ ] Custom REST API adapter
+- [ ] **Adapter Development Kit**
+  - [ ] Adapter scaffolding tools
+  - [ ] Testing utilities for adapters
+  - [ ] Adapter documentation generator
 
 ---
 
-**Last Updated:** 2025-11-04  
-**Maintainer:** Product Team – Shopping Cart App
+## 🧩 Phase 4: Ecosystem & Community (Q3-Q4 2026)
+**Goal:** Build a thriving ecosystem of plugins and extensions.
+
+### 🔹 Plugin Marketplace Preparation
+- [ ] **Plugin Standards**
+  - [ ] Plugin packaging format
+  - [ ] Version compatibility matrix
+  - [ ] Security review guidelines
+- [ ] **Plugin Discovery**
+  - [ ] Plugin registry/catalog
+  - [ ] Dependency management
+  - [ ] Plugin installation system
+
+### 🔹 Developer Tools
+- [ ] **CLI Tools**
+  - [ ] Project scaffolding CLI
+  - [ ] Plugin generator CLI
+  - [ ] Configuration validator CLI
+- [ ] **IDE Extensions**
+  - [ ] VS Code snippets for common patterns
+  - [ ] Configuration file intellisense
+  - [ ] Live documentation in IDE
+
+### 🔹 AI Agent Improvements
+- [ ] **Semantic Code Search**
+  - [ ] Natural language code search
+  - [ ] Intent-based pattern matching
+  - [ ] Context-aware suggestions
+- [ ] **Automated Refactoring**
+  - [ ] Migration scripts for breaking changes
+  - [ ] Pattern-based code modernization
+  - [ ] Dependency update automation
+
+---
+
+## 🗺️ Release Timeline
+
+| Phase | Focus Area | Target | Status |
+|-------|-----------|--------|--------|
+| Phase 1 – Foundation | Core architecture & plugin system | Q4 2025 | 🟢 95% Complete |
+| Phase 2 – AI Integration | Documentation & testing | Q1 2026 | ⚪ Planned |
+| Phase 3 – Advanced Features | Commerce features & customization | Q2 2026 | ⚪ Planned |
+| Phase 4 – Ecosystem | Community & developer tools | Q3-Q4 2026 | ⚪ Planned |
+
+---
+
+## 🎯 Current Focus (Phase 1 Completion)
+
+### Immediate Priorities
+- [x] Plugin configuration with active/inactive support ✅
+- [x] Section configuration with active flags ✅
+- [x] FeaturePlugin comprehensive documentation ✅
+- [x] PLUGIN_SYSTEM.md update for AI agents ✅
+- [ ] Complete remaining entity documentation
+- [ ] Add configuration validation
+- [ ] Create plugin development examples
+- [ ] Write adapter development guide
+
+### Near-Term Goals (Next 2 Weeks)
+- [ ] Entity factory pattern documentation
+- [ ] Error handling best practices guide
+- [ ] State management integration guide
+- [ ] Performance optimization guide
+
+---
+
+## 📘 Future Considerations
+
+### AI-Specific Features
+- [ ] Natural language configuration generation
+- [ ] Intent-based plugin composition
+- [ ] Automated UI generation from descriptions
+- [ ] Smart error recovery suggestions
+
+### Platform Expansion
+- [ ] Web platform support (Flutter Web)
+- [ ] Desktop platform support
+- [ ] Server-side rendering support
+- [ ] Headless commerce support
+
+### Developer Experience
+- [ ] Hot reload for configuration changes
+- [ ] Visual configuration editor
+- [ ] Real-time preview system
+- [ ] Plugin debugging tools
+
+---
+
+## 🤝 Contributing
+
+This is a framework designed for AI agents, but human contributions are welcome!
+
+### How to Contribute
+1. Review [ARCHITECTURE.md](docs/ai-ready/ARCHITECTURE.md) to understand the system
+2. Check [PLUGIN_SYSTEM.md](docs/ai-ready/PLUGIN_SYSTEM.md) for plugin development
+3. Follow the existing patterns and documentation style
+4. Ensure all code includes comprehensive documentation
+5. Update relevant AI-ready documentation
+
+### Documentation Standards
+- Write for AI agent comprehension
+- Include complete code examples
+- Document assumptions and edge cases
+- Provide clear intent and reasoning
+- Use consistent terminology
+
+---
+
+**Last Updated:** 2025-11-06
+**Maintainer:** Moose Core Framework Team
+**Framework Version:** 1.0.0
+**Target Flutter Version:** 3.24+

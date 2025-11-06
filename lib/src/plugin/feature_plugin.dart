@@ -3,6 +3,82 @@ import 'package:moose_core/adapters.dart';
 import 'package:moose_core/services.dart';
 import 'package:moose_core/widgets.dart';
 
+/// Base class for all feature plugins in the application.
+///
+/// Feature plugins are self-contained modules that provide specific functionality
+/// to the application. Each plugin has access to various registries for hooks,
+/// addons, widgets, adapters, actions, and the event bus for inter-plugin communication.
+///
+/// ## Plugin Lifecycle:
+/// 1. **Creation**: Plugin instance is created via factory function
+/// 2. **Configuration Check**: PluginRegistry checks if plugin is active in environment.json
+/// 3. **Registration**: If active, onRegister() is called for setup
+/// 4. **Initialization**: initialize() is called for async setup (API connections, etc.)
+///
+/// ## Configuration:
+/// Plugins can be configured in environment.json under the `plugins` key:
+/// ```json
+/// {
+///   "plugins": {
+///     "products": {
+///       "active": true,
+///       "settings": {
+///         "cache": {
+///           "productsTTL": 300,
+///           "categoriesTTL": 600
+///         }
+///       },
+///       "sections": {
+///         "main": [...]
+///       }
+///     }
+///   }
+/// }
+/// ```
+///
+/// ## Available Registries:
+/// - **hookRegistry**: Register lifecycle hooks that other plugins can trigger
+/// - **addonRegistry**: Register addons that extend functionality
+/// - **widgetRegistry**: Register UI components/sections
+/// - **adapterRegistry**: Register backend adapters (WooCommerce, Shopify, etc.)
+/// - **actionRegistry**: Register custom actions for user interactions
+/// - **eventBus**: Publish/subscribe to events across plugins
+///
+/// ## Example Implementation:
+/// ```dart
+/// class ProductsPlugin extends FeaturePlugin {
+///   @override
+///   String get name => 'products';
+///
+///   @override
+///   String get version => '1.0.0';
+///
+///   @override
+///   void onRegister() {
+///     // Register widgets
+///     widgetRegistry.register('product.list', (context, {data, onEvent}) {
+///       return ProductListWidget(data: data);
+///     });
+///
+///     // Register adapters
+///     adapterRegistry.registerProductsAdapter(WooProductsAdapter());
+///   }
+///
+///   @override
+///   Future<void> initialize() async {
+///     // Async initialization (API setup, cache warming, etc.)
+///     await loadInitialData();
+///   }
+///
+///   @override
+///   Map<String, WidgetBuilder>? getRoutes() {
+///     return {
+///       '/products': (context) => ProductsScreen(),
+///       '/product': (context) => ProductDetailScreen(),
+///     };
+///   }
+/// }
+/// ```
 abstract class FeaturePlugin {
   String get name;
   String get version;

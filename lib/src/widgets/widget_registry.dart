@@ -72,7 +72,9 @@ class WidgetRegistry {
     void Function(String event, dynamic payload)? onEvent,
   }) {
     final sectionConfigs = getSections(pluginName, groupName);
-    return sectionConfigs.map((section) {
+    return sectionConfigs
+        .where((section) => section.active)
+        .map((section) {
       return build(
         section.name,
         context,

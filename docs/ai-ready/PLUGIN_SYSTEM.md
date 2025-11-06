@@ -14,6 +14,15 @@
 
 The Plugin System is the foundation of the moose_core architecture. Every major feature is encapsulated in a self-contained plugin that can be independently developed, tested, and maintained.
 
+### Key Features
+
+- **Plugin Configuration**: Enable/disable plugins and configure settings via environment.json
+- **Lifecycle Management**: Automatic registration, initialization, and activation control
+- **Default Active**: Plugins are active by default if no configuration exists
+- **Settings Support**: Each plugin can have its own settings section
+- **Section Management**: Sections can be individually activated/deactivated
+- **Registry Access**: Plugins have access to hooks, widgets, adapters, actions, and event bus
+
 ## Plugin Architecture
 
 ### FeaturePlugin Base Class
@@ -143,6 +152,73 @@ void main() async {
 }
 ```
 
+## Plugin Configuration
+
+Plugins can be configured in `environment.json` under the `plugins` key. Each plugin can have:
+
+- **active**: Boolean flag to enable/disable the plugin (default: `true`)
+- **settings**: Plugin-specific configuration (cache settings, API keys, etc.)
+- **sections**: Widget sections configuration for the plugin
+
+### Configuration Example
+
+```json
+{
+  "plugins": {
+    "products": {
+      "active": true,
+      "settings": {
+        "cache": {
+          "productsTTL": 300,
+          "categoriesTTL": 600,
+          "collectionsTTL": 600
+        },
+        "perPage": 20,
+        "enableReviews": true
+      },
+      "sections": {
+        "main": [
+          {
+            "name": "product.featured_section",
+            "description": "Featured products carousel",
+            "active": true,
+            "settings": {
+              "title": "Featured Products",
+              "perPage": 10
+            }
+          }
+        ]
+      }
+    },
+    "analytics": {
+      "active": false,
+      "settings": {
+        "trackingId": "UA-123456-1"
+      }
+    }
+  }
+}
+```
+
+### Accessing Plugin Configuration
+
+```dart
+class ProductsPlugin extends FeaturePlugin {
+  @override
+  Future<void> initialize() async {
+    final registry = PluginRegistry();
+    final config = registry.getPluginConfig('products');
+
+    // Access settings
+    final cacheTTL = config.getSetting<int>('cache.productsTTL') ?? 300;
+    final perPage = config.getSetting<int>('perPage') ?? 20;
+
+    print('Products plugin active: ${config.active}');
+    print('Cache TTL: $cacheTTL seconds');
+  }
+}
+```
+
 ## Plugin Lifecycle
 
 ### 1. Registration Phase
@@ -153,16 +229,21 @@ await pluginRegistry.registerPlugin(() => MyPlugin());
 
 - Plugin factory function is called
 - Plugin instance is created
-- `onRegister()` is called immediately
-- Plugin is added to the registry
+- **Configuration check**: PluginRegistry checks `plugins:{pluginName}` in environment.json
+- If `active: false`, registration is skipped (plugin won't be registered or initialized)
+- If `active: true` or no configuration exists, registration continues:
+  - `onRegister()` is called immediately
+  - Plugin is added to the registry
+
+**Important**: If no plugin configuration exists in environment.json, the plugin is considered active by default.
 
 ### 2. Initialization Phase
 
 ```dart
-// Happens automatically after all plugins are registered
+// Happens automatically after registration
 ```
 
-- `initialize()` is called on each plugin
+- `initialize()` is called on each active plugin
 - Async resources are set up
 - Sections are registered with WidgetRegistry
 - Routes are collected
@@ -350,6 +431,88 @@ class SharePlugin extends FeaturePlugin {
 ```
 
 ## Best Practices
+
+### Plugin Configuration
+
+**Always provide sensible defaults:**
+
+```dart
+class ProductsPlugin extends FeaturePlugin {
+  @override
+  Future<void> initialize() async {
+    final registry = PluginRegistry();
+    final config = registry.getPluginConfig('products');
+
+    // Provide fallback values
+    final cacheTTL = config.getSetting<int>('cache.productsTTL') ?? 300;
+    final perPage = config.getSetting<int>('perPage') ?? 20;
+  }
+}
+```
+
+**Check plugin configuration for optional features:**
+
+```dart
+@override
+Future<void> initialize() async {
+  final config = PluginRegistry().getPluginConfig('products');
+
+  // Only enable feature if configured
+  if (config.getSetting<bool>('enableReviews') == true) {
+    widgetRegistry.register('product.reviews_section', ...);
+  }
+}
+```
+
+**Use nested settings for organization:**
+
+```json
+{
+  "plugins": {
+    "products": {
+      "settings": {
+        "cache": {
+          "productsTTL": 300,
+          "categoriesTTL": 600
+        },
+        "display": {
+          "perPage": 20,
+          "gridColumns": 2
+        },
+        "features": {
+          "enableReviews": true,
+          "enableWishlist": true
+        }
+      }
+    }
+  }
+}
+```
+
+### Disabling Plugins
+
+Plugins can be disabled in environment.json without removing their configuration:
+
+```json
+{
+  "plugins": {
+    "analytics": {
+      "active": false,
+      "settings": {
+        "trackingId": "UA-123456-1"
+      }
+    }
+  }
+}
+```
+
+When a plugin is inactive:
+- ✅ Registration is skipped (saves resources)
+- ✅ `onRegister()` is never called
+- ✅ `initialize()` is never called
+- ✅ Routes are not added to the app
+- ✅ Sections are not registered
+- ❌ Plugin cannot be retrieved with `getPlugin()`
 
 ### Plugin Naming
 
@@ -596,5 +759,16 @@ class EcommercePlugin extends FeaturePlugin {
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+**Last Updated:** 2025-11-06
+**Version:** 2.0.0
+
+## Changelog
+
+### Version 2.0.0 (2025-11-06)
+- Added plugin configuration support with `active` flag and `settings` section
+- Updated plugin lifecycle to check configuration during registration
+- Added `PluginConfig` entity for type-safe plugin configuration
+- Added `getPluginConfig()` method to PluginRegistry
+- Documented plugin configuration best practices
+- Updated section configuration to support `active` flag
+- Moved cache configuration from root level to `settings` section

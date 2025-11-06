@@ -1,3 +1,4 @@
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 
 import 'feature_plugin.dart';
@@ -34,19 +35,25 @@ class PluginRegistry {
 
   final Map<String, FeaturePlugin> _plugins = {};
   final _logger = AppLogger('PluginRegistry');
+  final _configManager = ConfigManager();
 
   /// Registers and initializes a feature plugin.
   ///
   /// The plugin is created and initialized immediately when this method is called.
+  /// If the plugin is configured as inactive in environment.json, registration is skipped.
+  /// If no plugin configuration exists in environment.json, the plugin is considered active.
   ///
   /// **Parameters:**
   /// - [factory]: Function that creates the plugin instance
   ///
   /// **Behavior:**
-  /// 1. Calls the factory function to create the plugin
-  /// 2. Calls plugin.onRegister()
-  /// 3. Calls plugin.initialize() and awaits completion
-  /// 4. Caches the plugin instance
+  /// 1. Creates the plugin instance from the factory
+  /// 2. Checks plugin configuration in environment.json (plugins:{pluginName})
+  /// 3. If active: false, skips registration and logs a message
+  /// 4. If active: true or no config, proceeds with registration:
+  ///    - Calls plugin.onRegister()
+  ///    - Calls plugin.initialize() and awaits completion
+  ///    - Caches the plugin instance
   ///
   /// **Example:**
   /// ```dart
@@ -54,6 +61,19 @@ class PluginRegistry {
   /// ```
   Future<void> registerPlugin(FeaturePlugin Function() factory) async {
     final plugin = factory();
+
+    // Get plugin configuration from environment.json
+    final pluginConfigData = _configManager.get('plugins:${plugin.name}');
+    final pluginConfig = pluginConfigData != null && pluginConfigData is Map<String, dynamic>
+        ? PluginConfig.fromJson(plugin.name, pluginConfigData)
+        : PluginConfig(name: plugin.name, active: true);
+
+    // Skip registration if plugin is inactive
+    if (!pluginConfig.active) {
+      _logger.info('Skipping inactive plugin: ${plugin.name}');
+      return;
+    }
+
     _plugins[plugin.name] = plugin;
 
     // Call onRegister hook
@@ -147,6 +167,28 @@ class PluginRegistry {
     }
 
     return routes;
+  }
+
+  /// Gets the configuration for a specific plugin from environment.json.
+  ///
+  /// If no configuration exists for the plugin, returns a default active configuration.
+  ///
+  /// **Parameters:**
+  /// - [pluginName]: The name of the plugin
+  ///
+  /// **Returns:**
+  /// - [PluginConfig]: The plugin configuration with active status and settings
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = registry.getPluginConfig('products');
+  /// final cacheTTL = config.getSetting<int>('cache.productsTTL');
+  /// ```
+  PluginConfig getPluginConfig(String pluginName) {
+    final pluginConfigData = _configManager.get('plugins:$pluginName');
+    return pluginConfigData != null && pluginConfigData is Map<String, dynamic>
+        ? PluginConfig.fromJson(pluginName, pluginConfigData)
+        : PluginConfig(name: pluginName, active: true);
   }
 
   /// Clears all registered plugins (for testing).

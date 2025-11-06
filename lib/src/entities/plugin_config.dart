@@ -1,21 +1,22 @@
-/// Configuration for product or content sections.
-class SectionConfig {
+/// Configuration for feature plugins in the application.
+///
+/// Controls plugin activation and stores plugin-specific settings.
+/// If no plugin configuration is defined in environment.json, the plugin
+/// is considered active by default.
+class PluginConfig {
   final String name;
-  final String description;
   final bool active;
   final Map<String, dynamic> settings;
 
-  const SectionConfig({
+  const PluginConfig({
     required this.name,
-    required this.description,
     this.active = true,
-    this.settings = const {}
+    this.settings = const {},
   });
 
-  factory SectionConfig.fromJson(Map<String, dynamic> json) {
-    return SectionConfig(
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String? ?? '',
+  factory PluginConfig.fromJson(String name, Map<String, dynamic> json) {
+    return PluginConfig(
+      name: name,
       active: json['active'] as bool? ?? true,
       settings: json['settings'] as Map<String, dynamic>? ?? {},
     );
@@ -23,23 +24,18 @@ class SectionConfig {
 
   Map<String, dynamic> toJson() {
     return {
-      'name': name,
-      'description': description,
       'active': active,
       'settings': settings,
     };
   }
 
-  SectionConfig copyWith({
+  PluginConfig copyWith({
     String? name,
-    String? description,
     bool? active,
     Map<String, dynamic>? settings,
-    Map<String, dynamic>? extensions,
   }) {
-    return SectionConfig(
+    return PluginConfig(
       name: name ?? this.name,
-      description: description ?? this.description,
       active: active ?? this.active,
       settings: settings ?? this.settings,
     );
@@ -47,22 +43,21 @@ class SectionConfig {
 
   @override
   String toString() {
-    return 'SectionConfig(name: $name, description: $description, active: $active, settings: $settings)';
+    return 'PluginConfig(name: $name, active: $active, settings: $settings)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
 
-    return other is SectionConfig &&
+    return other is PluginConfig &&
         other.name == name &&
-        other.description == description &&
         other.active == active &&
         _mapsEqual(other.settings, settings);
   }
 
   @override
-  int get hashCode => name.hashCode ^ description.hashCode ^ active.hashCode ^ settings.hashCode;
+  int get hashCode => name.hashCode ^ active.hashCode ^ settings.hashCode;
 
   bool _mapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
     if (a.length != b.length) return false;
@@ -71,4 +66,15 @@ class SectionConfig {
     }
     return true;
   }
+
+  /// Gets a setting value with type casting.
+  T? getSetting<T>(String key) {
+    if (!settings.containsKey(key)) return null;
+    final value = settings[key];
+    if (value == null) return null;
+    return value as T?;
+  }
+
+  /// Checks if a setting exists.
+  bool hasSetting(String key) => settings.containsKey(key);
 }

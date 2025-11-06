@@ -192,7 +192,7 @@ Access in code:
 
 ```dart
 final ttl = ConfigManager().get(
-  'plugins:products:cache:productsTTL',
+  'plugins:products:settings:cache:productsTTL',
   defaultValue: 300,
 ) as int;
 
