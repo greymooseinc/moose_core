@@ -1,4 +1,13 @@
-class User {
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
+
+/// Represents a user in the system.
+///
+/// Platform-agnostic user entity that works across different authentication
+/// providers (email/password, OAuth, phone, custom, anonymous). Supports
+/// multiple authentication providers and stores provider-specific data.
+@immutable
+class User extends CoreEntity {
   final String id;
   final String? email;
   final String? displayName;
@@ -12,7 +21,6 @@ class User {
   final Map<String, Map<String, dynamic>>? providerData;
   final DateTime? createdAt;
   final DateTime? lastLoginAt;
-  final Map<String, dynamic>? extensions;
 
   const User({
     required this.id,
@@ -28,7 +36,7 @@ class User {
     this.providerData,
     this.createdAt,
     this.lastLoginAt,
-    this.extensions,
+    super.extensions,
   });
 
   User copyWith({
@@ -110,4 +118,18 @@ class User {
       extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
+  
+  @override
+  List<Object?> get props => [
+        id,
+        email,
+        displayName,
+        phoneNumber,
+        photoUrl,
+        emailVerified,
+        phoneVerified,
+        isActive,
+        isAdmin,
+        extensions,
+      ];
 }

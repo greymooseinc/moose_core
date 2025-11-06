@@ -1,9 +1,11 @@
-class CollectionFilters {
-  // Pagination
+import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+
+/// Filters for querying collections with pagination and search.
+@immutable
+class CollectionFilters extends Equatable {
   final int page;
   final int perPage;
-
-  // Filters
   final String? search;
   final Map<String, dynamic>? metadataFilter;
 
@@ -45,4 +47,7 @@ class CollectionFilters {
       metadataFilter: json['metadataFilter'] as Map<String, dynamic>?,
     );
   }
+  
+  @override
+  List<Object?> get props => [page, perPage, search];
 }

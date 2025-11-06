@@ -1,9 +1,17 @@
-import 'package:equatable/equatable.dart';
-import 'product_attribute.dart';
-import 'product_variation.dart';
-import 'product_section.dart';
+import 'package:flutter/material.dart';
 
-class Product extends Equatable {
+import 'core_entity.dart';
+import 'product_attribute.dart';
+import 'product_section.dart';
+import 'product_variation.dart';
+
+/// Represents a product in the ecommerce system.
+///
+/// Platform-agnostic product entity that adapters convert from
+/// backend-specific formats (WooCommerce, Shopify, etc.). Supports
+/// simple and variable products with attributes, variations, and sections.
+@immutable
+class Product extends CoreEntity {
   final String id;
   final String name;
   final List<ProductSection> sections;
@@ -25,7 +33,6 @@ class Product extends Equatable {
   final String? permalink;
   final DateTime? dateCreated;
   final DateTime? dateModified;
-  final Map<String, dynamic>? extensions;
   final List<ProductAttribute> attributes;
   final List<ProductVariation> variations;
   final Map<String, String> defaultAttributes;
@@ -52,7 +59,7 @@ class Product extends Equatable {
     this.permalink,
     this.dateCreated,
     this.dateModified,
-    this.extensions,
+    super.extensions,
     this.attributes = const [],
     this.variations = const [],
     this.defaultAttributes = const {},
@@ -253,7 +260,25 @@ class Product extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, price, inStock];
+  List<Object?> get props => [
+    id,
+    name,
+    price,
+    regularPrice,
+    salePrice,
+    onSale,
+    inStock,
+    stockQuantity,
+    stockStatus,
+    categories,
+    tags,
+    featured,
+    averageRating,
+    ratingCount,
+    attributes,
+    variations,
+    defaultAttributes
+  ];
 
   @override
   String toString() {

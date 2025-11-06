@@ -1,15 +1,13 @@
-import '../config/config_manager.dart';
+import 'package:flutter/material.dart';
+import 'package:moose_core/services.dart';
 
+/// Filters for querying products with pagination, sorting, and search.
+@immutable
 class ProductFilters {
-  // Pagination
   final int page;
   final int perPage;
-
-  // Sorting
   final String? sortBy;
   final String? sortOrder;
-
-  // Filters
   final String? categoryId;
   final String? search;
   final double? minPrice;
@@ -64,7 +62,6 @@ class ProductFilters {
     );
   }
 
-  /// Create ProductFilters from JSON
   factory ProductFilters.fromJson(Map<String, dynamic> json) {
     return ProductFilters(
       page: json['page'] as int? ?? 1,
@@ -86,7 +83,6 @@ class ProductFilters {
     );
   }
 
-  /// Convert ProductFilters to JSON
   Map<String, dynamic> toJson() {
     return {
       'page': page,
@@ -108,7 +104,6 @@ class ProductFilters {
     };
   }
 
-  /// Parse a value to double, handling both int and double types
   static double? _parseDouble(dynamic value) {
     if (value == null) return null;
     if (value is double) return value;
@@ -117,7 +112,6 @@ class ProductFilters {
     return null;
   }
 
-  /// Parse a list of strings from various input types
   static List<String>? _parseStringList(dynamic value) {
     if (value == null) return null;
     if (value is List) {
@@ -130,7 +124,6 @@ class ProductFilters {
     return null;
   }
 
-  /// Parse attributes map with list values
   static Map<String, List<String>>? _parseAttributes(dynamic value) {
     if (value == null) return null;
     if (value is! Map) return null;

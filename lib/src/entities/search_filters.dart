@@ -1,14 +1,16 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
+
 import 'search_result_type.dart';
 
-/// Filters for search queries
-class SearchFilters extends Equatable {
+/// Filters for search queries across different content types.
+@immutable
+class SearchFilters extends CoreEntity {
   final List<SearchResultType>? types;
   final int? limit;
   final String? categoryId;
   final String? tagId;
   final Map<String, dynamic>? customFilters;
-  final Map<String, dynamic>? extensions;
 
   const SearchFilters({
     this.types,
@@ -16,7 +18,7 @@ class SearchFilters extends Equatable {
     this.categoryId,
     this.tagId,
     this.customFilters,
-    this.extensions,
+    super.extensions,
   });
 
   SearchFilters copyWith({

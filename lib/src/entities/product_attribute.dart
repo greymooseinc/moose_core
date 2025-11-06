@@ -1,6 +1,10 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class ProductAttribute extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a product attribute such as size, color, or material.
+@immutable
+class ProductAttribute extends CoreEntity {
   final String id;
   final String name;
   final String slug;
@@ -8,7 +12,6 @@ class ProductAttribute extends Equatable {
   final bool visible;
   final bool variation;
   final int position;
-  final Map<String, dynamic>? extensions;
 
   const ProductAttribute({
     required this.id,
@@ -18,7 +21,7 @@ class ProductAttribute extends Equatable {
     this.visible = true,
     this.variation = false,
     this.position = 0,
-    this.extensions,
+    super.extensions,
   });
 
   ProductAttribute copyWith({

@@ -1,13 +1,20 @@
-class ProductReviewStats {
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
+
+/// Represents aggregated product review statistics and rating distribution.
+@immutable
+class ProductReviewStats extends CoreEntity {
   final double averageRating;
   final int reviewCount;
   final Map<int, int> ratingDistribution;
-  final Map<String, dynamic>? extensions;
 
   const ProductReviewStats({
     required this.averageRating,
     required this.reviewCount,
     required this.ratingDistribution,
-    this.extensions,
+    super.extensions,
   });
+  
+  @override
+  List<Object?> get props => [averageRating, reviewCount];
 }

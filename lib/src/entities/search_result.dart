@@ -1,14 +1,16 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+
+import 'core_entity.dart';
 import 'search_result_type.dart';
 
-/// Generic search result that can represent any searchable entity
-class SearchResult extends Equatable {
+/// Represents a unified search result across different content types.
+@immutable
+class SearchResult extends CoreEntity {
   final String id;
   final String title;
   final String? description;
   final String? imageUrl;
   final SearchResultType type;
-  final Map<String, dynamic> extensions;
 
   const SearchResult({
     required this.id,
@@ -16,8 +18,8 @@ class SearchResult extends Equatable {
     this.description,
     this.imageUrl,
     required this.type,
-    this.extensions = const {},
-  });
+    Map<String, dynamic> extensions = const {},
+  }) : super(extensions: extensions);
 
   factory SearchResult.fromJson(Map<String, dynamic> json) {
     return SearchResult(

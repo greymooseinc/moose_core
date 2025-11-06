@@ -1,8 +1,15 @@
+import 'package:flutter/material.dart';
+
 import 'cart_item.dart';
 import 'checkout.dart';
-import 'package:equatable/equatable.dart';
+import 'core_entity.dart';
 
-class Order extends Equatable {
+/// Represents a customer order.
+///
+/// Contains order details including status, line items, pricing,
+/// billing/shipping addresses, and payment information.
+@immutable
+class Order extends CoreEntity {
   final String id;
   final String orderNumber;
   final String status;
@@ -24,7 +31,6 @@ class Order extends Equatable {
   final String? shippingMethodTitle;
   final String? transactionId;
   final String? customerNote;
-  final Map<String, dynamic>? extensions;
 
   const Order({
     required this.id,
@@ -48,7 +54,7 @@ class Order extends Equatable {
     this.shippingMethodTitle,
     this.transactionId,
     this.customerNote,
-    this.extensions,
+    super.extensions,
   });
 
   bool get isPaid => datePaid != null;
@@ -111,7 +117,7 @@ class Order extends Equatable {
       shippingMethodTitle: shippingMethodTitle ?? this.shippingMethodTitle,
       transactionId: transactionId ?? this.transactionId,
       customerNote: customerNote ?? this.customerNote,
-      extensions: extensions ?? this.extensions,
+      extensions: extensions ?? super.extensions,
     );
   }
 
@@ -206,7 +212,8 @@ class Order extends Equatable {
   }
 }
 
-class OrderLineItem extends Equatable {
+@immutable
+class OrderLineItem extends CoreEntity {
   final String id;
   final String productId;
   final String? variationId;
@@ -218,7 +225,6 @@ class OrderLineItem extends Equatable {
   final double total;
   final String? imageUrl;
   final Map<String, dynamic>? variationAttributes;
-  final Map<String, dynamic>? extensions;
 
   const OrderLineItem({
     required this.id,
@@ -232,7 +238,7 @@ class OrderLineItem extends Equatable {
     required this.total,
     this.imageUrl,
     this.variationAttributes,
-    this.extensions,
+    super.extensions,
   });
 
   factory OrderLineItem.fromCartItem(CartItem item) {

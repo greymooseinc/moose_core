@@ -1,7 +1,11 @@
-import 'post.dart';
-import 'paginated_result.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
+import 'paginated_result.dart';
+import 'post.dart';
+
+/// Represents a post sorting option for list views.
+@immutable
 class PostSortOption extends Equatable {
   final String id;
   final String label;
@@ -62,14 +66,7 @@ class PostSortOption extends Equatable {
   }
 }
 
-/// PostListResult - Wrapper for paginated posts with sort options
-///
-/// This class combines PaginatedResult<Post> with post-specific extensions
-/// like sort options. It provides a convenient interface for post listing
-/// features while using the generic pagination underneath.
-///
-/// Migration Note: This replaces the old PostListResult class that duplicated
-/// pagination logic. Now it wraps PaginatedResult<Post> and adds sort options.
+@immutable
 class PostListResult {
   final PaginatedResult<Post> paginatedPosts;
   final List<PostSortOption> sortOptions;

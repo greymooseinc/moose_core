@@ -1,4 +1,4 @@
-/// Types of search results that can be returned
+/// Types of search results supported by the system.
 enum SearchResultType {
   product,
   category,

@@ -1,60 +1,24 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
 
-/// Push notification entity
-///
-/// Platform-agnostic representation of a push notification.
-/// Adapters convert provider-specific formats (FCM, OneSignal, etc.) into this entity.
-class PushNotification extends Equatable {
-  /// Unique notification ID
+@immutable
+class PushNotification extends CoreEntity {
   final String id;
-
-  /// Notification title
   final String title;
-
-  /// Notification body/message
   final String body;
-
-  /// Notification image URL (optional)
   final String? imageUrl;
-
-  /// Custom data payload
-  /// Use this for deep linking, tracking, or custom actions
   final Map<String, dynamic>? data;
-
-  /// Notification type (e.g., 'order', 'promotion', 'chat', 'general')
-  /// Used for categorization and filtering
   final String? type;
-
-  /// Deep link or route to navigate to when tapped
   final String? route;
-
-  /// Route parameters for navigation
   final Map<String, dynamic>? routeParameters;
-
-  /// External URL to open (if not using in-app routing)
   final String? externalUrl;
-
-  /// When the notification was received
   final DateTime receivedAt;
-
-  /// Whether the notification has been read
   final bool isRead;
-
-  /// Whether the notification was received while app was in foreground
   final bool receivedInForeground;
-
-  /// Priority level (high, default, low)
   final NotificationPriority priority;
-
-  /// Badge count (for iOS)
   final int? badge;
-
-  /// Sound to play
   final String? sound;
-
-  /// Channel ID (for Android)
   final String? channelId;
-  final Map<String, dynamic>? extensions;
 
   const PushNotification({
     required this.id,
@@ -73,10 +37,9 @@ class PushNotification extends Equatable {
     this.badge,
     this.sound,
     this.channelId,
-    this.extensions,
+    super.extensions,
   });
 
-  /// Create a copy with modified fields
   PushNotification copyWith({
     String? id,
     String? title,
@@ -117,15 +80,12 @@ class PushNotification extends Equatable {
     );
   }
 
-  /// Mark notification as read
   PushNotification markAsRead() {
     return copyWith(isRead: true);
   }
 
-  /// Check if notification has a navigation action
   bool get hasNavigationAction => route != null || externalUrl != null;
 
-  /// Get the notification summary (for display in lists)
   String get summary => body.length > 100 ? '${body.substring(0, 100)}...' : body;
 
   @override
@@ -154,36 +114,27 @@ class PushNotification extends Equatable {
   }
 }
 
-/// Notification priority levels
 enum NotificationPriority {
   low,
   defaultPriority,
   high,
 }
 
-/// Notification permission status
 enum NotificationPermissionStatus {
-  /// Permission not yet requested
   notDetermined,
-
-  /// Permission denied by user
   denied,
-
-  /// Permission granted
   authorized,
-
-  /// Permission granted with restrictions (iOS only)
   provisional,
 }
 
-/// Notification settings for the app
-class NotificationSettings extends Equatable {
+/// Represents notification settings and preferences for the user.
+@immutable
+class NotificationSettings extends CoreEntity {
   final bool enabled;
   final bool showInForeground;
   final bool playSound;
   final bool showBadge;
   final Set<String> enabledTypes;
-  final Map<String, dynamic>? extensions;
 
   const NotificationSettings({
     this.enabled = true,
@@ -191,7 +142,7 @@ class NotificationSettings extends Equatable {
     this.playSound = true,
     this.showBadge = true,
     this.enabledTypes = const {},
-    this.extensions,
+    super.extensions,
   });
 
   NotificationSettings copyWith({
@@ -212,7 +163,6 @@ class NotificationSettings extends Equatable {
     );
   }
 
-  /// Check if a specific notification type is enabled
   bool isTypeEnabled(String type) {
     if (!enabled) return false;
     if (enabledTypes.isEmpty) return true; // If no types specified, all enabled

@@ -1,6 +1,8 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
 
-class CheckoutRequest extends Equatable {
+@immutable
+class CheckoutRequest extends CoreEntity {
   final String cartId;
   final BillingAddress billingAddress;
   final ShippingAddress shippingAddress;
@@ -8,7 +10,6 @@ class CheckoutRequest extends Equatable {
   final String? paymentMethodId;
   final String? customerNote;
   final List<String>? couponCodes;
-  final Map<String, dynamic>? extensions;
 
   const CheckoutRequest({
     required this.cartId,
@@ -18,7 +19,7 @@ class CheckoutRequest extends Equatable {
     this.paymentMethodId,
     this.customerNote,
     this.couponCodes,
-    this.extensions,
+    super.extensions,
   });
 
   CheckoutRequest copyWith({
@@ -83,7 +84,8 @@ class CheckoutRequest extends Equatable {
       ];
 }
 
-class BillingAddress extends Equatable {
+/// Represents a billing address for checkout and payment processing.
+class BillingAddress extends CoreEntity {
   final String firstName;
   final String lastName;
   final String? company;
@@ -108,6 +110,7 @@ class BillingAddress extends Equatable {
     required this.country,
     required this.email,
     required this.phone,
+    super.extensions
   });
 
   Map<String, dynamic> toJson() {
@@ -156,7 +159,8 @@ class BillingAddress extends Equatable {
       ];
 }
 
-class ShippingAddress extends Equatable {
+/// Represents a shipping address for order delivery.
+class ShippingAddress extends CoreEntity {
   final String firstName;
   final String lastName;
   final String? company;
@@ -177,6 +181,7 @@ class ShippingAddress extends Equatable {
     required this.state,
     required this.postcode,
     required this.country,
+    super.extensions
   });
 
   Map<String, dynamic> toJson() {
@@ -219,7 +224,7 @@ class ShippingAddress extends Equatable {
       ];
 }
 
-class PaymentMethod extends Equatable {
+class PaymentMethod extends CoreEntity {
   final String id;
   final String title;
   final String description;
@@ -234,6 +239,7 @@ class PaymentMethod extends Equatable {
     this.enabled = true,
     this.order = 0,
     this.settings,
+    super.extensions
   });
 
   Map<String, dynamic> toJson() {
@@ -262,7 +268,7 @@ class PaymentMethod extends Equatable {
   List<Object?> get props => [id, title, enabled, order];
 }
 
-class ShippingMethod extends Equatable {
+class ShippingMethod extends CoreEntity {
   final String id;
   final String title;
   final String description;
@@ -279,6 +285,7 @@ class ShippingMethod extends Equatable {
     this.taxStatus,
     this.enabled = true,
     this.settings,
+    super.extensions
   });
 
   Map<String, dynamic> toJson() {

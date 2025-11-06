@@ -1,7 +1,11 @@
-import 'product.dart';
-import 'paginated_result.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
+import 'paginated_result.dart';
+import 'product.dart';
+
+/// Represents a product sorting option for list views.
+@immutable
 class ProductSortOption extends Equatable {
   final String id;
   final String label;
@@ -62,14 +66,7 @@ class ProductSortOption extends Equatable {
   }
 }
 
-/// ProductListResult - Wrapper for paginated products with sort options
-///
-/// This class combines PaginatedResult<Product> with product-specific extensions
-/// like sort options. It provides a convenient interface for product listing
-/// features while using the generic pagination underneath.
-///
-/// Migration Note: This replaces the old ProductListResult class that duplicated
-/// pagination logic. Now it wraps PaginatedResult<Product> and adds sort options.
+@immutable
 class ProductListResult {
   final PaginatedResult<Product> paginatedProducts;
   final List<ProductSortOption> sortOptions;

@@ -1,6 +1,11 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class ProductVariation extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a product variation with specific attributes and pricing.
+/// Used for variable products where each variation has unique properties.
+@immutable
+class ProductVariation extends CoreEntity {
   final String id;
   final String productId;
   final String? sku;
@@ -13,7 +18,6 @@ class ProductVariation extends Equatable {
   final int stockQuantity;
   final String stockStatus;
   final Map<String, String> attributes;
-  final Map<String, dynamic>? extensions;
 
   const ProductVariation({
     required this.id,
@@ -28,7 +32,7 @@ class ProductVariation extends Equatable {
     required this.stockQuantity,
     this.stockStatus = 'instock',
     required this.attributes,
-    this.extensions,
+    super.extensions,
   });
 
   ProductVariation copyWith({

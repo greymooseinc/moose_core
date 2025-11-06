@@ -1,6 +1,13 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class Category extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a product category.
+///
+/// Platform-agnostic category entity with support for hierarchical
+/// categories (via parentId) and product counts.
+@immutable
+class Category extends CoreEntity {
   final String id;
   final String name;
   final String slug;
@@ -9,7 +16,6 @@ class Category extends Equatable {
   final String? parentId;
   final int productCount;
   final int displayOrder;
-  final Map<String, dynamic>? extensions;
 
   const Category({
     required this.id,
@@ -20,7 +26,7 @@ class Category extends Equatable {
     this.parentId,
     this.productCount = 0,
     this.displayOrder = 0,
-    this.extensions,
+    super.extensions,
   });
 
   Category copyWith({

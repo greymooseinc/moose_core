@@ -1,6 +1,13 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class CartItem extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a single item in a shopping cart.
+///
+/// Contains product information, quantity, pricing, and optional
+/// variation attributes for variable products.
+@immutable
+class CartItem extends CoreEntity {
   final String id;
   final String productId;
   final String? variationId;
@@ -12,7 +19,6 @@ class CartItem extends Equatable {
   final double total;
   final String? imageUrl;
   final Map<String, dynamic>? variationAttributes;
-  final Map<String, dynamic>? extensions;
 
   const CartItem({
     required this.id,
@@ -26,7 +32,7 @@ class CartItem extends Equatable {
     required this.total,
     this.imageUrl,
     this.variationAttributes,
-    this.extensions,
+    super.extensions,
   });
 
   CartItem copyWith({

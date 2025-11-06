@@ -1,7 +1,15 @@
-import 'cart_item.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class Cart extends Equatable {
+import 'cart_item.dart';
+import 'core_entity.dart';
+
+/// Represents a shopping cart.
+///
+/// Contains cart items, pricing calculations (subtotal, tax, shipping, discount),
+/// applied coupons, and shipping information.
+@immutable
+class Cart extends CoreEntity {
   final String id;
   final List<CartItem> items;
   final double subtotal;
@@ -12,7 +20,6 @@ class Cart extends Equatable {
   final String currency;
   final List<AppliedCoupon>? appliedCoupons;
   final ShippingInfo? shippingInfo;
-  final Map<String, dynamic>? extensions;
 
   const Cart({
     required this.id,
@@ -25,7 +32,7 @@ class Cart extends Equatable {
     this.currency = 'USD',
     this.appliedCoupons,
     this.shippingInfo,
-    this.extensions,
+    super.extensions,
   });
 
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);

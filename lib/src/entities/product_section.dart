@@ -1,31 +1,21 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-/// Represents a dynamic section of product information
-/// This allows different backends (Shopify, WooCommerce, etc.) to define
-/// custom sections for product details like description, care instructions,
-/// design details, specifications, etc.
-class ProductSection extends Equatable {
-  /// Unique identifier for the section type (e.g., 'description', 'care_instructions', 'design', 'specifications')
+import 'core_entity.dart';
+
+/// Represents a product content section for organizing product information.
+@immutable
+class ProductSection extends CoreEntity {
   final String type;
-
-  /// The content of the section
   final String content;
-
-  /// Optional title for the section (can be used for display)
   final String? title;
-
-  /// Order/priority for displaying sections (lower numbers appear first)
   final int order;
-
-  /// Optional extensions for additional section-specific configuration
-  final Map<String, dynamic>? extensions;
 
   const ProductSection({
     required this.type,
     required this.content,
     this.title,
     this.order = 0,
-    this.extensions,
+    super.extensions,
   });
 
   ProductSection copyWith({

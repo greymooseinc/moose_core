@@ -1,6 +1,10 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class Post extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a blog post or article with content and metadata.
+@immutable
+class Post extends CoreEntity {
   final String id;
   final String title;
   final String content;
@@ -16,7 +20,6 @@ class Post extends Equatable {
   final List<String> tags;
   final int commentCount;
   final int viewCount;
-  final Map<String, dynamic>? extensions;
 
   const Post({
     required this.id,
@@ -34,7 +37,7 @@ class Post extends Equatable {
     this.tags = const [],
     this.commentCount = 0,
     this.viewCount = 0,
-    this.extensions,
+    super.extensions,
   });
 
   Post copyWith({

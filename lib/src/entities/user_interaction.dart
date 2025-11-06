@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import 'package:moose_core/src/entities/core_entity.dart';
+
 enum UserInteractionType {
   internal,
   external,
@@ -5,7 +8,10 @@ enum UserInteractionType {
   custom,
 }
 
-class UserInteraction {
+/// Represents a user interaction action for navigation and deep linking.
+/// Supports internal routes, external URLs, and custom action handlers.
+@immutable
+class UserInteraction extends CoreEntity {
   final UserInteractionType interactionType;
   final String? route;
   final String? url;
@@ -114,34 +120,6 @@ class UserInteraction {
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is UserInteraction &&
-          runtimeType == other.runtimeType &&
-          interactionType == other.interactionType &&
-          route == other.route &&
-          url == other.url &&
-          customActionId == other.customActionId &&
-          _mapEquals(parameters, other.parameters);
-
-  @override
-  int get hashCode =>
-      interactionType.hashCode ^
-      route.hashCode ^
-      url.hashCode ^
-      customActionId.hashCode ^
-      parameters.hashCode;
-
-  bool _mapEquals(Map<String, dynamic>? a, Map<String, dynamic>? b) {
-    if (a == null) return b == null;
-    if (b == null || a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (!b.containsKey(key) || a[key] != b[key]) return false;
-    }
-    return true;
-  }
-
-  @override
   String toString() {
     return 'UserInteraction(interactionType: $interactionType, route: $route, url: $url, customActionId: $customActionId, parameters: $parameters)';
   }
@@ -171,4 +149,7 @@ class UserInteraction {
         return 'No action';
     }
   }
+  
+  @override
+  List<Object?> get props => [interactionType, route, url];
 }

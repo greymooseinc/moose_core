@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'user_interaction.dart';
-import '../helpers/text_style_helper.dart';
+import 'package:moose_core/services.dart';
 
-class Collection {
+import 'core_entity.dart';
+import 'user_interaction.dart';
+
+/// Represents a collection of products grouped together.
+@immutable
+class Collection extends CoreEntity {
   final String id;
   final String title;
   final String? subtitle;
   final String? featuredImage;
   final List<String>? images;
-  final Map<String, dynamic>? extensions;
   final UserInteraction? action;
   final TextStyle? cardTitleStyle;
   final TextStyle? cardSubtitleStyle;
@@ -19,7 +22,7 @@ class Collection {
     this.subtitle,
     this.featuredImage,
     this.images,
-    this.extensions,
+    super.extensions,
     this.action,
     this.cardTitleStyle,
     this.cardSubtitleStyle,
@@ -84,4 +87,7 @@ class Collection {
           : null,
     );
   }
+
+  @override
+  List<Object?> get props => [id, title, subtitle, featuredImage, images, extensions, action];
 }

@@ -4,7 +4,10 @@
 
 ## TL;DR
 
-All core entities have an `extensions` field (`Map<String, dynamic>?`) that allows storing platform-specific data from different backends (WooCommerce, Shopify, custom APIs) without needing to modify or extend the entity classes.
+All core entities extend from `CoreEntity` which provides an `extensions` field (`Map<String, dynamic>?`) that allows storing platform-specific data from different backends (WooCommerce, Shopify, custom APIs) without needing to modify or extend the entity classes.
+
+**CoreEntity** provides a type-safe helper method to access extensions data:
+- `getExtension<T>(key)` - Get an extension value with type casting
 
 ```dart
 // Use core entities directly - no need to create custom entities
@@ -31,9 +34,24 @@ final product = Product(
 );
 ```
 
+## Core Entity Base Class
+
+All core entities extend from `CoreEntity`, which provides the `extensions` field and a type-safe getter:
+
+```dart
+abstract class CoreEntity extends Equatable {
+  final Map<String, dynamic>? extensions;
+
+  const CoreEntity({this.extensions});
+
+  // Type-safe getter for extensions
+  T? getExtension<T>(String key);
+}
+```
+
 ## What is the Extensions Field?
 
-The `extensions` field is a `Map<String, dynamic>?` property available on all core entities:
+The `extensions` field is a `Map<String, dynamic>?` property inherited from `CoreEntity` and available on all core entities:
 - **Product**
 - **Category**
 - **Cart** & **CartItem**
@@ -173,13 +191,22 @@ class WooProductsRepository extends CoreRepository implements ProductsRepository
 // In your UI or business logic
 final product = await productsRepo.getProductById('123');
 
-// Access WooCommerce-specific data
+// Option 1: Direct access
 final wooData = product.extensions?['woocommerce'] as Map<String, dynamic>?;
 final permalink = wooData?['permalink'] as String?;
 final weight = wooData?['weight'] as String?;
 
-// Access custom data
-final loyaltyPoints = product.extensions?['loyalty_points'] as int?;
+// Option 2: Using CoreEntity getExtension (type-safe)
+final wooData = product.getExtension<Map<String, dynamic>>('woocommerce');
+final permalink = wooData?['permalink'] as String?;
+final weight = wooData?['weight'] as String?;
+final loyaltyPoints = product.getExtension<int>('loyalty_points');
+
+// Check if extension exists
+if (product.extensions?.containsKey('woocommerce') ?? false) {
+  final wooData = product.getExtension<Map<String, dynamic>>('woocommerce');
+  // Use wooData...
+}
 ```
 
 ### Pattern 3: Using copyWithExtensions

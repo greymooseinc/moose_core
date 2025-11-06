@@ -1,6 +1,10 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
-class ProductReview extends Equatable {
+import 'core_entity.dart';
+
+/// Represents a customer product review with rating and content.
+@immutable
+class ProductReview extends CoreEntity {
   final String id;
   final String productId;
   final String reviewer;
@@ -11,8 +15,7 @@ class ProductReview extends Equatable {
   final DateTime dateCreated;
   final bool verified;
   final String status;
-  final List<String>? photos; // Photo URLs or local paths
-  final Map<String, dynamic>? extensions;
+  final List<String>? photos;
 
   const ProductReview({
     required this.id,
@@ -26,7 +29,7 @@ class ProductReview extends Equatable {
     this.verified = false,
     this.status = 'approved',
     this.photos,
-    this.extensions,
+    super.extensions,
   });
 
   ProductReview copyWith({

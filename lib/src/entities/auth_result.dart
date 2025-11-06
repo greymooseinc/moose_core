@@ -1,36 +1,23 @@
+import 'package:flutter/material.dart';
+
+import 'core_entity.dart';
 import 'user.dart';
 
-/// Result of an authentication operation
-class AuthResult {
-  /// Whether the authentication was successful
+/// Result of an authentication operation.
+///
+/// Encapsulates the outcome of login, signup, or other auth operations.
+/// Contains user data, tokens, and error information.
+@immutable
+class AuthResult extends CoreEntity {
   final bool success;
-
-  /// The authenticated user (if successful)
   final User? user;
-
-  /// Authentication token (JWT, session token, etc.)
   final String? token;
-
-  /// Refresh token for renewing the auth token
   final String? refreshToken;
-
-  /// Token expiration time
   final DateTime? expiresAt;
-
-  /// Error message (if failed)
   final String? errorMessage;
-
-  /// Error code for programmatic handling
   final String? errorCode;
-
-  /// Whether additional user action is required (e.g., email verification)
   final bool requiresAdditionalAction;
-
-  /// Type of additional action required
   final String? additionalActionType;
-
-  /// Additional data specific to the auth provider
-  final Map<String, dynamic>? extensions;
 
   const AuthResult({
     required this.success,
@@ -42,10 +29,9 @@ class AuthResult {
     this.errorCode,
     this.requiresAdditionalAction = false,
     this.additionalActionType,
-    this.extensions,
+    super.extensions,
   });
 
-  /// Create a successful authentication result
   factory AuthResult.success({
     required User user,
     String? token,
@@ -63,7 +49,6 @@ class AuthResult {
     );
   }
 
-  /// Create a failed authentication result
   factory AuthResult.failure({
     required String errorMessage,
     String? errorCode,
@@ -77,7 +62,6 @@ class AuthResult {
     );
   }
 
-  /// Create a result that requires additional user action
   factory AuthResult.requiresAction({
     required String actionType,
     User? user,
@@ -93,9 +77,11 @@ class AuthResult {
       extensions: extensions,
     );
   }
+  
+  @override
+  List<Object?> get props => [success, user, token, refreshToken, expiresAt, requiresAdditionalAction];
 }
 
-/// Result of a password reset operation
 class PasswordResetResult {
   final bool success;
   final String? message;
@@ -130,7 +116,6 @@ class PasswordResetResult {
   }
 }
 
-/// Result of an email verification operation
 class EmailVerificationResult {
   final bool success;
   final String? message;
