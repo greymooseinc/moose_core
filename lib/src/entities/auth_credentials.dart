@@ -10,10 +10,12 @@ abstract class AuthCredentials {
 class EmailPasswordCredentials extends AuthCredentials {
   final String email;
   final String password;
+  final Map<String, dynamic>? extensions;
 
   const EmailPasswordCredentials({
     required this.email,
     required this.password,
+    this.extensions,
   });
 }
 
@@ -21,10 +23,12 @@ class EmailPasswordCredentials extends AuthCredentials {
 class PhoneCredentials extends AuthCredentials {
   final String phoneNumber;
   final String? verificationCode;
+  final Map<String, dynamic>? extensions;
 
   const PhoneCredentials({
     required this.phoneNumber,
     this.verificationCode,
+    this.extensions,
   });
 }
 
@@ -34,21 +38,25 @@ class OAuthCredentials extends AuthCredentials {
   final String? accessToken;
   final String? idToken;
   final Map<String, dynamic>? additionalData;
+  final Map<String, dynamic>? extensions;
 
   const OAuthCredentials({
     required this.provider,
     this.accessToken,
     this.idToken,
     this.additionalData,
+    this.extensions,
   });
 }
 
 /// Credentials for custom token authentication
 class CustomTokenCredentials extends AuthCredentials {
   final String token;
+  final Map<String, dynamic>? extensions;
 
   const CustomTokenCredentials({
     required this.token,
+    this.extensions,
   });
 }
 

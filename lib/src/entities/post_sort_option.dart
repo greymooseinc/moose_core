@@ -64,7 +64,7 @@ class PostSortOption extends Equatable {
 
 /// PostListResult - Wrapper for paginated posts with sort options
 ///
-/// This class combines PaginatedResult<Post> with post-specific metadata
+/// This class combines PaginatedResult<Post> with post-specific extensions
 /// like sort options. It provides a convenient interface for post listing
 /// features while using the generic pagination underneath.
 ///

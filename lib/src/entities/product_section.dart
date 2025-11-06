@@ -17,15 +17,15 @@ class ProductSection extends Equatable {
   /// Order/priority for displaying sections (lower numbers appear first)
   final int order;
 
-  /// Optional metadata for additional section-specific configuration
-  final Map<String, dynamic>? metadata;
+  /// Optional extensions for additional section-specific configuration
+  final Map<String, dynamic>? extensions;
 
   const ProductSection({
     required this.type,
     required this.content,
     this.title,
     this.order = 0,
-    this.metadata,
+    this.extensions,
   });
 
   ProductSection copyWith({
@@ -33,14 +33,14 @@ class ProductSection extends Equatable {
     String? content,
     String? title,
     int? order,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return ProductSection(
       type: type ?? this.type,
       content: content ?? this.content,
       title: title ?? this.title,
       order: order ?? this.order,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -50,7 +50,7 @@ class ProductSection extends Equatable {
       'content': content,
       'title': title,
       'order': order,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -60,12 +60,12 @@ class ProductSection extends Equatable {
       content: json['content'] ?? '',
       title: json['title'],
       order: json['order'] ?? 0,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 
   @override
-  List<Object?> get props => [type, content, title, order, metadata];
+  List<Object?> get props => [type, content, title, order, extensions];
 
   @override
   String toString() {

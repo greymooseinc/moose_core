@@ -8,7 +8,7 @@ class CheckoutRequest extends Equatable {
   final String? paymentMethodId;
   final String? customerNote;
   final List<String>? couponCodes;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const CheckoutRequest({
     required this.cartId,
@@ -18,7 +18,7 @@ class CheckoutRequest extends Equatable {
     this.paymentMethodId,
     this.customerNote,
     this.couponCodes,
-    this.metadata,
+    this.extensions,
   });
 
   CheckoutRequest copyWith({
@@ -29,7 +29,7 @@ class CheckoutRequest extends Equatable {
     String? paymentMethodId,
     String? customerNote,
     List<String>? couponCodes,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return CheckoutRequest(
       cartId: cartId ?? this.cartId,
@@ -39,7 +39,7 @@ class CheckoutRequest extends Equatable {
       paymentMethodId: paymentMethodId ?? this.paymentMethodId,
       customerNote: customerNote ?? this.customerNote,
       couponCodes: couponCodes ?? this.couponCodes,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -52,7 +52,7 @@ class CheckoutRequest extends Equatable {
       'payment_method_id': paymentMethodId,
       'customer_note': customerNote,
       'coupon_codes': couponCodes,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -69,7 +69,7 @@ class CheckoutRequest extends Equatable {
       couponCodes: (json['coupon_codes'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

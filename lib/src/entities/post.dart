@@ -16,7 +16,7 @@ class Post extends Equatable {
   final List<String> tags;
   final int commentCount;
   final int viewCount;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const Post({
     required this.id,
@@ -34,7 +34,7 @@ class Post extends Equatable {
     this.tags = const [],
     this.commentCount = 0,
     this.viewCount = 0,
-    this.metadata,
+    this.extensions,
   });
 
   Post copyWith({
@@ -53,7 +53,7 @@ class Post extends Equatable {
     List<String>? tags,
     int? commentCount,
     int? viewCount,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return Post(
       id: id ?? this.id,
@@ -71,7 +71,7 @@ class Post extends Equatable {
       tags: tags ?? this.tags,
       commentCount: commentCount ?? this.commentCount,
       viewCount: viewCount ?? this.viewCount,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -92,7 +92,7 @@ class Post extends Equatable {
       'tags': tags,
       'comment_count': commentCount,
       'view_count': viewCount,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -113,7 +113,7 @@ class Post extends Equatable {
         tags,
         commentCount,
         viewCount,
-        metadata,
+        extensions,
       ];
 
   @override

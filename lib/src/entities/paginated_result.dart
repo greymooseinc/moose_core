@@ -46,7 +46,7 @@ class PaginatedResult<T> extends Equatable {
     required this.perPage,
   }) : hasMore = currentPage < totalPages;
 
-  /// Create paginated result from list with pagination metadata
+  /// Create paginated result from list with pagination extensions
   ///
   /// [items] - List of items for current page
   /// [page] - Current page number (1-indexed)
@@ -123,7 +123,7 @@ class PaginatedResult<T> extends Equatable {
   /// Append items from another page
   ///
   /// Useful for infinite scroll: combines current items with new page items
-  /// Returns new PaginatedResult with combined items and updated metadata
+  /// Returns new PaginatedResult with combined items and updated extensions
   PaginatedResult<T> appendPage(PaginatedResult<T> nextPageResult) {
     return PaginatedResult<T>(
       items: [...items, ...nextPageResult.items],

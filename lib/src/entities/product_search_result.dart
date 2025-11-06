@@ -6,6 +6,7 @@ class ProductSearchResult {
   final int currentPage;
   final int totalPages;
   final Map<String, List<String>>? facets;
+  final Map<String, dynamic>? extensions;
 
   const ProductSearchResult({
     required this.products,
@@ -13,5 +14,6 @@ class ProductSearchResult {
     required this.currentPage,
     required this.totalPages,
     this.facets,
+    this.extensions,
   });
 }

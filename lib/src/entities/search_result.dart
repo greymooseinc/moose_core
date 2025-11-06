@@ -8,7 +8,7 @@ class SearchResult extends Equatable {
   final String? description;
   final String? imageUrl;
   final SearchResultType type;
-  final Map<String, dynamic> metadata;
+  final Map<String, dynamic> extensions;
 
   const SearchResult({
     required this.id,
@@ -16,7 +16,7 @@ class SearchResult extends Equatable {
     this.description,
     this.imageUrl,
     required this.type,
-    this.metadata = const {},
+    this.extensions = const {},
   });
 
   factory SearchResult.fromJson(Map<String, dynamic> json) {
@@ -26,7 +26,7 @@ class SearchResult extends Equatable {
       description: json['description'],
       imageUrl: json['image_url'],
       type: _parseType(json['type']),
-      metadata: json['metadata'] as Map<String, dynamic>? ?? {},
+      extensions: json['extensions'] as Map<String, dynamic>? ?? {},
     );
   }
 
@@ -59,7 +59,7 @@ class SearchResult extends Equatable {
       'description': description,
       'image_url': imageUrl,
       'type': type.name,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 

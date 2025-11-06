@@ -1,9 +1,7 @@
-import '../actions/action_registry.dart';
-import '../adapter/adapter_registry.dart';
-import '../events/hook_registry.dart';
-import '../widgets/addon_registry.dart';
-import '../widgets/widget_registry.dart';
 import 'package:flutter/material.dart';
+import 'package:moose_core/adapters.dart';
+import 'package:moose_core/services.dart';
+import 'package:moose_core/widgets.dart';
 
 abstract class FeaturePlugin {
   String get name;
@@ -13,6 +11,7 @@ abstract class FeaturePlugin {
   final WidgetRegistry widgetRegistry = WidgetRegistry();
   final AdapterRegistry adapterRegistry = AdapterRegistry();
   final ActionRegistry actionRegistry = ActionRegistry();
+  final EventBus eventBus = EventBus();
 
   /// Called when plugin is registered
   void onRegister();

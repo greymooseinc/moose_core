@@ -25,7 +25,7 @@ class Product extends Equatable {
   final String? permalink;
   final DateTime? dateCreated;
   final DateTime? dateModified;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
   final List<ProductAttribute> attributes;
   final List<ProductVariation> variations;
   final Map<String, String> defaultAttributes;
@@ -52,7 +52,7 @@ class Product extends Equatable {
     this.permalink,
     this.dateCreated,
     this.dateModified,
-    this.metadata,
+    this.extensions,
     this.attributes = const [],
     this.variations = const [],
     this.defaultAttributes = const {},
@@ -80,7 +80,7 @@ class Product extends Equatable {
     String? permalink,
     DateTime? dateCreated,
     DateTime? dateModified,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
     List<ProductAttribute>? attributes,
     List<ProductVariation>? variations,
     Map<String, String>? defaultAttributes,
@@ -107,14 +107,14 @@ class Product extends Equatable {
       permalink: permalink ?? this.permalink,
       dateCreated: dateCreated ?? this.dateCreated,
       dateModified: dateModified ?? this.dateModified,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
       attributes: attributes ?? this.attributes,
       variations: variations ?? this.variations,
       defaultAttributes: defaultAttributes ?? this.defaultAttributes,
     );
   }
 
-  Product copyWithMetadata(Map<String, dynamic> newMetadata) {
+  Product copyWithExtensions(Map<String, dynamic> newExtensions) {
     return Product(
       id: id,
       name: name,
@@ -137,9 +137,9 @@ class Product extends Equatable {
       permalink: permalink,
       dateCreated: dateCreated,
       dateModified: dateModified,
-      metadata: {
-        ...?metadata,
-        ...newMetadata,
+      extensions: {
+        ...?extensions,
+        ...newExtensions,
       },
       attributes: attributes,
       variations: variations,
@@ -170,7 +170,7 @@ class Product extends Equatable {
       'permalink': permalink,
       'date_created': dateCreated?.toIso8601String(),
       'date_modified': dateModified?.toIso8601String(),
-      'metadata': metadata,
+      'extensions': extensions,
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'variations': variations.map((v) => v.toJson()).toList(),
       'default_attributes': defaultAttributes,
@@ -230,7 +230,7 @@ class Product extends Equatable {
       dateModified: json['date_modified'] != null
           ? DateTime.tryParse(json['date_modified'])
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
       attributes: (json['attributes'] as List<dynamic>?)
               ?.map((a) => ProductAttribute.fromJson(a as Map<String, dynamic>))
               .toList() ??

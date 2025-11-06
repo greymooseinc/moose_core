@@ -12,7 +12,7 @@ class ProductReview extends Equatable {
   final bool verified;
   final String status;
   final List<String>? photos; // Photo URLs or local paths
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const ProductReview({
     required this.id,
@@ -26,7 +26,7 @@ class ProductReview extends Equatable {
     this.verified = false,
     this.status = 'approved',
     this.photos,
-    this.metadata,
+    this.extensions,
   });
 
   ProductReview copyWith({
@@ -41,7 +41,7 @@ class ProductReview extends Equatable {
     bool? verified,
     String? status,
     List<String>? photos,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return ProductReview(
       id: id ?? this.id,
@@ -55,7 +55,7 @@ class ProductReview extends Equatable {
       verified: verified ?? this.verified,
       status: status ?? this.status,
       photos: photos ?? this.photos,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -72,7 +72,7 @@ class ProductReview extends Equatable {
       'verified': verified,
       'status': status,
       'photos': photos,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -95,7 +95,7 @@ class ProductReview extends Equatable {
       photos: json['photos'] != null
           ? List<String>.from(json['photos'])
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

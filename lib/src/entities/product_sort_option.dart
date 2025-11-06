@@ -64,7 +64,7 @@ class ProductSortOption extends Equatable {
 
 /// ProductListResult - Wrapper for paginated products with sort options
 ///
-/// This class combines PaginatedResult<Product> with product-specific metadata
+/// This class combines PaginatedResult<Product> with product-specific extensions
 /// like sort options. It provides a convenient interface for product listing
 /// features while using the generic pagination underneath.
 ///

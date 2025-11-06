@@ -8,6 +8,7 @@ class ProductAttribute extends Equatable {
   final bool visible;
   final bool variation;
   final int position;
+  final Map<String, dynamic>? extensions;
 
   const ProductAttribute({
     required this.id,
@@ -17,6 +18,7 @@ class ProductAttribute extends Equatable {
     this.visible = true,
     this.variation = false,
     this.position = 0,
+    this.extensions,
   });
 
   ProductAttribute copyWith({
@@ -27,6 +29,7 @@ class ProductAttribute extends Equatable {
     bool? visible,
     bool? variation,
     int? position,
+    Map<String, dynamic>? extensions,
   }) {
     return ProductAttribute(
       id: id ?? this.id,
@@ -36,6 +39,7 @@ class ProductAttribute extends Equatable {
       visible: visible ?? this.visible,
       variation: variation ?? this.variation,
       position: position ?? this.position,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -48,6 +52,7 @@ class ProductAttribute extends Equatable {
       'visible': visible,
       'variation': variation,
       'position': position,
+      'extensions': extensions,
     };
   }
 

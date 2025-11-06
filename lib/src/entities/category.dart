@@ -9,7 +9,7 @@ class Category extends Equatable {
   final String? parentId;
   final int productCount;
   final int displayOrder;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const Category({
     required this.id,
@@ -20,7 +20,7 @@ class Category extends Equatable {
     this.parentId,
     this.productCount = 0,
     this.displayOrder = 0,
-    this.metadata,
+    this.extensions,
   });
 
   Category copyWith({
@@ -32,7 +32,7 @@ class Category extends Equatable {
     String? parentId,
     int? productCount,
     int? displayOrder,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return Category(
       id: id ?? this.id,
@@ -43,7 +43,7 @@ class Category extends Equatable {
       parentId: parentId ?? this.parentId,
       productCount: productCount ?? this.productCount,
       displayOrder: displayOrder ?? this.displayOrder,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -57,7 +57,7 @@ class Category extends Equatable {
       'parent_id': parentId,
       'product_count': productCount,
       'display_order': displayOrder,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -71,7 +71,7 @@ class Category extends Equatable {
       parentId: json['parent_id']?.toString(),
       productCount: json['product_count'] ?? 0,
       displayOrder: json['display_order'] ?? 0,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

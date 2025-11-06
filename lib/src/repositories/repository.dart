@@ -1,10 +1,11 @@
-import '../events/hook_registry.dart';
+import 'package:moose_core/services.dart';
 
 /// Base class for all repository implementations
 ///
 /// Provides common functionality and lifecycle management for repositories.
 abstract class CoreRepository {
   final HookRegistry hookRegistry = HookRegistry();
+  final EventBus eventBus = EventBus();
 
   /// Initialize the repository
   ///

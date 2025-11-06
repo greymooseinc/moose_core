@@ -1,71 +1,18 @@
-/// Represents an authenticated user in the e-commerce system
-///
-/// This entity contains core user information that can be extended
-/// with additional platform-specific data via the metadata field.
 class User {
-  /// Unique identifier for the user
   final String id;
-
-  /// User's email address
   final String? email;
-
-  /// User's display name
   final String? displayName;
-
-  /// User's phone number
   final String? phoneNumber;
-
-  /// URL to user's profile photo
   final String? photoUrl;
-
-  /// Whether the user's email has been verified
   final bool emailVerified;
-
-  /// Whether the user's phone has been verified
   final bool phoneVerified;
-
-  /// Whether the user account is active
   final bool isActive;
-
-  /// Whether the user account is an admin
   final bool isAdmin;
-
-  /// List of authentication providers (e.g., 'password', 'google.com', 'facebook.com')
   final List<String> providers;
-
-  /// Provider-specific user data (e.g., Google user object, Facebook user data)
-  /// Key: provider ID (e.g., 'google.com', 'facebook.com')
-  /// Value: provider-specific user data as a map
-  ///
-  /// Example:
-  /// ```dart
-  /// {
-  ///   'google.com': {
-  ///     'uid': 'google_user_id',
-  ///     'email': 'user@gmail.com',
-  ///     'displayName': 'John Doe',
-  ///     'photoURL': 'https://...',
-  ///     'providerId': 'google.com',
-  ///   },
-  ///   'facebook.com': {
-  ///     'uid': 'facebook_user_id',
-  ///     'email': 'user@facebook.com',
-  ///     'displayName': 'John Doe',
-  ///     'photoURL': 'https://...',
-  ///     'providerId': 'facebook.com',
-  ///   }
-  /// }
-  /// ```
   final Map<String, Map<String, dynamic>>? providerData;
-
-  /// When the user was created
   final DateTime? createdAt;
-
-  /// When the user last logged in
   final DateTime? lastLoginAt;
-
-  /// Platform-specific metadata (customer ID, custom fields, etc.)
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const User({
     required this.id,
@@ -81,10 +28,9 @@ class User {
     this.providerData,
     this.createdAt,
     this.lastLoginAt,
-    this.metadata,
+    this.extensions,
   });
 
-  /// Create a copy of this user with modified fields
   User copyWith({
     String? id,
     String? email,
@@ -99,7 +45,7 @@ class User {
     Map<String, Map<String, dynamic>>? providerData,
     DateTime? createdAt,
     DateTime? lastLoginAt,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return User(
       id: id ?? this.id,
@@ -115,7 +61,7 @@ class User {
       providerData: providerData ?? this.providerData,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -134,7 +80,7 @@ class User {
       'providerData': providerData,
       'createdAt': createdAt?.toIso8601String(),
       'lastLoginAt': lastLoginAt?.toIso8601String(),
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -161,7 +107,7 @@ class User {
       lastLoginAt: json['lastLoginAt'] != null
           ? DateTime.parse(json['lastLoginAt'] as String)
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 }

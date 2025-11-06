@@ -12,7 +12,7 @@ class Cart extends Equatable {
   final String currency;
   final List<AppliedCoupon>? appliedCoupons;
   final ShippingInfo? shippingInfo;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const Cart({
     required this.id,
@@ -25,7 +25,7 @@ class Cart extends Equatable {
     this.currency = 'USD',
     this.appliedCoupons,
     this.shippingInfo,
-    this.metadata,
+    this.extensions,
   });
 
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
@@ -45,7 +45,7 @@ class Cart extends Equatable {
     String? currency,
     List<AppliedCoupon>? appliedCoupons,
     ShippingInfo? shippingInfo,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return Cart(
       id: id ?? this.id,
@@ -58,7 +58,7 @@ class Cart extends Equatable {
       currency: currency ?? this.currency,
       appliedCoupons: appliedCoupons ?? this.appliedCoupons,
       shippingInfo: shippingInfo ?? this.shippingInfo,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -74,7 +74,7 @@ class Cart extends Equatable {
       'currency': currency,
       'applied_coupons': appliedCoupons?.map((c) => c.toJson()).toList(),
       'shipping_info': shippingInfo?.toJson(),
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -107,7 +107,7 @@ class Cart extends Equatable {
       shippingInfo: json['shipping_info'] != null
           ? ShippingInfo.fromJson(json['shipping_info'] as Map<String, dynamic>)
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

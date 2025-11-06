@@ -193,15 +193,30 @@ abstract class ProductsRepository extends CoreRepository {
 }
 
 // Adapter Implementation (in your app or separate package)
-class WooProductsRepository implements ProductsRepository {
+class WooProductsRepository extends CoreRepository implements ProductsRepository {
   final WooCommerceApiClient _apiClient;
 
   WooProductsRepository(this._apiClient);
 
   @override
+  void initialize() {
+    // Called automatically after instantiation
+    _setupEventListeners();
+  }
+
+  @override
   Future<List<Product>> getProducts(ProductFilters? filters) async {
     final response = await _apiClient.get('/products', params: filters);
-    return response.map((json) => Product.fromWooDTO(json)).toList();
+    final products = response.map((json) => Product.fromWooDTO(json)).toList();
+
+    // Use eventBus to fire analytics events
+    eventBus.fire(AppProductSearchedEvent(...));
+
+    return products;
+  }
+
+  void _setupEventListeners() {
+    // Setup any necessary listeners
   }
 }
 ```

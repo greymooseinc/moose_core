@@ -24,7 +24,7 @@ class Order extends Equatable {
   final String? shippingMethodTitle;
   final String? transactionId;
   final String? customerNote;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const Order({
     required this.id,
@@ -48,7 +48,7 @@ class Order extends Equatable {
     this.shippingMethodTitle,
     this.transactionId,
     this.customerNote,
-    this.metadata,
+    this.extensions,
   });
 
   bool get isPaid => datePaid != null;
@@ -87,7 +87,7 @@ class Order extends Equatable {
     String? shippingMethodTitle,
     String? transactionId,
     String? customerNote,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return Order(
       id: id ?? this.id,
@@ -111,7 +111,7 @@ class Order extends Equatable {
       shippingMethodTitle: shippingMethodTitle ?? this.shippingMethodTitle,
       transactionId: transactionId ?? this.transactionId,
       customerNote: customerNote ?? this.customerNote,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -138,7 +138,7 @@ class Order extends Equatable {
       'shipping_method_title': shippingMethodTitle,
       'transaction_id': transactionId,
       'customer_note': customerNote,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -187,7 +187,7 @@ class Order extends Equatable {
       shippingMethodTitle: json['shipping_method_title'],
       transactionId: json['transaction_id'],
       customerNote: json['customer_note'],
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 
@@ -218,7 +218,7 @@ class OrderLineItem extends Equatable {
   final double total;
   final String? imageUrl;
   final Map<String, dynamic>? variationAttributes;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const OrderLineItem({
     required this.id,
@@ -232,7 +232,7 @@ class OrderLineItem extends Equatable {
     required this.total,
     this.imageUrl,
     this.variationAttributes,
-    this.metadata,
+    this.extensions,
   });
 
   factory OrderLineItem.fromCartItem(CartItem item) {
@@ -248,7 +248,7 @@ class OrderLineItem extends Equatable {
       total: item.total,
       imageUrl: item.imageUrl,
       variationAttributes: item.variationAttributes,
-      metadata: item.metadata,
+      extensions: item.extensions,
     );
   }
 
@@ -265,7 +265,7 @@ class OrderLineItem extends Equatable {
       'total': total,
       'image_url': imageUrl,
       'variation_attributes': variationAttributes,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -288,7 +288,7 @@ class OrderLineItem extends Equatable {
           : (json['total'] as num?)?.toDouble() ?? 0.0,
       imageUrl: json['image_url'],
       variationAttributes: json['variation_attributes'] as Map<String, dynamic>?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

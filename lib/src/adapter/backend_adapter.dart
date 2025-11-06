@@ -1,4 +1,4 @@
-import '../repositories/repository.dart';
+import 'package:moose_core/repositories.dart';
 
 /// BackendAdapter - Abstract base class for backend implementations
 ///

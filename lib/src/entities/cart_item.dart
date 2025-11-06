@@ -12,7 +12,7 @@ class CartItem extends Equatable {
   final double total;
   final String? imageUrl;
   final Map<String, dynamic>? variationAttributes;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const CartItem({
     required this.id,
@@ -26,7 +26,7 @@ class CartItem extends Equatable {
     required this.total,
     this.imageUrl,
     this.variationAttributes,
-    this.metadata,
+    this.extensions,
   });
 
   CartItem copyWith({
@@ -41,7 +41,7 @@ class CartItem extends Equatable {
     double? total,
     String? imageUrl,
     Map<String, dynamic>? variationAttributes,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return CartItem(
       id: id ?? this.id,
@@ -55,7 +55,7 @@ class CartItem extends Equatable {
       total: total ?? this.total,
       imageUrl: imageUrl ?? this.imageUrl,
       variationAttributes: variationAttributes ?? this.variationAttributes,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -72,7 +72,7 @@ class CartItem extends Equatable {
       'total': total,
       'image_url': imageUrl,
       'variation_attributes': variationAttributes,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -95,7 +95,7 @@ class CartItem extends Equatable {
           : (json['total'] as num?)?.toDouble() ?? 0.0,
       imageUrl: json['image_url'],
       variationAttributes: json['variation_attributes'] as Map<String, dynamic>?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

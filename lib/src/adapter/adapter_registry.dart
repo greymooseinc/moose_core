@@ -21,9 +21,11 @@
 // ```
 // =============================================================================
 
+import 'package:moose_core/repositories.dart';
+import 'package:moose_core/services.dart';
+
 import 'backend_adapter.dart';
-import '../repositories/repository.dart';
-import '../utils/logger.dart';
+
 
 /// Singleton registry for managing backend adapters and repository implementations.
 ///
@@ -176,7 +178,7 @@ class AdapterRegistry {
       _extractRepositoriesFromAdapter(adapter);
 
       _initialized = true;
-      _logger.success('Registered adapter: $adapterName (${adapter.version}) with ${adapter.registeredRepositoryTypes.length} repositories');
+      _logger.debug('Registered adapter: $adapterName (${adapter.version}) with ${adapter.registeredRepositoryTypes.length} repositories');
     } catch (e) {
       _logger.error('Failed to register adapter', e);
       rethrow;

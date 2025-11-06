@@ -188,16 +188,39 @@ Base class for all repository interfaces.
 
 ```dart
 abstract class CoreRepository {
-  /// Dispose resources when repository is no longer needed
-  void dispose() {}
+  final HookRegistry hookRegistry = HookRegistry();
+  final EventBus eventBus = EventBus();
+
+  /// Initialize the repository
+  ///
+  /// Called automatically after instantiation. Override to perform setup tasks.
+  void initialize() {}
 }
 ```
+
+**Features:**
+- **Automatic Initialization**: `initialize()` called by adapter after creation
+- **HookRegistry Access**: Built-in access to hook system for transformations
+- **EventBus Access**: Built-in access to event system for notifications
 
 **Example:**
 ```dart
 abstract class ProductsRepository extends CoreRepository {
   Future<List<Product>> getProducts(ProductFilters? filters);
   Future<Product> getProductById(String id);
+}
+
+class WooProductsRepository extends CoreRepository implements ProductsRepository {
+  @override
+  void initialize() {
+    // Called automatically - setup listeners, state, etc.
+  }
+
+  @override
+  Future<List<Product>> getProducts(ProductFilters? filters) async {
+    // Use hookRegistry for transformations
+    // Use eventBus for analytics
+  }
 }
 ```
 

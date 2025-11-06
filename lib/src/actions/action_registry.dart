@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../entities/user_interaction.dart';
+import 'package:moose_core/entities.dart';
 
 typedef CustomActionHandler = void Function(
   BuildContext context,

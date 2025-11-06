@@ -61,6 +61,31 @@ abstract class BackendAdapter {
     return _factories.containsKey(T);
   }
 
+  /// Check if a repository is currently cached
+  bool isRepositoryCached<T extends CoreRepository>() {
+    return _cache.containsKey(T);
+  }
+
+  /// Clear the cache for a specific repository type
+  void clearRepositoryCache<T extends CoreRepository>() {
+    _cache.remove(T);
+  }
+
+  /// Clear all cached repository instances
+  void clearAllRepositoryCaches() {
+    _cache.clear();
+  }
+
+  /// Get list of all registered repository types
+  List<Type> get registeredRepositoryTypes {
+    return _factories.keys.toList();
+  }
+
+  /// Get a repository by its runtime type (for AdapterRegistry)
+  CoreRepository getRepositoryByType(Type type) {
+    // Returns cached instance or creates new one
+  }
+
   /// Initialize the adapter with configuration
   Future<void> initialize(Map<String, dynamic> config);
 }
@@ -71,13 +96,36 @@ abstract class BackendAdapter {
 All repository interfaces must extend `CoreRepository`:
 
 ```dart
-/// Base class for all repositories
-/// Ensures consistent contract across all repositories
+/// Base class for all repository implementations
+///
+/// Provides common functionality and lifecycle management for repositories.
 abstract class CoreRepository {
-  /// Dispose resources when repository is no longer needed
-  void dispose() {}
+  final HookRegistry hookRegistry = HookRegistry();
+  final EventBus eventBus = EventBus();
+
+  /// Initialize the repository
+  ///
+  /// This method is called automatically after the repository is instantiated
+  /// but before it's cached. Override this method to perform synchronous
+  /// initialization tasks such as:
+  /// - Setting up listeners
+  /// - Initializing local variables
+  /// - Registering hooks
+  /// - Configuring internal state
+  ///
+  /// **Note:** This method is synchronous. For async initialization (loading
+  /// data, network calls, etc.), trigger those operations here but don't await
+  /// them, or handle them in your repository methods as needed.
+  ///
+  /// The default implementation does nothing.
+  void initialize() {}
 }
 ```
+
+**Key Features:**
+- **Automatic Initialization**: `initialize()` is called automatically by the adapter
+- **HookRegistry Access**: Every repository has access to `hookRegistry` for data transformations
+- **EventBus Access**: Every repository has access to `eventBus` for firing events
 
 ## Creating a Custom Adapter
 
@@ -181,8 +229,14 @@ class WooProductsRepository implements ProductsRepository {
   }
 
   @override
-  void dispose() {
-    // Clean up resources if needed
+  void initialize() {
+    // Called automatically after instantiation
+    // Setup listeners, initialize state, etc.
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    // Setup any event listeners or hooks
   }
 }
 ```
@@ -296,17 +350,27 @@ void main() async {
 
 ### Lazy Initialization
 
-Repositories are only created when first accessed:
+Repositories are only created when first accessed, and their `initialize()` method is automatically called:
 
 ```dart
-// First access - repository is created
+// First access - repository is created and initialized
 final productsRepo = adapter.getRepository<ProductsRepository>();
+// Behind the scenes:
+// 1. Factory creates instance
+// 2. initialize() method is called
+// 3. Instance is cached
 
 // Second access - cached repository is returned
 final productsRepo2 = adapter.getRepository<ProductsRepository>();
 
 assert(identical(productsRepo, productsRepo2));  // Same instance
 ```
+
+**Initialization Flow:**
+1. Factory function creates repository instance
+2. Adapter automatically calls `repository.initialize()`
+3. Repository is cached for subsequent access
+4. Cached instance is returned on future calls
 
 ### Synchronous vs Asynchronous Factories
 
@@ -346,6 +410,48 @@ class ProductsRepository extends CoreRepository {
 // ❌ Wrong - doesn't extend CoreRepository
 class ProductsService {  // Won't compile!
   // ...
+}
+```
+
+### Using HookRegistry and EventBus in Repositories
+
+Every repository has access to `hookRegistry` and `eventBus`:
+
+```dart
+class WooProductsRepository extends CoreRepository implements ProductsRepository {
+  final WooCommerceApiClient _apiClient;
+
+  WooProductsRepository(this._apiClient);
+
+  @override
+  Future<List<Product>> getProducts(ProductFilters? filters) async {
+    try {
+      final response = await _apiClient.get('/products', ...);
+      final products = response.map(_convertToProduct).toList();
+
+      // Use HookRegistry for transformations (e.g., apply pricing rules)
+      final transformedProducts = products.map((product) {
+        return hookRegistry.execute('product:transform', product);
+      }).toList();
+
+      // Fire EventBus events for analytics
+      eventBus.fire(AppProductSearchedEvent(
+        searchQuery: filters?.search ?? '',
+        resultCount: transformedProducts.length,
+        productIds: transformedProducts.map((p) => p.id).toList(),
+      ));
+
+      return transformedProducts;
+    } catch (e) {
+      // Fire error event
+      eventBus.fire(AppApplicationErrorEvent(
+        errorMessage: 'Failed to load products',
+        error: e,
+        context: 'WooProductsRepository.getProducts',
+      ));
+      throw RepositoryException('Failed to load products: $e');
+    }
+  }
 }
 ```
 
@@ -431,6 +537,28 @@ void _validateConfig(Map<String, dynamic> config) {
 registerRepositoryFactory<ProductsRepository>(
   () => MyProductsRepository(_client),
 );
+
+// ✅ Override initialize() for setup tasks
+@override
+void initialize() {
+  _setupEventListeners();
+  _loadCachedData();  // Fire-and-forget async operation
+}
+
+// ✅ Use hookRegistry for transformations
+@override
+Future<Product> getProductById(String id) async {
+  final product = await _apiClient.getProduct(id);
+  return hookRegistry.execute('product:transform', product);
+}
+
+// ✅ Use eventBus for analytics and notifications
+@override
+Future<Cart> addToCart(String productId) async {
+  final cart = await _apiClient.addToCart(productId);
+  eventBus.fire(AppCartItemAddedEvent(...));
+  return cart;
+}
 ```
 
 ### DON'T
@@ -462,6 +590,18 @@ class BadAdapter extends BackendAdapter {
 // ❌ Don't skip CoreRepository
 abstract class ProductsService {  // ❌ Doesn't extend CoreRepository
   Future<List<Product>> getProducts();
+}
+
+// ❌ Don't make initialize() async
+@override
+Future<void> initialize() async {  // ❌ Should be synchronous
+  await _loadData();  // This will block the adapter initialization
+}
+
+// ❌ Don't await in initialize() - use fire-and-forget
+@override
+void initialize() {
+  _loadData();  // ✅ Correct - triggers async operation without awaiting
 }
 ```
 
@@ -557,7 +697,15 @@ class MockAdapter extends BackendAdapter {
   }
 }
 
-class MockProductsRepository implements ProductsRepository {
+class MockProductsRepository extends CoreRepository implements ProductsRepository {
+  bool _initialized = false;
+
+  @override
+  void initialize() {
+    _initialized = true;
+    print('MockProductsRepository initialized');
+  }
+
   @override
   Future<List<Product>> getProducts(ProductFilters? filters) async {
     return [
@@ -570,8 +718,7 @@ class MockProductsRepository implements ProductsRepository {
     return Product(id: id, name: 'Test Product', price: 10.0);
   }
 
-  @override
-  void dispose() {}
+  bool get isInitialized => _initialized;
 }
 ```
 
@@ -619,6 +766,34 @@ void main() {
 
       final repo = adapter.getRepository<ProductsRepository>();
       expect(repo, isA<ProductsRepository>());
+    });
+
+    test('repository initialize is called automatically', () async {
+      final config = {
+        'baseUrl': 'https://test.com',
+        'consumerKey': 'ck_test',
+        'consumerSecret': 'cs_test',
+      };
+
+      await adapter.initialize(config);
+
+      final repo = adapter.getRepository<MockProductsRepository>();
+      expect(repo.isInitialized, isTrue);
+    });
+
+    test('cached repositories are not re-initialized', () async {
+      final config = {
+        'baseUrl': 'https://test.com',
+        'consumerKey': 'ck_test',
+        'consumerSecret': 'cs_test',
+      };
+
+      await adapter.initialize(config);
+
+      final repo1 = adapter.getRepository<ProductsRepository>();
+      final repo2 = adapter.getRepository<ProductsRepository>();
+
+      expect(identical(repo1, repo2), isTrue);
     });
   });
 }
@@ -688,5 +863,16 @@ class CustomApiAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+**Last Updated:** 2025-11-05
+**Version:** 2.0.0
+
+**Changelog:**
+- **v2.0.0 (2025-11-05)**:
+  - Added `CoreRepository.initialize()` method documentation
+  - Added automatic initialization flow in adapter
+  - Added `HookRegistry` and `EventBus` access in repositories
+  - Added cache management methods (`clearRepositoryCache`, `isRepositoryCached`)
+  - Added `getRepositoryByType()` and `registeredRepositoryTypes` documentation
+  - Updated best practices with initialize() examples
+  - Updated testing examples with initialization verification
+- **v1.0.0 (2025-11-03)**: Initial version

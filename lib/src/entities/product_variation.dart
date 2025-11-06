@@ -13,7 +13,7 @@ class ProductVariation extends Equatable {
   final int stockQuantity;
   final String stockStatus;
   final Map<String, String> attributes;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const ProductVariation({
     required this.id,
@@ -28,7 +28,7 @@ class ProductVariation extends Equatable {
     required this.stockQuantity,
     this.stockStatus = 'instock',
     required this.attributes,
-    this.metadata,
+    this.extensions,
   });
 
   ProductVariation copyWith({
@@ -44,7 +44,7 @@ class ProductVariation extends Equatable {
     int? stockQuantity,
     String? stockStatus,
     Map<String, String>? attributes,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return ProductVariation(
       id: id ?? this.id,
@@ -59,7 +59,7 @@ class ProductVariation extends Equatable {
       stockQuantity: stockQuantity ?? this.stockQuantity,
       stockStatus: stockStatus ?? this.stockStatus,
       attributes: attributes ?? this.attributes,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -77,7 +77,7 @@ class ProductVariation extends Equatable {
       'stock_quantity': stockQuantity,
       'stock_status': stockStatus,
       'attributes': attributes,
-      'metadata': metadata,
+      'extensions': extensions,
     };
   }
 
@@ -105,7 +105,7 @@ class ProductVariation extends Equatable {
       stockQuantity: json['stock_quantity'] ?? 0,
       stockStatus: json['stock_status'] ?? 'instock',
       attributes: Map<String, String>.from(json['attributes'] ?? {}),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 

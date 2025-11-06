@@ -2,11 +2,13 @@ class SectionConfig {
   final String name;
   final String description;
   final Map<String, dynamic> settings;
+  final Map<String, dynamic>? extensions;
 
   const SectionConfig({
     required this.name,
     required this.description,
     this.settings = const {},
+    this.extensions,
   });
 
   factory SectionConfig.fromJson(Map<String, dynamic> json) {
@@ -14,6 +16,7 @@ class SectionConfig {
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       settings: json['settings'] as Map<String, dynamic>? ?? {},
+      extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
 
@@ -22,6 +25,7 @@ class SectionConfig {
       'name': name,
       'description': description,
       'settings': settings,
+      'extensions': extensions,
     };
   }
 
@@ -29,11 +33,13 @@ class SectionConfig {
     String? name,
     String? description,
     Map<String, dynamic>? settings,
+    Map<String, dynamic>? extensions,
   }) {
     return SectionConfig(
       name: name ?? this.name,
       description: description ?? this.description,
       settings: settings ?? this.settings,
+      extensions: extensions ?? this.extensions,
     );
   }
 

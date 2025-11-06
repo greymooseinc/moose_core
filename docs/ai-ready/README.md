@@ -130,35 +130,75 @@ import 'package:moose_core/services.dart';
    - HookRegistry
    - AddonRegistry
 
+### Event-Driven Communication
+
+6. **[EVENT_SYSTEMS_QUICK_REFERENCE.md](./EVENT_SYSTEMS_QUICK_REFERENCE.md)** - ⚡ Quick reference for AI agents
+   - TL;DR decision matrix
+   - Copy-paste templates
+   - Common patterns
+   - Mistake avoidance
+   - **START HERE for event systems**
+
+7. **[EVENT_SYSTEM_COMPARISON.md](./EVENT_SYSTEM_COMPARISON.md)** - HookRegistry vs EventBus
+   - When to use each system
+   - Detailed comparison table
+   - Decision matrix
+   - Integration patterns
+   - Performance considerations
+
+8. **[EVENT_BUS_GUIDE.md](./EVENT_BUS_GUIDE.md)** - EventBus (Pub/Sub) system
+   - Publish-subscribe pattern
+   - Event lifecycle
+   - Subscription management
+   - Best practices and patterns
+   - Testing strategies
+   - Advanced features
+
+9. **[EVENT_BUS_EXAMPLES.md](./EVENT_BUS_EXAMPLES.md)** - Real-world EventBus examples
+   - Authentication flow
+   - Shopping cart integration
+   - Analytics tracking
+   - Multi-plugin communication
+   - Complete integration scenarios
+
 ### Advanced Topics
 
-6. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
-   - CacheManager
-   - MemoryCache
-   - PersistentCache
-   - TTL configuration
+10. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
+    - CacheManager
+    - MemoryCache
+    - PersistentCache
+    - TTL configuration
 
-7. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
-   - State management anti-patterns
-   - Architecture violations
-   - Common mistakes
-   - Quick reference checklist
+11. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
+    - State management anti-patterns
+    - Architecture violations
+    - Common mistakes
+    - Quick reference checklist
 
-8. **[API.md](./API.md)** - Public API reference
+12. **[API.md](./API.md)** - Public API reference
    - Exported classes and methods
    - Usage examples
    - Type definitions
 
+### Authentication & Authorization
+
+13. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
+    - Multi-provider authentication
+    - AuthRepository implementation
+    - Provider-specific integration (Firebase, Auth0, custom)
+    - User entity with provider data
+    - Complete examples for AI agents
+
 ### Domain Entities
 
-9. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
-   - Dynamic content sections for products
-   - Flexible backend mapping
-   - Custom section types
-   - UI rendering patterns
-   - Migration from legacy fields
+14. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
+    - Dynamic content sections for products
+    - Flexible backend mapping
+    - Custom section types
+    - UI rendering patterns
+    - Migration from legacy fields
 
-10. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
+15. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
     - Product sections quick guide
     - Copy-paste templates
     - Common patterns

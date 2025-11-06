@@ -8,7 +8,7 @@ class Collection {
   final String? subtitle;
   final String? featuredImage;
   final List<String>? images;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
   final UserInteraction? action;
   final TextStyle? cardTitleStyle;
   final TextStyle? cardSubtitleStyle;
@@ -19,7 +19,7 @@ class Collection {
     this.subtitle,
     this.featuredImage,
     this.images,
-    this.metadata,
+    this.extensions,
     this.action,
     this.cardTitleStyle,
     this.cardSubtitleStyle,
@@ -31,7 +31,7 @@ class Collection {
     String? subtitle,
     String? featuredImage,
     List<String>? images,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
     UserInteraction? action,
     TextStyle? cardTitleStyle,
     TextStyle? cardSubtitleStyle,
@@ -42,7 +42,7 @@ class Collection {
       subtitle: subtitle ?? this.subtitle,
       featuredImage: featuredImage ?? this.featuredImage,
       images: images ?? this.images,
-      metadata: metadata ?? this.metadata,
+      extensions: extensions ?? this.extensions,
       action: action ?? this.action,
       cardTitleStyle: cardTitleStyle ?? this.cardTitleStyle,
       cardSubtitleStyle: cardSubtitleStyle ?? this.cardSubtitleStyle,
@@ -56,7 +56,7 @@ class Collection {
       if (subtitle != null) 'subtitle': subtitle,
       if (featuredImage != null) 'featuredImage': featuredImage,
       if (images != null) 'images': images,
-      if (metadata != null) 'metadata': metadata,
+      if (extensions != null) 'extensions': extensions,
       if (action != null) 'action': action!.toJson(),
       if (cardTitleStyle != null) 'titleStyle': TextStyleHelper.toJson(cardTitleStyle!),
       if (cardSubtitleStyle != null) 'cardSubtitleStyle': TextStyleHelper.toJson(cardSubtitleStyle!),
@@ -72,7 +72,7 @@ class Collection {
       images: (json['images'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      extensions: json['extensions'] as Map<String, dynamic>?,
       action: json['action'] != null
           ? UserInteraction.fromJson(json['action'] as Map<String, dynamic>)
           : null,

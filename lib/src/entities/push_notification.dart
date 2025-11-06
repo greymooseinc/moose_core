@@ -54,6 +54,7 @@ class PushNotification extends Equatable {
 
   /// Channel ID (for Android)
   final String? channelId;
+  final Map<String, dynamic>? extensions;
 
   const PushNotification({
     required this.id,
@@ -72,6 +73,7 @@ class PushNotification extends Equatable {
     this.badge,
     this.sound,
     this.channelId,
+    this.extensions,
   });
 
   /// Create a copy with modified fields
@@ -92,6 +94,7 @@ class PushNotification extends Equatable {
     int? badge,
     String? sound,
     String? channelId,
+    Map<String, dynamic>? extensions,
   }) {
     return PushNotification(
       id: id ?? this.id,
@@ -110,6 +113,7 @@ class PushNotification extends Equatable {
       badge: badge ?? this.badge,
       sound: sound ?? this.sound,
       channelId: channelId ?? this.channelId,
+      extensions: extensions ?? this.extensions,
     );
   }
 
@@ -174,20 +178,12 @@ enum NotificationPermissionStatus {
 
 /// Notification settings for the app
 class NotificationSettings extends Equatable {
-  /// Whether notifications are enabled
   final bool enabled;
-
-  /// Whether to show notifications when app is in foreground
   final bool showInForeground;
-
-  /// Whether to play sound
   final bool playSound;
-
-  /// Whether to show badge
   final bool showBadge;
-
-  /// Enabled notification types
   final Set<String> enabledTypes;
+  final Map<String, dynamic>? extensions;
 
   const NotificationSettings({
     this.enabled = true,
@@ -195,6 +191,7 @@ class NotificationSettings extends Equatable {
     this.playSound = true,
     this.showBadge = true,
     this.enabledTypes = const {},
+    this.extensions,
   });
 
   NotificationSettings copyWith({
@@ -203,6 +200,7 @@ class NotificationSettings extends Equatable {
     bool? playSound,
     bool? showBadge,
     Set<String>? enabledTypes,
+    Map<String, dynamic>? extensions,
   }) {
     return NotificationSettings(
       enabled: enabled ?? this.enabled,
@@ -210,6 +208,7 @@ class NotificationSettings extends Equatable {
       playSound: playSound ?? this.playSound,
       showBadge: showBadge ?? this.showBadge,
       enabledTypes: enabledTypes ?? this.enabledTypes,
+      extensions: extensions ?? this.extensions,
     );
   }
 

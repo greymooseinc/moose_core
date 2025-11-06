@@ -16,7 +16,10 @@
       "Bash(find:*)",
       "Bash(Select-String -Pattern \"cart|error|warning\" -Context 0,1)",
       "Bash(Select-Object -First 30)",
-      "Bash(Select-String \"error\" -Context 2)"
+      "Bash(Select-String \"error\" -Context 2)",
+      "Bash(python:*)",
+      "Bash(Select-String \"error\")",
+      "Bash(Select-Object -First 20)"
     ],
     "deny": [],
     "ask": []

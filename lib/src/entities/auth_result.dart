@@ -30,7 +30,7 @@ class AuthResult {
   final String? additionalActionType;
 
   /// Additional data specific to the auth provider
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const AuthResult({
     required this.success,
@@ -42,7 +42,7 @@ class AuthResult {
     this.errorCode,
     this.requiresAdditionalAction = false,
     this.additionalActionType,
-    this.metadata,
+    this.extensions,
   });
 
   /// Create a successful authentication result
@@ -51,7 +51,7 @@ class AuthResult {
     String? token,
     String? refreshToken,
     DateTime? expiresAt,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return AuthResult(
       success: true,
@@ -59,7 +59,7 @@ class AuthResult {
       token: token,
       refreshToken: refreshToken,
       expiresAt: expiresAt,
-      metadata: metadata,
+      extensions: extensions,
     );
   }
 
@@ -67,13 +67,13 @@ class AuthResult {
   factory AuthResult.failure({
     required String errorMessage,
     String? errorCode,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return AuthResult(
       success: false,
       errorMessage: errorMessage,
       errorCode: errorCode,
-      metadata: metadata,
+      extensions: extensions,
     );
   }
 
@@ -82,7 +82,7 @@ class AuthResult {
     required String actionType,
     User? user,
     String? message,
-    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? extensions,
   }) {
     return AuthResult(
       success: false,
@@ -90,7 +90,7 @@ class AuthResult {
       requiresAdditionalAction: true,
       additionalActionType: actionType,
       errorMessage: message,
-      metadata: metadata,
+      extensions: extensions,
     );
   }
 }
@@ -101,14 +101,14 @@ class PasswordResetResult {
   final String? message;
   final String? errorMessage;
   final String? resetToken;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const PasswordResetResult({
     required this.success,
     this.message,
     this.errorMessage,
     this.resetToken,
-    this.metadata,
+    this.extensions,
   });
 
   factory PasswordResetResult.success({
@@ -135,13 +135,13 @@ class EmailVerificationResult {
   final bool success;
   final String? message;
   final String? errorMessage;
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? extensions;
 
   const EmailVerificationResult({
     required this.success,
     this.message,
     this.errorMessage,
-    this.metadata,
+    this.extensions,
   });
 
   factory EmailVerificationResult.success({String? message}) {

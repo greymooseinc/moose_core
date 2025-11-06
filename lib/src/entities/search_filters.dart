@@ -8,6 +8,7 @@ class SearchFilters extends Equatable {
   final String? categoryId;
   final String? tagId;
   final Map<String, dynamic>? customFilters;
+  final Map<String, dynamic>? extensions;
 
   const SearchFilters({
     this.types,
@@ -15,6 +16,7 @@ class SearchFilters extends Equatable {
     this.categoryId,
     this.tagId,
     this.customFilters,
+    this.extensions,
   });
 
   SearchFilters copyWith({
@@ -23,6 +25,7 @@ class SearchFilters extends Equatable {
     String? categoryId,
     String? tagId,
     Map<String, dynamic>? customFilters,
+    Map<String, dynamic>? extensions,
   }) {
     return SearchFilters(
       types: types ?? this.types,
@@ -30,6 +33,7 @@ class SearchFilters extends Equatable {
       categoryId: categoryId ?? this.categoryId,
       tagId: tagId ?? this.tagId,
       customFilters: customFilters ?? this.customFilters,
+      extensions: extensions ?? this.extensions,
     );
   }
 
