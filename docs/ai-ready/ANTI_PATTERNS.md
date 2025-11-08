@@ -53,6 +53,7 @@ class _ProductsSectionState extends State<ProductsSection> {
 // BLoC
 class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
   final ProductsRepository repository;
+  ProductFilters _currentFilters = const ProductFilters();
 
   ProductsBloc(this.repository) : super(ProductsInitial()) {
     on<LoadProducts>(_onLoadProducts);
@@ -64,10 +65,17 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
   ) async {
     emit(ProductsLoading());
     try {
-      final products = await repository.getProducts();
-      emit(ProductsLoaded(products));
+      _currentFilters = event.filters ?? const ProductFilters();
+      final products = await repository.getProducts(_currentFilters);
+      emit(ProductsLoaded(
+        products: products,
+        activeFilters: _currentFilters.hasActiveFilters ? _currentFilters : null,
+      ));
     } catch (e) {
-      emit(ProductsError(e.toString()));
+      emit(ProductsError(
+        e.toString(),
+        activeFilters: _currentFilters.hasActiveFilters ? _currentFilters : null,
+      ));
     }
   }
 }
@@ -77,13 +85,25 @@ class ProductsSection extends FeatureSection {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ProductsBloc(repository)..add(LoadProducts()),
+      create: (context) => ProductsBloc(repository)..add(const LoadProducts()),
       child: BlocBuilder<ProductsBloc, ProductsState>(
         builder: (context, state) {
-          if (state is ProductsLoading) return CircularProgressIndicator();
+          if (state is ProductsLoading) return const CircularProgressIndicator();
           if (state is ProductsLoaded) return _buildProducts(state.products);
-          if (state is ProductsError) return Text(state.message);
-          return SizedBox.shrink();
+          if (state is ProductsError) {
+            return Column(
+              children: [
+                Text(state.message),
+                TextButton(
+                  onPressed: () => context.read<ProductsBloc>().add(
+                        LoadProducts(filters: state.activeFilters),
+                      ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            );
+          }
+          return const SizedBox.shrink();
         },
       ),
     );
@@ -91,9 +111,71 @@ class ProductsSection extends FeatureSection {
 }
 ```
 
+### ❌ ANTI-PATTERN 2: Dropping Request Context from Error States
+
+**Why it's wrong:**
+- Retry buttons can't restore user choices
+- Analytics hooks lose visibility into the failing request
+- Filter badges reset even though the user never cleared them
+
+**Wrong:**
+```dart
+class ProductsError extends ProductsState {
+  final String message;
+  const ProductsError(this.message);
+}
+
+emit(ProductsError(e.toString()));
+```
+
+**Correct:**
+```dart
+class ProductsError extends ProductsState {
+  final String message;
+  final ProductFilters? activeFilters;
+
+  const ProductsError(this.message, {this.activeFilters});
+}
+
+emit(ProductsError(
+  e.toString(),
+  activeFilters: _currentFilters.hasActiveFilters ? _currentFilters : null,
+));
+```
+
+### ❌ ANTI-PATTERN 3: Resolving `RefreshIndicator` Before the BLoC Finishes
+
+**Why it's wrong:**
+- The spinner stops even though the bloc is still fetching
+- Users think nothing happened
+- Race conditions when multiple refreshes stack up
+
+**Wrong:**
+```dart
+RefreshIndicator(
+  onRefresh: () async {
+    context.read<ProductsBloc>().add(const RefreshProductsEvent());
+  },
+  child: _buildList(),
+);
+```
+
+**Correct:**
+```dart
+RefreshIndicator(
+  onRefresh: () async {
+    final bloc = context.read<ProductsBloc>();
+    bloc.add(RefreshProductsEvent(filters: state.activeFilters));
+    await bloc.stream.firstWhere(
+      (next) => next is ProductsLoaded || next is ProductsError,
+    );
+  },
+  child: _buildList(),
+);
+```
 ## Data Access Anti-Patterns
 
-### ❌ ANTI-PATTERN 2: Direct API Calls from BLoCs
+### ❌ ANTI-PATTERN 4: Direct API Calls from BLoCs
 
 **Why it's wrong:**
 - Tight coupling to backend
@@ -129,7 +211,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
 }
 ```
 
-### ❌ ANTI-PATTERN 3: Business Logic in Repositories
+### ❌ ANTI-PATTERN 5: Business Logic in Repositories
 
 **Why it's wrong:**
 - Violates single responsibility
@@ -173,7 +255,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
 }
 ```
 
-### ❌ ANTI-PATTERN 4: Returning DTOs from Repositories
+### ❌ ANTI-PATTERN 6: Returning DTOs from Repositories
 
 **Why it's wrong:**
 - Leaks implementation details
@@ -204,7 +286,7 @@ class WooProductsRepository implements ProductsRepository {
 
 ## Configuration Anti-Patterns
 
-### ❌ ANTI-PATTERN 5: Hardcoded Values in FeatureSections
+### ❌ ANTI-PATTERN 7: Hardcoded Values in FeatureSections
 
 **Why it's wrong:**
 - Not configurable
@@ -256,7 +338,7 @@ class CollectionsSection extends FeatureSection {
 }
 ```
 
-### ❌ ANTI-PATTERN 6: Not Implementing getDefaultSettings()
+### ❌ ANTI-PATTERN 8: Not Implementing getDefaultSettings()
 
 **Why it's wrong:**
 - Settings scattered in code
@@ -297,7 +379,7 @@ class MySection extends FeatureSection {
 
 ## Structure Anti-Patterns
 
-### ❌ ANTI-PATTERN 7: Not Extending FeatureSection for Sections
+### ❌ ANTI-PATTERN 9: Not Extending FeatureSection for Sections
 
 **Why it's wrong:**
 - Loses configuration system
@@ -327,7 +409,7 @@ class MySection extends FeatureSection { // ✅ Extends FeatureSection
 }
 ```
 
-### ❌ ANTI-PATTERN 8: Not Extending CoreRepository
+### ❌ ANTI-PATTERN 10: Not Extending CoreRepository
 
 **Why it's wrong:**
 - Inconsistent API
@@ -350,7 +432,7 @@ abstract class ProductsRepository extends CoreRepository { // ✅ Extends CoreRe
 
 ## Type Anti-Patterns
 
-### ❌ ANTI-PATTERN 9: Using int for UI Dimensions
+### ❌ ANTI-PATTERN 11: Using int for UI Dimensions
 
 **Why it's wrong:**
 - Flutter uses double for dimensions
@@ -381,7 +463,7 @@ Map<String, dynamic> getDefaultSettings() {
 }
 ```
 
-### ❌ ANTI-PATTERN 10: Not Using Equatable for Events/States
+### ❌ ANTI-PATTERN 12: Not Using Equatable for Events/States
 
 **Why it's wrong:**
 - BLoC can't properly compare states
@@ -407,7 +489,7 @@ class ProductsLoaded extends ProductsState {
 }
 ```
 
-### ❌ ANTI-PATTERN 11: Mutable Events/States
+### ❌ ANTI-PATTERN 13: Mutable Events/States
 
 **Why it's wrong:**
 - Violates BLoC contract
@@ -430,7 +512,7 @@ class LoadProducts extends ProductsEvent {
 }
 ```
 
-### ❌ ANTI-PATTERN 12: Not Handling Error States
+### ❌ ANTI-PATTERN 14: Not Handling Error States
 
 **Why it's wrong:**
 - Poor user experience
@@ -505,3 +587,4 @@ Before committing code, check:
 
 **Last Updated:** 2025-11-03
 **Version:** 1.0.0
+

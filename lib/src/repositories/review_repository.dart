@@ -62,4 +62,43 @@ abstract class ReviewRepository extends CoreRepository {
     required String entityType,
     required String entityId,
   });
+
+  /// Get review images for a specific review
+  ///
+  /// [reviewId] - The ID of the review to get images for
+  ///
+  /// Returns a list of image URLs associated with the review
+  /// Returns an empty list if the review has no images or if loading fails
+  ///
+  /// This method allows lazy-loading of review images separately from the review content,
+  /// which can improve performance when displaying review lists
+  Future<List<String>> getReviewImages(String reviewId);
+
+  /// Get all review images for a product
+  ///
+  /// [entityType] - Type of entity: 'product', 'post', etc.
+  /// [entityId] - ID of the entity to get review images for
+  ///
+  /// Returns a list of maps containing:
+  /// - 'reviewId': The ID of the review
+  /// - 'imageUrl': The URL of the image
+  /// - 'reviewer': The name of the reviewer
+  /// - 'rating': The rating given in the review
+  ///
+  /// This is useful for displaying a gallery of all review images for a product
+  /// in a dedicated section on the product details page
+  ///
+  /// Returns an empty list if there are no images or if loading fails
+  Future<List<Map<String, dynamic>>> getProductReviewImages({
+    required String entityType,
+    required String entityId,
+  });
+
+  /// Get a specific review by its ID
+  ///
+  /// [reviewId] - The ID of the review to fetch
+  ///
+  /// Returns the ProductReview entity
+  /// Throws exception if the review is not found or if loading fails
+  Future<ProductReview> getReviewById(String reviewId);
 }
