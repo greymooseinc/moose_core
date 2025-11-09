@@ -28,9 +28,10 @@ abstract class ReviewRepository extends CoreRepository {
   /// [page] - Page number for pagination (default: 1)
   /// [perPage] - Number of reviews per page (default: 10)
   /// [status] - Review status filter: 'approved', 'pending', 'all' (default: 'approved')
+  /// [sortBy] - Sort order: 'newest', 'oldest', 'highest_rating', 'lowest_rating' (default: 'newest')
   ///
   /// Returns PaginatedResult<ProductReview> with:
-  /// - List of reviews for current page (sorted by date, newest first)
+  /// - List of reviews for current page (sorted by specified order)
   /// - Pagination metadata (currentPage, totalPages, hasMore, etc.)
   /// - Total count of reviews
   ///
@@ -41,6 +42,7 @@ abstract class ReviewRepository extends CoreRepository {
     int page = 1,
     int perPage = 10,
     String status = 'approved',
+    String sortBy = 'newest',
   });
 
   /// Create a new review

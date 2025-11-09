@@ -49,6 +49,13 @@ import 'package:moose_core/moose_core.dart';
 
 // 1. Create a plugin
 class ProductsPlugin extends FeaturePlugin {
+  ProductsRepository? _productsRepository;
+
+  ProductsRepository _repository() {
+    _productsRepository ??= adapterRegistry.getRepository<ProductsRepository>();
+    return _productsRepository!;
+  }
+
   @override
   String get name => 'products';
 
@@ -57,50 +64,52 @@ class ProductsPlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    // Register sections
-    WidgetRegistry().register(
+    // Register sections and pass dependencies explicitly
+    widgetRegistry.register(
       'products.featured',
       (context, {data, onEvent}) => FeaturedProductsSection(
+        repository: _repository(),
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
   }
 
   @override
-  Map<String, WidgetBuilder>? getRoutes() {
-    return {
-      '/products': (context) => ProductsListScreen(),
-    };
-  }
+  Map<String, WidgetBuilder>? getRoutes() => {
+        '/products': (context) => ProductsListScreen(),
+      };
 }
 
 // 2. Create a FeatureSection
 class FeaturedProductsSection extends FeatureSection {
-  const FeaturedProductsSection({super.key, super.settings});
+  final ProductsRepository repository;
+
+  const FeaturedProductsSection({
+    super.key,
+    super.settings,
+    required this.repository,
+  });
 
   @override
-  Map<String, dynamic> getDefaultSettings() {
-    return {
-      'title': 'Featured Products',
-      'itemCount': 10,
-      'showPrice': true,
-    };
-  }
+  Map<String, dynamic> getDefaultSettings() => {
+        'title': 'FEATURED PRODUCTS',
+        'itemCount': 10,
+      };
 
   @override
   Widget build(BuildContext context) {
-    // Access repository via adapters getter
-    final repository = adapters.getRepository<ProductsRepository>();
-
     return BlocProvider(
-      create: (context) => FeaturedProductsBloc(repository)
-        ..add(LoadFeaturedProducts()),
+      create: (_) => FeaturedProductsBloc(repository)
+        ..add(const LoadFeaturedProducts()),
       child: BlocBuilder<FeaturedProductsBloc, FeaturedProductsState>(
         builder: (context, state) {
           if (state is FeaturedProductsLoaded) {
             return _buildProducts(state.products);
           }
-          return CircularProgressIndicator();
+          if (state is FeaturedProductsError) {
+            return Text(state.message);
+          }
+          return const CircularProgressIndicator();
         },
       ),
     );
@@ -213,7 +222,12 @@ final widget = WidgetRegistry().build('my.widget', context);
 #### AdapterRegistry
 Backend adapter management:
 ```dart
-AdapterRegistry().register(WooCommerceAdapter());
+await AdapterRegistry().registerAdapter(() async {
+  final adapter = WooCommerceAdapter();
+  await adapter.initialize(config['woocommerce']);
+  return adapter;
+});
+
 final repo = AdapterRegistry().getRepository<ProductsRepository>();
 ```
 
@@ -224,6 +238,27 @@ ActionRegistry().register('custom_action', (context, payload) async {
   // Handle action
 });
 ActionRegistry().execute('custom_action', context, payload);
+```
+
+#### HookRegistry
+Data transformation and service hooks:
+```dart
+// Cart plugin exposes hooks
+hookRegistry.register('cart:get_cart_item_count', (data) {
+  if (state is CartLoaded) return state.cart.itemCount;
+  return 0;
+});
+
+hookRegistry.register('cart:item_count_stream', (data) {
+  return cartBloc.stream.map((state) => state.totalItems).distinct();
+});
+
+// Other plugins consume hooks
+final count = hookRegistry.execute<int>('cart:get_cart_item_count', 0);
+final stream = hookRegistry.execute<Stream<int>>(
+  'cart:item_count_stream',
+  const Stream<int>.empty(),
+);
 ```
 
 ## Architecture
