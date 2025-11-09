@@ -44,3 +44,4 @@ export 'src/services/variation_selector_service.dart';
 
 // Utilities
 export 'src/utils/logger.dart';
+export 'src/utils/currency_formatter.dart';
