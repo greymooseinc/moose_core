@@ -27,7 +27,8 @@
       "Bash(Select-String \"issues found\")",
       "Bash(git add -A)",
       "Bash(git commit -m \"$(cat <<''EOF''\ndocs: Add AI agent git workflow instructions to README\n\n- Added comprehensive git commit guidelines for AI agents\n- Specified when and how to commit changes\n- Included commit message format and examples\n- Listed files to exclude from commits\n- Updated last updated date to 2025-11-09\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
