@@ -240,8 +240,38 @@ ActionRegistry().register('custom_action', (context, payload) async {
 ActionRegistry().execute('custom_action', context, payload);
 ```
 
+#### EventBus
+Asynchronous event-driven communication between plugins:
+```dart
+// Fire events (fire-and-forget)
+EventBus().fire(
+  'cart.item.added',
+  data: {
+    'productId': 'prod-123',
+    'quantity': 2,
+  },
+  metadata: {
+    'cartTotal': 99.99,
+  },
+);
+
+// Subscribe to events
+final subscription = EventBus().on('cart.item.added', (event) {
+  final productId = event.data['productId'];
+  print('Item added: $productId');
+});
+
+// Async event handlers
+EventBus().onAsync('order.placed', (event) async {
+  await sendConfirmationEmail(event.data['orderId']);
+});
+
+// Clean up
+await subscription.cancel();
+```
+
 #### HookRegistry
-Data transformation and service hooks:
+Synchronous data transformation and service hooks:
 ```dart
 // Cart plugin exposes hooks
 hookRegistry.register('cart:get_cart_item_count', (data) {
@@ -295,7 +325,7 @@ The package is organized into focused modules for better maintainability and sel
 | **widgets.dart** | UI components | FeatureSection, WidgetRegistry, AddonRegistry |
 | **adapters.dart** | Adapter pattern | BackendAdapter, AdapterRegistry |
 | **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
-| **services.dart** | Utilities & helpers | ActionRegistry, HookRegistry, ApiClient, Logger |
+| **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
 
 See [Migration Guide](docs/MIGRATION_MODULAR_STRUCTURE.md) for details on using modular imports.
 
@@ -305,6 +335,7 @@ See [Migration Guide](docs/MIGRATION_MODULAR_STRUCTURE.md) for details on using 
 - [Plugin System](docs/ai-ready/PLUGIN_SYSTEM.md) - Creating and using plugins
 - [FeatureSection Guide](docs/ai-ready/FEATURE_SECTION.md) - Building configurable sections
 - [Adapter Pattern](docs/ai-ready/ADAPTER_PATTERN.md) - Backend adapter implementation
+- [Event System Guide](docs/ai-ready/EVENT_SYSTEM_GUIDE.md) - EventBus and HookRegistry usage
 - [Registries](docs/ai-ready/REGISTRIES.md) - Using registry systems
 - [Anti-Patterns](docs/ai-ready/ANTI_PATTERNS.md) - What to avoid
 - [API Reference](docs/ai-ready/API.md) - Complete API documentation
