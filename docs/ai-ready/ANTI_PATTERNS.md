@@ -379,7 +379,130 @@ class MySection extends FeatureSection {
 
 ## Structure Anti-Patterns
 
-### ❌ ANTI-PATTERN 9: Not Extending FeatureSection for Sections
+### ❌ ANTI-PATTERN 9: Using StatefulWidget for FeatureSections
+
+**Why it's wrong:**
+- Breaks FeatureSection contract (must extend FeatureSection, not StatefulWidget)
+- Loses configuration system (getSetting<T>() not available)
+- Not registerable with WidgetRegistry
+- Mixes widget lifecycle management with business logic
+- State management should be handled by BLoC, not widget state
+
+**Wrong:**
+```dart
+// ❌ Extending StatefulWidget to listen to EventBus
+class RecentlyViewedSection extends StatefulWidget {
+  final ProductsRepository repository;
+  final Map<String, dynamic>? settings;
+
+  const RecentlyViewedSection({
+    super.key,
+    required this.repository,
+    this.settings,
+  });
+
+  @override
+  State<RecentlyViewedSection> createState() => _RecentlyViewedSectionState();
+}
+
+class _RecentlyViewedSectionState extends State<RecentlyViewedSection> {
+  late final RecentlyViewedBloc _bloc;
+  EventSubscription? _eventSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _bloc = RecentlyViewedBloc(/* ... */);
+
+    // ❌ EventBus subscription in widget state
+    _eventSubscription = EventBus().on<AppProductViewedEvent>((event) {
+      _bloc.add(LoadRecentlyViewed());
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventSubscription?.cancel();
+    _bloc.close();
+    super.dispose();
+  }
+}
+```
+
+**Correct:**
+```dart
+// ✅ EventBus subscription in BLoC, not widget
+class RecentlyViewedBloc extends Bloc<RecentlyViewedEvent, RecentlyViewedState> {
+  final RecentlyViewedService _service;
+  final ProductsRepository _repository;
+  EventSubscription? _eventSubscription;
+
+  RecentlyViewedBloc({
+    required RecentlyViewedService service,
+    required ProductsRepository repository,
+  })  : _service = service,
+        _repository = repository,
+        super(const RecentlyViewedState()) {
+    on<LoadRecentlyViewed>(_onLoadRecentlyViewed);
+
+    // ✅ EventBus subscription in BLoC
+    _eventSubscription = EventBus().on<AppProductViewedEvent>((event) {
+      add(LoadRecentlyViewed(
+        maxAge: state.maxAge,
+        cacheTTL: state.cacheTTL,
+      ));
+    });
+  }
+
+  @override
+  Future<void> close() {
+    _eventSubscription?.cancel();
+    return super.close();
+  }
+}
+
+// ✅ Section extends FeatureSection (stateless)
+class RecentlyViewedSection extends FeatureSection {
+  final ProductsRepository repository;
+
+  const RecentlyViewedSection({
+    super.key,
+    required this.repository,
+    super.settings,
+  });
+
+  @override
+  Map<String, dynamic> getDefaultSettings() {
+    return {
+      'title': 'RECENTLY VIEWED',
+      'maxAge': 72,
+      'cacheTTL': 24,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => RecentlyViewedBloc(
+        service: RecentlyViewedService(),
+        repository: repository,
+      )..add(LoadRecentlyViewed(
+          maxAge: Duration(hours: getSetting<int>('maxAge')),
+          cacheTTL: Duration(hours: getSetting<int>('cacheTTL')),
+        )),
+      child: BlocBuilder<RecentlyViewedBloc, RecentlyViewedState>(
+        builder: (context, state) {
+          // UI based on state
+        },
+      ),
+    );
+  }
+}
+```
+
+**Key Principle:** If you need to react to external events (EventBus, timers, etc.), put that logic in the BLoC, not in widget state. The BLoC should listen and emit new states; the widget should only build UI based on those states.
+
+### ❌ ANTI-PATTERN 10: Not Extending FeatureSection for Sections
 
 **Why it's wrong:**
 - Loses configuration system
@@ -409,7 +532,7 @@ class MySection extends FeatureSection { // ✅ Extends FeatureSection
 }
 ```
 
-### ❌ ANTI-PATTERN 10: Not Extending CoreRepository
+### ❌ ANTI-PATTERN 11: Not Extending CoreRepository
 
 **Why it's wrong:**
 - Inconsistent API
@@ -432,7 +555,7 @@ abstract class ProductsRepository extends CoreRepository { // ✅ Extends CoreRe
 
 ## Type Anti-Patterns
 
-### ❌ ANTI-PATTERN 11: Using int for UI Dimensions
+### ❌ ANTI-PATTERN 12: Using int for UI Dimensions
 
 **Why it's wrong:**
 - Flutter uses double for dimensions
@@ -463,7 +586,7 @@ Map<String, dynamic> getDefaultSettings() {
 }
 ```
 
-### ❌ ANTI-PATTERN 12: Not Using Equatable for Events/States
+### ❌ ANTI-PATTERN 13: Not Using Equatable for Events/States
 
 **Why it's wrong:**
 - BLoC can't properly compare states
@@ -489,7 +612,7 @@ class ProductsLoaded extends ProductsState {
 }
 ```
 
-### ❌ ANTI-PATTERN 13: Mutable Events/States
+### ❌ ANTI-PATTERN 14: Mutable Events/States
 
 **Why it's wrong:**
 - Violates BLoC contract
@@ -512,7 +635,7 @@ class LoadProducts extends ProductsEvent {
 }
 ```
 
-### ❌ ANTI-PATTERN 14: Not Handling Error States
+### ❌ ANTI-PATTERN 15: Not Handling Error States
 
 **Why it's wrong:**
 - Poor user experience

@@ -15,7 +15,7 @@
 ///
 /// - **EventBus**: Asynchronous pub/sub system for notifications
 ///   - Use for fire-and-forget notifications and side effects
-///   - Type-safe event classes extend Event base class
+///   - String-based events using dot notation (e.g., 'cart.item.added')
 ///   - Multiple subscribers can listen to same event
 ///   - Example: Track analytics, send notifications, update cache
 ///
@@ -34,7 +34,6 @@ export 'src/config/config_manager.dart';
 // Events System
 export 'src/events/hook_registry.dart';
 export 'src/events/event_bus.dart';
-export 'src/events/common_events.dart';
 
 // Helpers
 export 'src/helpers/color_helper.dart';

@@ -30,7 +30,7 @@ import 'package:moose_core/services.dart';       // Utilities & helpers
 | **widgets.dart** | FeatureSection, WidgetRegistry, AddonRegistry |
 | **adapters.dart** | BackendAdapter, AdapterRegistry |
 | **cache.dart** | CacheManager, MemoryCache, PersistentCache |
-| **services.dart** | ActionRegistry, HookRegistry, ApiClient, ConfigManager, AppLogger, ColorHelper, TextStyleHelper, VariationSelectorService |
+| **services.dart** | ActionRegistry, HookRegistry, EventBus, ApiClient, ConfigManager, AppLogger, ColorHelper, TextStyleHelper, VariationSelectorService |
 
 ## Core Classes
 

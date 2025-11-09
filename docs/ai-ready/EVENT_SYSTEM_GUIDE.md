@@ -22,7 +22,7 @@
 
 ### EventBus - Notifications
 - **Use when**: Fire-and-forget notifications and side effects
-- **Pattern**: Asynchronous pub/sub messaging
+- **Pattern**: Asynchronous pub/sub messaging with string-based events
 - **Example**: Track analytics, send notifications, update cache
 
 ## Import Statement
@@ -33,40 +33,36 @@ import 'package:moose_core/services.dart';
 // Now you have access to:
 // - HookRegistry()
 // - EventBus()
-// - All common event types (AppCartItemAddedEvent, etc.)
+// - Event class
 ```
 
 ## EventBus Quick Start
 
-### 1. Define Event (or use pre-built)
+**IMPORTANT**: EventBus uses **string-based events only**. No typed events, no shared event classes between plugins. This ensures true plugin independence!
 
-```dart
-// Use pre-built events from common_events.dart
-import 'package:moose_core/services.dart';
-
-// All events are prefixed with "App" to avoid BLoC confusion
-```
-
-### 2. Fire Events (from BLoC or Repository)
+### 1. Fire an Event (from BLoC or Repository)
 
 ```dart
 // In your BLoC after successful operation
-EventBus().fire(AppCartItemAddedEvent(
-  productId: 'product-123',
-  quantity: 2,
-  variationId: 'var-456',
-  itemData: {
-    'productName': 'Cool T-Shirt',
-    'price': 29.99,
+EventBus().fire(
+  'cart.item.added',
+  data: {
+    'productId': 'product-123',
+    'quantity': 2,
+    'variationId': 'var-456',
+    'itemData': {
+      'productName': 'Cool T-Shirt',
+      'price': 29.99,
+    },
   },
   metadata: {
     'cartTotal': 59.99,
     'itemCount': 2,
   },
-));
+);
 ```
 
-### 3. Subscribe to Events (in Plugin)
+### 2. Subscribe to Events (in Plugin)
 
 ```dart
 class MyPlugin extends FeaturePlugin {
@@ -75,8 +71,12 @@ class MyPlugin extends FeaturePlugin {
   @override
   Future<void> initialize() async {
     _subscriptions.add(
-      EventBus().on<AppCartItemAddedEvent>((event) {
-        print('Item added: ${event.productId}');
+      EventBus().on('cart.item.added', (event) {
+        // Access event data
+        final productId = event.data['productId'];
+        final quantity = event.data['quantity'];
+
+        print('Item added: $productId (qty: $quantity)');
         // Handle event - track analytics, show notification, etc.
       }),
     );
@@ -92,325 +92,293 @@ class MyPlugin extends FeaturePlugin {
 }
 ```
 
-## Pre-Built Event Types
+### 3. Async Event Handlers
 
-**NOTE: All events prefixed with "App" to avoid BLoC event confusion**
+For async operations (API calls, database writes, etc.):
 
-### Cart Events
-- `AppCartItemAddedEvent(productId, quantity, variationId, itemData, metadata)`
-- `AppCartItemRemovedEvent(itemId, productId, previousQuantity, metadata)`
-- `AppCartItemQuantityUpdatedEvent(itemId, productId, oldQuantity, newQuantity, metadata)`
-- `AppCartClearedEvent(itemCount, totalValue)`
-- `AppCartCouponAppliedEvent(couponCode, discountAmount, metadata)`
-
-### Product Events
-- `AppProductViewedEvent(productId, productName, price, metadata)`
-- `AppProductSearchedEvent(searchQuery, resultCount, productIds, metadata)`
-- `AppProductReviewedEvent(productId, reviewId, rating, comment, metadata)`
-
-### Auth Events
-- `AppUserLoggedInEvent(userId, email, displayName, userData, metadata)`
-- `AppUserLoggedOutEvent(userId, reason, metadata)`
-- `AppUserProfileUpdatedEvent(userId, updatedFields, metadata)`
-
-### Order Events
-- `AppOrderCreatedEvent(orderId, total, itemCount, orderData, metadata)`
-- `AppOrderStatusChangedEvent(orderId, oldStatus, newStatus, metadata)`
-- `AppPaymentCompletedEvent(orderId, paymentId, amount, paymentMethod, metadata)`
-
-### Error Events
-- `AppApplicationErrorEvent(errorMessage, errorCode, error, stackTrace, context, metadata)`
-- `AppApiErrorEvent(endpoint, statusCode, errorMessage, requestData, metadata)`
-
-### Navigation Events
-- `AppScreenViewedEvent(screenName, previousScreen, parameters, metadata)`
-
-### Notification Events
-- `AppNotificationReceivedEvent(notificationId, title, body, data, metadata)`
-- `AppNotificationTappedEvent(notificationId, data, metadata)`
-
-## Where to Fire Events
-
-### ✅ From BLoC (Business Logic)
 ```dart
-class CartBloc extends Bloc<CartEvent, CartState> {
-  Future<void> _onAddToCart(AddToCart event, Emitter emit) async {
-    try {
-      final cart = await _repository.addItem(...);
+EventBus().onAsync(
+  'order.placed',
+  (event) async {
+    final orderId = event.data['orderId'];
 
-      // Fire EventBus event AFTER successful operation
-      EventBus().fire(AppCartItemAddedEvent(...));
-
-      emit(CartLoaded(cart: cart));
-    } catch (e) {
-      EventBus().fire(AppApplicationErrorEvent(...));
-      emit(CartError(...));
-    }
-  }
-}
-```
-
-### ✅ From Repository (Data Layer)
-```dart
-class ShopifyAuthRepository extends AuthRepository {
-  @override
-  Future<AuthResult> signIn(AuthCredentials credentials) async {
-    try {
-      final user = await _authenticate(...);
-
-      // Fire EventBus event AFTER successful operation
-      EventBus().fire(AppUserLoggedInEvent(
-        userId: user.id,
-        email: user.email,
-        displayName: user.displayName,
-      ));
-
-      return AuthResult.success(user: user);
-    } catch (e) {
-      EventBus().fire(AppApplicationErrorEvent(...));
-      return AuthResult.failure(...);
-    }
-  }
-}
-```
-
-### ❌ NOT from UI Layer
-```dart
-// WRONG - Don't fire from widgets
-class ProductDetailScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // ❌ BAD - don't fire events from UI
-    // EventBus().fire(AppProductViewedEvent(...));
-  }
-}
-```
-
-## Common Patterns
-
-### Pattern 1: Analytics Plugin
-```dart
-class AnalyticsPlugin extends FeaturePlugin {
-  final List<EventSubscription> _subscriptions = [];
-
-  @override
-  Future<void> initialize() async {
-    // Subscribe to all cart events
-    _subscriptions.add(
-      EventBus().on<AppCartItemAddedEvent>((event) {
-        _trackEvent('cart_item_added', {
-          'product_id': event.productId,
-          'quantity': event.quantity,
-          ...?event.metadata,
-        });
-      }),
-    );
-
-    // Subscribe to all user events
-    _subscriptions.add(
-      EventBus().on<AppUserLoggedInEvent>((event) {
-        _trackEvent('user_logged_in', {
-          'user_id': event.userId,
-          'email': event.email,
-        });
-      }),
-    );
-
-    // Subscribe to errors
-    _subscriptions.add(
-      EventBus().on<AppApplicationErrorEvent>((event) {
-        _trackError(event.errorMessage, event.context);
-      }),
-    );
-  }
-
-  void _trackEvent(String name, Map<String, dynamic> properties) {
-    // Send to analytics service
-    print('📊 Analytics: $name - $properties');
-  }
-
-  void _trackError(String message, String? context) {
-    // Send to error tracking service
-    print('❌ Error: $message in $context');
-  }
-}
-```
-
-### Pattern 2: Cart with Events
-```dart
-class CartBloc extends Bloc<CartEvent, CartState> {
-  Future<void> _onAddToCart(AddToCart event, Emitter emit) async {
-    try {
-      final cart = await _repository.addItem(
-        productId: event.productId,
-        quantity: event.quantity,
-      );
-
-      // Fire success event
-      EventBus().fire(AppCartItemAddedEvent(
-        productId: event.productId,
-        quantity: event.quantity,
-        itemData: {
-          'productName': cart.items.last.name,
-          'price': cart.items.last.price,
-        },
-        metadata: {
-          'cartTotal': cart.total,
-          'itemCount': cart.items.length,
-        },
-      ));
-
-      emit(CartLoaded(cart: cart));
-    } catch (e) {
-      // Fire error event
-      EventBus().fire(AppApplicationErrorEvent(
-        errorMessage: 'Failed to add item to cart',
-        errorCode: 'cart_add_failed',
-        error: e,
-        context: 'CartBloc._onAddToCart',
-        metadata: {
-          'productId': event.productId,
-          'quantity': event.quantity,
-        },
-      ));
-
-      emit(CartError(message: e.toString()));
-    }
-  }
-}
-```
-
-### Pattern 3: Multi-Plugin Communication
-```dart
-// AuthPlugin fires event
-class AuthPlugin {
-  Future<void> signIn() async {
-    final user = await _repository.signIn();
-    EventBus().fire(AppUserLoggedInEvent(userId: user.id));
-  }
-}
-
-// CachePlugin reacts to event
-class CachePlugin extends FeaturePlugin {
-  @override
-  Future<void> initialize() async {
-    EventBus().on<AppUserLoggedInEvent>((event) {
-      _initializeUserCache(event.userId);
-    });
-  }
-}
-
-// AnalyticsPlugin reacts to event
-class AnalyticsPlugin extends FeaturePlugin {
-  @override
-  Future<void> initialize() async {
-    EventBus().on<AppUserLoggedInEvent>((event) {
-      _trackLogin(event.userId);
-    });
-  }
-}
-```
-
-## HookRegistry Quick Start
-
-### 1. Register Hook (for transformations)
-```dart
-class PricingPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    hookRegistry.register('product:calculate_price', (product) {
-      // Transform the product price
-      if (_isPremiumUser()) {
-        return product.copyWith(price: product.price * 0.9); // 10% off
-      }
-      return product;
-    }, priority: 10); // Higher priority runs first
-  }
-}
-```
-
-### 2. Execute Hook
-```dart
-// Get transformed data
-final pricedProduct = hookRegistry.execute(
-  'product:calculate_price',
-  originalProduct,
+    // Async operations
+    await sendConfirmationEmail(orderId);
+    await updateInventory(orderId);
+  },
+  onError: (error) {
+    print('Error processing order: $error');
+  },
 );
 ```
 
-## Common Mistakes to Avoid
+## Event Naming Convention
 
-### ❌ Mistake 1: Using Hooks for Notifications
+**CRITICAL**: Use dot notation for event names
+
+Format: `<domain>.<action>.<optional-detail>`
+
+### ✅ Good Event Names:
 ```dart
-// WRONG - hooks are for transformations, not side effects
-hookRegistry.register('cart:item_added', (cart) {
-  _showNotification('Item added');  // Side effect!
-  return cart;  // Didn't transform anything
+'cart.item.added'
+'user.profile.updated'
+'payment.completed'
+'notification.sent'
+'product.viewed'
+'order.status.changed'
+'error.api'
+```
+
+### ❌ Bad Event Names:
+```dart
+'CartItemAdded'        // Don't use PascalCase
+'cart_item_added'      // Don't use snake_case
+'itemAdded'            // Too generic
+'cart'                 // Not specific enough
+```
+
+## Common Event Patterns
+
+### Cart Events
+```dart
+// Item added to cart
+EventBus().fire('cart.item.added', data: {
+  'productId': String,
+  'quantity': int,
+  'variationId': String?,
+  'itemData': Map<String, dynamic>,
 });
 
-// RIGHT - use EventBus for notifications
-EventBus().fire(AppCartItemAddedEvent(...));
+// Item removed from cart
+EventBus().fire('cart.item.removed', data: {
+  'itemId': String,
+  'productId': String,
+  'previousQuantity': int,
+});
+
+// Item quantity updated
+EventBus().fire('cart.item.quantity.updated', data: {
+  'itemId': String,
+  'productId': String,
+  'oldQuantity': int,
+  'newQuantity': int,
+});
+
+// Cart cleared
+EventBus().fire('cart.cleared', data: {
+  'itemCount': int,
+  'totalValue': double,
+});
+
+// Coupon applied
+EventBus().fire('cart.coupon.applied', data: {
+  'couponCode': String,
+  'discountAmount': double,
+});
 ```
 
-### ❌ Mistake 2: Using EventBus for Transformations
+### Product Events
 ```dart
-// WRONG - EventBus can't return values
-EventBus().fire(CalculatePriceEvent(product: product));
-// How do I get the calculated price? I CAN'T!
+// Product viewed
+EventBus().fire('product.viewed', data: {
+  'productId': String,
+  'productName': String,
+  'price': double,
+});
 
-// RIGHT - use HookRegistry for transformations
-final pricedProduct = hookRegistry.execute('product:calculate_price', product);
+// Product searched
+EventBus().fire('product.searched', data: {
+  'searchQuery': String,
+  'resultCount': int,
+  'productIds': List<String>,
+});
+
+// Product reviewed
+EventBus().fire('product.reviewed', data: {
+  'productId': String,
+  'reviewId': String,
+  'rating': double,
+  'comment': String?,
+});
 ```
 
-### ❌ Mistake 3: Firing Events from UI
+### User Events
 ```dart
-// WRONG - fire from BLoC, not UI
-class ProductDetailScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    if (state is ProductDetailLoaded) {
-      EventBus().fire(AppProductViewedEvent(...)); // ❌ BAD
+// User logged in
+EventBus().fire('user.logged.in', data: {
+  'userId': String,
+  'email': String,
+  'displayName': String?,
+});
+
+// User logged out
+EventBus().fire('user.logged.out', data: {
+  'userId': String,
+  'reason': String?,
+});
+
+// User profile updated
+EventBus().fire('user.profile.updated', data: {
+  'userId': String,
+  'updatedFields': List<String>,
+});
+```
+
+### Order Events
+```dart
+// Order created
+EventBus().fire('order.created', data: {
+  'orderId': String,
+  'total': double,
+  'itemCount': int,
+  'orderData': Map<String, dynamic>,
+});
+
+// Order status changed
+EventBus().fire('order.status.changed', data: {
+  'orderId': String,
+  'oldStatus': String,
+  'newStatus': String,
+});
+
+// Payment completed
+EventBus().fire('payment.completed', data: {
+  'orderId': String,
+  'paymentId': String,
+  'amount': double,
+  'paymentMethod': String,
+});
+```
+
+### Navigation Events
+```dart
+// Screen viewed
+EventBus().fire('screen.viewed', data: {
+  'screenName': String,
+  'previousScreen': String?,
+  'parameters': Map<String, dynamic>?,
+});
+```
+
+### Error Events
+```dart
+// Application error
+EventBus().fire('error.application', data: {
+  'errorMessage': String,
+  'errorCode': String?,
+  'context': Map<String, dynamic>?,
+});
+
+// API error
+EventBus().fire('error.api', data: {
+  'endpoint': String,
+  'statusCode': int,
+  'errorMessage': String,
+  'requestData': Map<String, dynamic>?,
+});
+```
+
+### Notification Events
+```dart
+// Notification received
+EventBus().fire('notification.received', data: {
+  'notificationId': String,
+  'title': String,
+  'body': String,
+  'data': Map<String, dynamic>?,
+});
+
+// Notification tapped
+EventBus().fire('notification.tapped', data: {
+  'notificationId': String,
+  'data': Map<String, dynamic>?,
+});
+```
+
+## Best Practices
+
+### 1. Always Include Required Context
+
+```dart
+// ✅ Good - includes all necessary context
+EventBus().fire('order.placed', data: {
+  'orderId': 'order-123',
+  'userId': 'user-456',
+  'total': 99.99,
+  'items': [...],
+});
+
+// ❌ Bad - missing important context
+EventBus().fire('order.placed', data: {
+  'orderId': 'order-123',
+});
+```
+
+### 2. Use Metadata for Non-Essential Data
+
+```dart
+EventBus().fire(
+  'product.viewed',
+  data: {
+    // Essential data
+    'productId': 'prod-123',
+    'productName': 'Cool Shirt',
+    'price': 29.99,
+  },
+  metadata: {
+    // Additional context
+    'source': 'search_results',
+    'position': 3,
+    'sessionId': 'sess-789',
+  },
+);
+```
+
+### 3. Check for Subscribers (Performance Optimization)
+
+```dart
+// Avoid expensive computations if no one is listening
+if (EventBus().hasSubscribers('analytics.detailed')) {
+  final expensiveData = await computeAnalytics();
+  EventBus().fire('analytics.detailed', data: expensiveData);
+}
+```
+
+### 4. Handle Errors in Async Handlers
+
+```dart
+EventBus().onAsync(
+  'order.placed',
+  (event) async {
+    try {
+      await processOrder(event.data['orderId']);
+    } catch (e) {
+      // Fire error event
+      EventBus().fire('error.order.processing', data: {
+        'orderId': event.data['orderId'],
+        'error': e.toString(),
+      });
     }
-  }
-}
-
-// RIGHT - fire from BLoC
-class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
-  Future<void> _onLoadProductDetail(event, emit) async {
-    final product = await repository.getProductById(event.productId);
-    EventBus().fire(AppProductViewedEvent(...)); // ✅ GOOD
-    emit(ProductDetailLoaded(product));
-  }
-}
+  },
+  onError: (error) {
+    print('Handler error: $error');
+  },
+);
 ```
 
-### ❌ Mistake 4: Not Cleaning Up Subscriptions
-```dart
-// WRONG - memory leak
-class MyPlugin extends FeaturePlugin {
-  @override
-  Future<void> initialize() async {
-    EventBus().on<AppCartItemAddedEvent>((event) {
-      // Handle event
-    });
-    // Subscription never cancelled!
-  }
-}
+### 5. Clean Up Subscriptions
 
-// RIGHT - track and cancel subscriptions
+```dart
 class MyPlugin extends FeaturePlugin {
   final List<EventSubscription> _subscriptions = [];
 
   @override
   Future<void> initialize() async {
-    _subscriptions.add(
-      EventBus().on<AppCartItemAddedEvent>((event) {
-        // Handle event
-      }),
-    );
+    _subscriptions.add(EventBus().on('some.event', (_) {}));
   }
 
-  Future<void> cleanup() async {
+  // IMPORTANT: Always cancel subscriptions!
+  Future<void> dispose() async {
     for (final sub in _subscriptions) {
       await sub.cancel();
     }
@@ -419,86 +387,193 @@ class MyPlugin extends FeaturePlugin {
 }
 ```
 
+## Plugin Communication Example
+
+### Payment Plugin (Publisher)
+```dart
+class PaymentPlugin extends FeaturePlugin {
+  Future<void> processPayment(String orderId, double amount) async {
+    // Process payment...
+
+    // Fire event - no dependency on other plugins!
+    EventBus().fire('payment.completed', data: {
+      'orderId': orderId,
+      'amount': amount,
+      'paymentMethod': 'stripe',
+    });
+  }
+}
+```
+
+### Analytics Plugin (Subscriber)
+```dart
+class AnalyticsPlugin extends FeaturePlugin {
+  @override
+  Future<void> initialize() async {
+    // Listen to payment events - no dependency on PaymentPlugin!
+    EventBus().on('payment.completed', (event) {
+      final orderId = event.data['orderId'];
+      final amount = event.data['amount'];
+
+      _trackPurchase(orderId, amount);
+    });
+  }
+}
+```
+
+### Email Plugin (Another Subscriber)
+```dart
+class EmailPlugin extends FeaturePlugin {
+  @override
+  Future<void> initialize() async {
+    // Also listens to same event - no coupling!
+    EventBus().onAsync('payment.completed', (event) async {
+      final orderId = event.data['orderId'];
+      await sendPaymentConfirmation(orderId);
+    });
+  }
+}
+```
+
+## BLoC Integration
+
+### Fire Events from BLoC
+
+```dart
+class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
+  Future<void> _onLoadProduct(
+    LoadProduct event,
+    Emitter<ProductsState> emit,
+  ) async {
+    final product = await repository.getProduct(event.productId);
+    emit(ProductLoaded(product));
+
+    // Fire event after state change
+    EventBus().fire('product.viewed', data: {
+      'productId': product.id,
+      'productName': product.name,
+      'price': product.price,
+    });
+  }
+}
+```
+
+### Listen to Events in BLoC
+
+```dart
+class RecentlyViewedBloc extends Bloc<RecentlyViewedEvent, RecentlyViewedState> {
+  EventSubscription? _eventSubscription;
+
+  RecentlyViewedBloc() : super(RecentlyViewedInitial()) {
+    on<LoadRecentlyViewed>(_onLoadRecentlyViewed);
+
+    // Subscribe to product.viewed events
+    _eventSubscription = EventBus().on('product.viewed', (event) {
+      // Add event to reload the list
+      add(LoadRecentlyViewed());
+    });
+  }
+
+  @override
+  Future<void> close() {
+    _eventSubscription?.cancel();
+    return super.close();
+  }
+}
+```
+
 ## Testing Events
 
-### Test EventBus
 ```dart
-test('event notifies subscribers', () async {
-  final eventBus = EventBus();
-  AppCartItemAddedEvent? received;
+void main() {
+  late EventBus eventBus;
 
-  final sub = eventBus.on<AppCartItemAddedEvent>((event) {
-    received = event;
+  setUp(() {
+    eventBus = EventBus();
   });
 
-  eventBus.fire(AppCartItemAddedEvent(
-    productId: 'p1',
-    quantity: 2,
-  ));
-
-  await Future.delayed(Duration.zero);
-
-  expect(received, isNotNull);
-  expect(received!.productId, equals('p1'));
-
-  await sub.cancel();
-});
-```
-
-### Test HookRegistry
-```dart
-test('hook transforms product price', () {
-  final hookRegistry = HookRegistry();
-
-  hookRegistry.register('product:calculate_price', (product) {
-    return product.copyWith(price: product.price * 0.9);
+  tearDown(() async {
+    await eventBus.reset();
   });
 
-  final product = Product(id: '1', price: 100.0);
-  final result = hookRegistry.execute('product:calculate_price', product);
+  test('should receive event', () async {
+    bool eventReceived = false;
 
-  expect(result.price, equals(90.0));
-});
+    eventBus.on('test.event', (event) {
+      eventReceived = true;
+      expect(event.data['value'], equals(42));
+    });
+
+    eventBus.fire('test.event', data: {'value': 42});
+
+    // Wait for microtasks
+    await Future.delayed(Duration.zero);
+
+    expect(eventReceived, isTrue);
+  });
+}
 ```
 
-## Decision Table
+## Common Pitfalls
 
-| Scenario | System | Why |
-|----------|--------|-----|
-| Calculate product price with discounts | HookRegistry | Need return value |
-| Notify analytics of user action | EventBus | Fire-and-forget |
-| Filter search results | HookRegistry | Transform data |
-| Send email confirmation | EventBus | Side effect |
-| Apply user-specific pricing | HookRegistry | Need result |
-| Update recommendation engine | EventBus | Notification |
-| Modify API request headers | HookRegistry | Transform request |
-| Log error to monitoring | EventBus | Side effect |
-| Validate cart before checkout | HookRegistry | Return validation result |
-| Clear cache on logout | EventBus | Notification |
+### ❌ DON'T: Create typed event classes
+```dart
+// WRONG - Don't do this!
+class ProductViewedEvent {
+  final String productId;
+  ProductViewedEvent(this.productId);
+}
 
-## Performance Notes
+EventBus().fire(ProductViewedEvent('123')); // ❌ Wrong!
+```
 
-- **HookRegistry**: Synchronous, fast, blocks until all hooks complete
-- **EventBus**: Asynchronous, slight overhead, non-blocking
+### ✅ DO: Use string names with data
+```dart
+// CORRECT - Do this!
+EventBus().fire('product.viewed', data: {
+  'productId': '123',
+}); // ✅ Correct!
+```
 
-**Rule of Thumb**: If it needs to happen immediately and return a value, use HookRegistry. Everything else, use EventBus.
+### ❌ DON'T: Forget to cancel subscriptions
+```dart
+// WRONG - Memory leak!
+class MyWidget extends StatefulWidget {
+  @override
+  void initState() {
+    EventBus().on('some.event', (_) {});  // ❌ Never cancelled!
+  }
+}
+```
 
-## Summary Checklist
+### ✅ DO: Cancel in dispose/close
+```dart
+// CORRECT
+class MyBloc extends Bloc {
+  EventSubscription? _sub;
 
-### When implementing events:
-- [ ] Fire events from BLoC or Repository, NOT from UI
-- [ ] Use App-prefixed event names to avoid BLoC confusion
-- [ ] Subscribe to events in Plugin's `initialize()` method
-- [ ] Store subscriptions in a list for cleanup
-- [ ] Fire events AFTER successful operations
-- [ ] Fire error events in catch blocks
-- [ ] Include relevant metadata for analytics
-- [ ] Use HookRegistry for transformations (return values)
-- [ ] Use EventBus for notifications (fire-and-forget)
-- [ ] Clean up subscriptions to prevent memory leaks
+  MyBloc() : super(InitialState()) {
+    _sub = EventBus().on('some.event', (_) {});
+  }
+
+  @override
+  Future<void> close() {
+    _sub?.cancel();  // ✅ Properly cleaned up!
+    return super.close();
+  }
+}
+```
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2025-11-05
-**Note**: All event names now prefixed with "App" to distinguish from BLoC events
+**Remember:** EventBus is for **fire-and-forget** notifications. If you need a return value, use HookRegistry instead!
+
+**See Also:**
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Complete architectural guide
+- [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) - Plugin development
+- [ANTI_PATTERNS.md](./ANTI_PATTERNS.md) - What NOT to do
+
+---
+
+**Last Updated:** 2025-11-09
+**Version:** 2.0.0 (String-based events only)
