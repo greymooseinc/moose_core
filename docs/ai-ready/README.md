@@ -72,7 +72,7 @@ The package is organized into focused modules for better maintainability and sel
 | **widgets.dart** | UI components | FeatureSection, WidgetRegistry, AddonRegistry |
 | **adapters.dart** | Adapter pattern | BackendAdapter, AdapterRegistry |
 | **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
-| **services.dart** | Utilities & helpers | ActionRegistry, HookRegistry, ApiClient, Logger |
+| **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
 
 ### Import Options
 
@@ -132,57 +132,39 @@ import 'package:moose_core/services.dart';
 
 ### Event-Driven Communication
 
-6. **[EVENT_SYSTEMS_QUICK_REFERENCE.md](./EVENT_SYSTEMS_QUICK_REFERENCE.md)** - ⚡ Quick reference for AI agents
+6. **[EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md)** - ⚡ Complete event system guide for AI agents
    - TL;DR decision matrix
-   - Copy-paste templates
-   - Common patterns
-   - Mistake avoidance
-   - **START HERE for event systems**
-
-7. **[EVENT_SYSTEM_COMPARISON.md](./EVENT_SYSTEM_COMPARISON.md)** - HookRegistry vs EventBus
-   - When to use each system
-   - Detailed comparison table
-   - Decision matrix
-   - Integration patterns
-   - Performance considerations
-
-8. **[EVENT_BUS_GUIDE.md](./EVENT_BUS_GUIDE.md)** - EventBus (Pub/Sub) system
-   - Publish-subscribe pattern
-   - Event lifecycle
-   - Subscription management
-   - Best practices and patterns
+   - EventBus: Asynchronous pub/sub for notifications
+   - HookRegistry: Synchronous callbacks for data transformation
+   - String-based events with dot notation (e.g., 'cart.item.added')
+   - Common event patterns for all domains
+   - BLoC integration examples
    - Testing strategies
-   - Advanced features
-
-9. **[EVENT_BUS_EXAMPLES.md](./EVENT_BUS_EXAMPLES.md)** - Real-world EventBus examples
-   - Authentication flow
-   - Shopping cart integration
-   - Analytics tracking
-   - Multi-plugin communication
-   - Complete integration scenarios
+   - Common pitfalls and best practices
+   - **START HERE for event systems**
 
 ### Advanced Topics
 
-10. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
-    - CacheManager
-    - MemoryCache
-    - PersistentCache
-    - TTL configuration
+7. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
+   - CacheManager
+   - MemoryCache
+   - PersistentCache
+   - TTL configuration
 
-11. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
-    - State management anti-patterns
-    - Architecture violations
-    - Common mistakes
-    - Quick reference checklist
+8. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
+   - State management anti-patterns
+   - Architecture violations
+   - Common mistakes
+   - Quick reference checklist
 
-12. **[API.md](./API.md)** - Public API reference
+9. **[API.md](./API.md)** - Public API reference
    - Exported classes and methods
    - Usage examples
    - Type definitions
 
 ### Authentication & Authorization
 
-13. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
+10. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
     - Multi-provider authentication
     - AuthRepository implementation
     - Provider-specific integration (Firebase, Auth0, custom)
@@ -191,14 +173,14 @@ import 'package:moose_core/services.dart';
 
 ### Domain Entities
 
-14. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
+11. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
     - Dynamic content sections for products
     - Flexible backend mapping
     - Custom section types
     - UI rendering patterns
     - Migration from legacy fields
 
-15. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
+12. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
     - Product sections quick guide
     - Copy-paste templates
     - Common patterns
