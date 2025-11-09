@@ -408,7 +408,73 @@ When contributing to the core package:
 ---
 
 **Version:** 1.0.0
-**Last Updated:** 2025-11-03
+**Last Updated:** 2025-11-09
 **License:** MIT
 
-**Note to AI Agents:** This package follows industry best practices for AI-ready codebases. All architectural patterns are explicitly documented to enable consistent code generation and maintenance.
+---
+
+## Instructions for AI Agents
+
+### Code Generation Best Practices
+
+This package follows industry best practices for AI-ready codebases. All architectural patterns are explicitly documented to enable consistent code generation and maintenance.
+
+### Git Workflow
+
+**IMPORTANT:** After completing a batch of file changes in response to a user request, you MUST commit the changes to git with a descriptive commit message.
+
+#### Git Commit Guidelines:
+
+1. **When to Commit:**
+   - After completing all file modifications for a single user request
+   - One commit per user prompt (not per file)
+   - Before finishing your response to the user
+
+2. **Commit Message Format:**
+   ```
+   <type>: <short description>
+
+   <optional detailed description>
+
+   🤖 Generated with Claude Code
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   ```
+
+3. **Commit Types:**
+   - `feat:` - New features or functionality
+   - `fix:` - Bug fixes
+   - `refactor:` - Code restructuring without behavior change
+   - `docs:` - Documentation updates
+   - `test:` - Test additions or modifications
+   - `chore:` - Maintenance tasks
+
+4. **Example Commit Workflow:**
+   ```bash
+   # After making changes to multiple files
+   cd /path/to/repo
+   git add .
+   git commit -m "$(cat <<'EOF'
+   refactor: Convert EventBus to string-based events
+
+   - Removed typed event classes
+   - Updated EventBus API to use string event names
+   - Updated all plugins to use dot notation (e.g., 'cart.item.added')
+   - Updated documentation with new patterns
+
+   🤖 Generated with Claude Code
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+
+5. **What NOT to Commit:**
+   - `.claude/settings.local.json` (user-specific settings)
+   - Temporary or build files
+   - IDE-specific configuration files
+
+6. **Before Committing:**
+   - Verify changes with `git status`
+   - Check for any unintended modifications
+   - Ensure all related files are included

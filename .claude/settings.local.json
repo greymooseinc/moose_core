@@ -21,7 +21,12 @@
       "Bash(Select-String \"error\")",
       "Bash(Select-Object -First 20)",
       "Bash(Select-String -Pattern \"review\" -Context 1)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(Select-String \"recently_viewed\" -Context 2)",
+      "Bash(dart analyze:*)",
+      "Bash(Select-String \"issues found\")",
+      "Bash(git add -A)",
+      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: Add AI agent git workflow instructions to README\n\n- Added comprehensive git commit guidelines for AI agents\n- Specified when and how to commit changes\n- Included commit message format and examples\n- Listed files to exclude from commits\n- Updated last updated date to 2025-11-09\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
