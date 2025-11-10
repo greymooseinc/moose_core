@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moose_core/adapters.dart';
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 import 'package:moose_core/widgets.dart';
 
@@ -97,4 +98,17 @@ abstract class FeaturePlugin {
 
   /// Optional: Plugin can provide routes
   Map<String, WidgetBuilder>? getRoutes();
+
+  /// Optional: Bottom navigation tabs exposed by this plugin.
+  ///
+  /// Plugin authors can override this getter and return a const list of tabs:
+  /// ```dart
+  /// @override
+  /// List<BottomTab> get bottomTabs => const [
+  ///   BottomTab(id: 'products', label: 'Products', route: '/products'),
+  /// ];
+  /// ```
+  /// The [PluginRegistry] automatically registers the underlying hooks so
+  /// individual plugins do not have to interact with `bottom_tabs:filter_tabs`.
+  List<BottomTab> get bottomTabs => const [];
 }

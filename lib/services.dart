@@ -41,6 +41,7 @@ export 'src/helpers/text_style_helper.dart';
 
 // Business Services
 export 'src/services/variation_selector_service.dart';
+export 'src/services/app_navigator.dart';
 
 // Utilities
 export 'src/utils/logger.dart';

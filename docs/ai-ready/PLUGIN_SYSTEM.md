@@ -1,3 +1,4 @@
+
 # Plugin System Guide
 
 > Complete guide to creating and managing plugins in moose_core
@@ -46,8 +47,82 @@ abstract class FeaturePlugin {
   /// Return routes provided by this plugin
   /// Routes will be merged into the app's routing table
   Map<String, WidgetBuilder>? getRoutes();
+
+  /// Optional: bottom navigation tabs contributed by this plugin
+  List<BottomTab> get bottomTabs => const [];
 }
 ```
+
+### Bottom Navigation Tabs (AI Agent Guidance)
+
+Bottom tabs are now declared directly on each plugin. **Do not** register the `bottom_tabs:filter_tabs` hook manually unless you have a truly dynamic/conditional scenario. Instead:
+
+1. Override `List<BottomTab> get bottomTabs`.
+2. Return a const list of tabs owned by the plugin.
+3. Let `PluginRegistry` merge and expose them through the existing hooks (`bottom_tabs:get_tabs`, etc.).
+
+```dart
+class ProductsPlugin extends FeaturePlugin {
+  @override
+  String get name => 'products';
+
+  @override
+  List<BottomTab> get bottomTabs => const [
+        BottomTab(
+          id: 'products',
+          label: 'Shop',
+          icon: Icons.shopping_bag_outlined,
+          activeIcon: Icons.shopping_bag,
+          route: '/products',
+          extensions: {'order': 30}, // lower numbers appear left-most
+        ),
+      ];
+}
+```
+
+If you need to toggle tabs at runtime (auth state, experiments, feature flags), keep `bottomTabs` minimal (or empty) and layer conditional logic through a hook:
+
+```dart
+class NotificationsPlugin extends FeaturePlugin {
+  @override
+  List<BottomTab> get bottomTabs => const [];
+
+  @override
+  void onRegister() {
+    hookRegistry.register(
+      'bottom_tabs:filter_tabs',
+      (tabs) {
+        if (tabs is! List<BottomTab>) return tabs;
+        final isAuthenticated =
+            hookRegistry.execute('auth:is_authenticated', false) as bool? ?? false;
+        if (!isAuthenticated) return tabs;
+
+        const alertsTab = BottomTab(
+          id: 'alerts',
+          label: 'Alerts',
+          icon: Icons.notifications_outlined,
+          activeIcon: Icons.notifications,
+          route: '/alerts',
+          extensions: {'order': 125},
+        );
+
+        final index = tabs.indexWhere((t) => t.id == alertsTab.id);
+        if (index != -1) {
+          tabs[index] = alertsTab;
+          return tabs;
+        }
+        return [...tabs, alertsTab];
+      },
+      priority: 10,
+    );
+  }
+}
+```
+
+> **AI Agent Checklist:**  
+> - Always start with the `bottomTabs` getter.  
+> - Only fall back to hook registration for runtime/conditional needs.  
+> - Keep `extensions['order']` spaced (10, 20, 30, …) so new tabs can slot in later.
 
 ### Plugin Responsibilities
 
@@ -772,3 +847,7 @@ class EcommercePlugin extends FeaturePlugin {
 - Documented plugin configuration best practices
 - Updated section configuration to support `active` flag
 - Moved cache configuration from root level to `settings` section
+
+
+
+

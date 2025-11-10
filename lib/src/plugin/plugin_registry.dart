@@ -1,9 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 
 import 'feature_plugin.dart';
-
-import 'package:flutter/material.dart';
 
 /// Singleton registry for managing feature plugins.
 ///
@@ -36,6 +35,8 @@ class PluginRegistry {
   final Map<String, FeaturePlugin> _plugins = {};
   final _logger = AppLogger('PluginRegistry');
   final _configManager = ConfigManager();
+  final List<BottomTab> _bottomTabs = [];
+  bool _bottomTabsHookRegistered = false;
 
   /// Registers and initializes a feature plugin.
   ///
@@ -83,6 +84,48 @@ class PluginRegistry {
     // Initialize the plugin
     await plugin.initialize();
     _logger.success('Initialized plugin: ${plugin.name}');
+
+    _registerBottomTabs(plugin);
+  }
+
+  void _registerBottomTabs(FeaturePlugin plugin) {
+    final tabs = plugin.bottomTabs;
+    if (tabs.isEmpty) return;
+
+    for (final tab in tabs) {
+      final existingIndex = _bottomTabs.indexWhere((t) => t.id == tab.id);
+      if (existingIndex != -1) {
+        _bottomTabs[existingIndex] = tab;
+      } else {
+        _bottomTabs.add(tab);
+      }
+    }
+
+    if (_bottomTabsHookRegistered) {
+      return;
+    }
+
+    HookRegistry().register(
+      'bottom_tabs:filter_tabs',
+      (existingTabs) {
+        if (existingTabs is! List<BottomTab>) return existingTabs;
+
+        final merged = List<BottomTab>.from(existingTabs);
+        for (final tab in _bottomTabs) {
+          final idx = merged.indexWhere((t) => t.id == tab.id);
+          if (idx != -1) {
+            merged[idx] = tab;
+          } else {
+            merged.add(tab);
+          }
+        }
+
+        return merged;
+      },
+      priority: 10,
+    );
+
+    _bottomTabsHookRegistered = true;
   }
 
   /// Retrieves a registered plugin by name with type safety.
