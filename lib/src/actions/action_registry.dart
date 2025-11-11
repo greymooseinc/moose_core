@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moose_core/entities.dart';
+import 'package:moose_core/services.dart';
 
 typedef CustomActionHandler = void Function(
   BuildContext context,
@@ -71,7 +72,7 @@ class ActionRegistry {
       return;
     }
 
-    Navigator.pushNamed(
+    AppNavigator.pushNamed(
       context,
       interaction.route!,
       arguments: interaction.parameters,

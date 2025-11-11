@@ -56,6 +56,9 @@ class AppNavigator {
           handled = true;
           result = res;
         },
+        'onSwitched': () {
+          Navigator.pushNamed<T>(context, routeName, arguments: arguments);
+        },
       },
     );
 
@@ -90,6 +93,9 @@ class AppNavigator {
           handled = true;
           result = res;
         },
+        'onSwitched': () {
+          Navigator.push<T>(context, route);
+        },
       },
     );
 
@@ -118,6 +124,11 @@ class AppNavigator {
         'context': context,
         '_markHandled': (Object? res) {
           handled = true;
+        },
+        'onSwitched': () {
+          if (Navigator.canPop(context)) {
+           Navigator.pop<T>(context);
+          }
         },
       },
     );
@@ -187,6 +198,10 @@ class AppNavigator {
     if (!handled) {
       debugPrint('AppNavigator: No handler for tab index $index');
     }
+  }
+
+  static bool canPop<T extends Object?>(BuildContext context, [T? result]) {
+    return Navigator.canPop(context);
   }
 
   /// Get the EventBus instance for advanced use cases.
