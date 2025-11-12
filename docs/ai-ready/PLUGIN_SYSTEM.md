@@ -825,6 +825,182 @@ class EcommercePlugin extends FeaturePlugin {
 }
 ```
 
+## Plugin Documentation Standards
+
+### Required Documentation Files
+
+Every plugin **MUST** include comprehensive documentation:
+
+#### README.md (Comprehensive AI-Ready Documentation)
+**Location**: `lib/plugins/{plugin_name}/README.md`
+
+**Purpose**: Complete AI-ready documentation guide (20-50 pages) that serves both as quick reference and comprehensive guide
+
+**Required Sections** (in order):
+1. **Header** - Title, last updated, version, target audience
+2. **Overview** - What it does, architecture fit (2-3 paragraphs)
+3. **Architecture** - BLoC layer, presentation layer, data layer
+4. **Key Features** - Detailed feature descriptions with capabilities
+5. **Widget Registry** - All registered widgets with table
+6. **Routes** - All routes with arguments and examples
+7. **Hook Points** - All hooks (data, event, addon) with examples
+8. **Configuration** - Complete config examples with settings tables
+9. **Usage Examples** - Real-world scenarios (3-5 examples)
+10. **Advanced Customization** - Extension recipes with code (3-5)
+11. **Integration with Other Plugins** - Cross-plugin patterns (3-5)
+12. **Best Practices for AI Agents** - When to use, guidelines, pitfalls
+13. **Troubleshooting** - Common issues with solutions
+14. **File Structure** - Complete directory tree
+15. **Dependencies** - Core and external dependencies
+16. **Future Enhancements** (optional)
+17. **Version History**
+18. **Support** - Where to get help
+
+### Documentation Quality Standards
+
+All plugin documentation **MUST**:
+- ✅ **Be Accurate**: Reflect actual implementation
+- ✅ **Include Code Examples**: Working code for every pattern
+- ✅ **Document Hook Points**: All extensibility points with examples
+- ✅ **Show Configuration**: Complete JSON config examples
+- ✅ **Explain WHY**: Not just what, but why certain patterns exist
+- ✅ **Cross-Reference**: Link to related docs (ARCHITECTURE.md, REGISTRIES.md)
+- ✅ **Target AI Agents**: Write for AI-first, humans second
+- ✅ **Show Integration**: How plugin works with others
+- ✅ **Include Troubleshooting**: Common issues and solutions
+- ✅ **Document Extensions**: How to extend without modifying
+
+### Documentation Format
+
+- **Use Markdown**: All documentation in `.md` format
+- **Use Tables**: For settings, hooks, and widget registry
+- **Use Code Blocks**: With language hints (dart, json)
+- **Use Headings**: Clear hierarchy (H1 → H2 → H3)
+- **Use Lists**: For features, steps, and options
+- **Use Links**: Cross-reference related documentation
+
+### Hook Documentation Format
+
+For every hook point, document:
+
+```markdown
+#### `{hook_name}`
+Brief description of what the hook does.
+
+**Data Provided**:
+- `field1`: Type - Description
+- `field2`: Type - Description
+
+**Usage**:
+\`\`\`dart
+hookRegistry.register('{hook_name}', (data) {
+  // Example implementation
+  return modifiedData;
+}, priority: 10);
+\`\`\`
+```
+
+### Configuration Documentation Format
+
+For every configurable section, provide:
+
+```markdown
+#### {Section Name}
+
+\`\`\`json
+{
+  "name": "{plugin}.{section}",
+  "settings": {
+    "setting1": value1,
+    "setting2": value2
+  }
+}
+\`\`\`
+
+**Settings**:
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `setting1` | Type | Default | What it does |
+| `setting2` | Type | Default | What it does |
+```
+
+### Example README.md Structure
+
+```markdown
+# {Plugin Name} Plugin
+
+> Comprehensive AI-ready documentation for the {Plugin Name} plugin
+
+**Last Updated**: YYYY-MM-DD
+**Version**: X.X.X
+**Target Audience**: AI Agents & Developers
+
+## Table of Contents
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Key Features](#key-features)
+4. [Widget Registry](#widget-registry)
+5. [Routes](#routes)
+6. [Hook Points](#hook-points)
+7. [Configuration](#configuration)
+8. [Usage Examples](#usage-examples)
+9. [Advanced Customization](#advanced-customization)
+10. [Integration with Other Plugins](#integration-with-other-plugins)
+11. [Best Practices for AI Agents](#best-practices-for-ai-agents)
+12. [Troubleshooting](#troubleshooting)
+13. [File Structure](#file-structure)
+14. [Dependencies](#dependencies)
+15. [Version History](#version-history)
+
+## Overview
+
+[2-3 paragraphs describing what the plugin does, its role in the architecture]
+
+## Quick Start
+
+\`\`\`json
+{
+  "sections": [
+    {
+      "name": "{plugin}.{section}",
+      "settings": { ... }
+    }
+  ]
+}
+\`\`\`
+
+[Continue with all 18 required sections...]
+```
+
+### Examples to Follow
+
+Reference these plugins for documentation standards:
+- **Products Plugin**: [lib/plugins/products/README.md](../../flutter_shopping_app/lib/plugins/products/README.md) - E-commerce functionality
+- **Blog Plugin**: [lib/plugins/blog/README.md](../../flutter_shopping_app/lib/plugins/blog/README.md) - Content management
+- **Share Plugin**: [lib/plugins/share/README.md](../../flutter_shopping_app/lib/plugins/share/README.md) - Cross-plugin integration
+
+### AI Agent Instructions
+
+When creating a new plugin, **ALWAYS**:
+
+1. ✅ Create comprehensive `README.md` in the plugin directory
+2. ✅ Follow the exact 18-section structure above
+3. ✅ Document ALL hook points with examples
+4. ✅ Provide complete configuration tables
+5. ✅ Include 3-5 usage examples
+6. ✅ Include 3-5 extension recipes
+7. ✅ Include 3-5 integration examples
+8. ✅ Add troubleshooting section
+9. ✅ Cross-reference related documentation
+10. ✅ Update README.md whenever code changes
+
+**Do NOT**:
+- ❌ Skip the README.md file
+- ❌ Create incomplete documentation
+- ❌ Put plugin docs in `docs/ai-ready/` (keep them with the plugin)
+- ❌ Forget to update when code changes
+- ❌ Write only for humans (AI agents are primary audience)
+
 ## Related Documentation
 
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Overall architecture
@@ -832,12 +1008,35 @@ class EcommercePlugin extends FeaturePlugin {
 - **[REGISTRIES.md](./REGISTRIES.md)** - Registry systems
 - **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
 
+## Reference Implementations
+
+Plugins with exemplary documentation:
+- `lib/plugins/products/` - Complete e-commerce plugin
+- `lib/plugins/blog/` - Content management plugin
+- `lib/plugins/share/` - Cross-plugin integration example
+
 ---
 
-**Last Updated:** 2025-11-06
-**Version:** 2.0.0
+**Last Updated:** 2025-11-11
+**Version:** 2.2.0
 
 ## Changelog
+
+### Version 2.2.0 (2025-11-11)
+- **Updated Plugin Documentation Standards** section
+- Changed to single comprehensive README.md file per plugin
+- Simplified documentation structure (removed separate DOCUMENTATION.md)
+- Updated AI agent instructions for single-file approach
+- Updated example references to new structure
+
+### Version 2.1.0 (2025-11-11)
+- **Added Plugin Documentation Standards** section
+- Required documentation files: README.md and DOCUMENTATION.md
+- Defined 18 required sections for comprehensive documentation
+- Documentation quality standards and format guidelines
+- Hook and configuration documentation formats
+- AI agent instructions for creating plugin documentation
+- Reference implementations (Products, Blog, Share plugins)
 
 ### Version 2.0.0 (2025-11-06)
 - Added plugin configuration support with `active` flag and `settings` section
