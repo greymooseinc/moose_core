@@ -230,6 +230,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "http",
+      "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.6.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "http_multi_server",
       "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/http_multi_server-3.2.2",
       "packageUri": "lib/",
@@ -264,6 +270,12 @@
       "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/json_annotation-4.9.0",
       "packageUri": "lib/",
       "languageVersion": "3.0"
+    },
+    {
+      "name": "json_schema",
+      "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/json_schema-5.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
     },
     {
       "name": "leak_tracker",
@@ -404,6 +416,18 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "quiver",
+      "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/quiver-3.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "rfc_6901",
+      "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/rfc_6901-0.2.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "shared_preferences",
       "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences-2.5.3",
       "packageUri": "lib/",
@@ -524,6 +548,12 @@
       "languageVersion": "3.5"
     },
     {
+      "name": "uri",
+      "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/uri-1.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "vector_math",
       "rootUri": "file:///C:/Users/MadushaKumarasiri/AppData/Local/Pub/Cache/hosted/pub.dev/vector_math-2.1.4",
       "packageUri": "lib/",
@@ -578,7 +608,7 @@
       "languageVersion": "3.0"
     }
   ],
-  "generated": "2025-11-04T21:13:12.889386Z",
+  "generated": "2025-11-12T20:57:54.228693Z",
   "generator": "pub",
   "generatorVersion": "3.6.0-332.0.dev",
   "flutterRoot": "file:///C:/flutter/flutter",

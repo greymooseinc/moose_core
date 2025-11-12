@@ -137,17 +137,33 @@ class AdapterRegistry {
   /// All repositories from the adapter are extracted and registered.
   ///
   /// **Parameters:**
-  /// - [factory]: Async function that creates and initializes the adapter
+  /// - [factory]: Function that creates the adapter (can be sync or async)
+  /// - [autoInitialize]: If true, automatically calls `initializeFromConfig()` (default: true)
   ///
   /// **Behavior:**
-  /// - Calls the factory function to create and initialize the adapter
+  /// - Calls the factory function to create the adapter
+  /// - If autoInitialize is true, calls `initializeFromConfig()` automatically
   /// - Extracts all repository implementations from the adapter
   /// - Registers repositories (last registered wins for duplicate types)
   /// - Caches the adapter instance
   ///
-  /// **Example:**
+  /// **Example (Auto-initialize):**
   /// ```dart
-  /// // Register WooCommerce adapter
+  /// // Simplest approach - automatic config loading
+  /// await AdapterRegistry().registerAdapter(
+  ///   () => ShopifyAdapter(),
+  ///   autoInitialize: true,
+  /// );
+  ///
+  /// await AdapterRegistry().registerAdapter(
+  ///   () => JudgemeAdapter(),
+  ///   autoInitialize: true,
+  /// );
+  /// ```
+  ///
+  /// **Example (Manual initialization):**
+  /// ```dart
+  /// // Manual config passing
   /// await AdapterRegistry().registerAdapter(() async {
   ///   final adapter = WooCommerceAdapter();
   ///   await adapter.initialize({
@@ -157,18 +173,32 @@ class AdapterRegistry {
   ///   });
   ///   return adapter;
   /// });
-  ///
-  /// // Register FCM notification adapter
-  /// await AdapterRegistry().registerAdapter(() async {
-  ///   final adapter = FCMNotificationAdapter();
-  ///   await adapter.initialize({});
-  ///   return adapter;
-  /// });
   /// ```
-  Future<void> registerAdapter(Future<BackendAdapter> Function() factory) async {
+  Future<void> registerAdapter(
+    dynamic Function() factory, {
+    bool autoInitialize = true,
+  }) async {
     try {
-      // Call factory to create and initialize adapter
-      final adapter = await factory();
+      BackendAdapter adapter;
+
+      // Handle both sync and async factories
+      final result = factory();
+      if (result is Future<BackendAdapter>) {
+        adapter = await result;
+      } else if (result is BackendAdapter) {
+        adapter = result;
+      } else {
+        throw Exception(
+          'Factory must return BackendAdapter or Future<BackendAdapter>, '
+          'got ${result.runtimeType}'
+        );
+      }
+
+      // Auto-initialize if requested
+      if (autoInitialize) {
+        await adapter.initializeFromConfig();
+      }
+
       final adapterName = adapter.name;
 
       // Cache the adapter instance

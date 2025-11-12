@@ -1,4 +1,6 @@
 import 'package:moose_core/repositories.dart';
+import 'package:moose_core/services.dart';
+import 'package:json_schema/json_schema.dart';
 
 /// BackendAdapter - Abstract base class for backend implementations
 ///
@@ -53,6 +55,43 @@ abstract class BackendAdapter {
 
   /// Adapter version (e.g., '1.0.0', '3.0')
   String get version;
+
+  /// JSON Schema for validating adapter configuration.
+  ///
+  /// Subclasses must override this to provide their configuration schema.
+  /// The schema will be validated automatically during initialization.
+  ///
+  /// **Returns:**
+  /// - [Map<String, dynamic>]: JSON Schema definition
+  ///
+  /// **Example:**
+  /// ```dart
+  /// @override
+  /// Map<String, dynamic> get configSchema => {
+  ///   'type': 'object',
+  ///   'required': ['baseUrl', 'apiKey'],
+  ///   'properties': {
+  ///     'baseUrl': {
+  ///       'type': 'string',
+  ///       'format': 'uri',
+  ///       'description': 'Base URL of the API',
+  ///     },
+  ///     'apiKey': {
+  ///       'type': 'string',
+  ///       'minLength': 1,
+  ///       'description': 'API authentication key',
+  ///     },
+  ///     'timeout': {
+  ///       'type': 'integer',
+  ///       'minimum': 0,
+  ///       'default': 30,
+  ///       'description': 'Request timeout in seconds',
+  ///     },
+  ///   },
+  ///   'additionalProperties': false,
+  /// };
+  /// ```
+  Map<String, dynamic> get configSchema;
 
   /// Repository factories storage
   final Map<Type, Object> _factories = {};
@@ -461,20 +500,93 @@ abstract class BackendAdapter {
     );
   }
 
+  /// Validates configuration against the adapter's JSON schema.
+  ///
+  /// This method is called automatically before initialize() to ensure
+  /// configuration meets requirements. It uses the configSchema getter
+  /// to validate the provided configuration.
+  ///
+  /// **Parameters:**
+  /// - [config]: Configuration map to validate
+  ///
+  /// **Throws:**
+  /// - [AdapterConfigValidationException]: If configuration is invalid
+  ///
+  /// **Example:**
+  /// ```dart
+  /// // This is called automatically, but you can call it manually if needed
+  /// try {
+  ///   validateConfig({'baseUrl': 'https://api.example.com'});
+  /// } catch (e) {
+  ///   print('Configuration error: $e');
+  /// }
+  /// ```
+  void validateConfig(Map<String, dynamic> config) {
+    try {
+      final schema = JsonSchema.create(configSchema);
+      final validationResult = schema.validate(config);
+
+      if (!validationResult.isValid) {
+        final errors = validationResult.errors.map((error) {
+          return '  - ${error.instancePath.isEmpty ? 'root' : error.instancePath}: ${error.message}';
+        }).join('\n');
+
+        throw AdapterConfigValidationException(
+          'Configuration validation failed for adapter "$name":\n$errors\n\n'
+          'Schema: ${_formatSchema(configSchema)}\n'
+          'Provided config: $config',
+        );
+      }
+    } catch (e) {
+      if (e is AdapterConfigValidationException) {
+        rethrow;
+      }
+      throw AdapterConfigValidationException(
+        'Failed to validate configuration for adapter "$name": $e',
+      );
+    }
+  }
+
+  /// Format schema for error messages
+  String _formatSchema(Map<String, dynamic> schema) {
+    final required = schema['required'] as List? ?? [];
+    final properties = schema['properties'] as Map<String, dynamic>? ?? {};
+
+    if (required.isEmpty && properties.isEmpty) {
+      return schema.toString();
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Required fields: ${required.join(", ")}');
+    buffer.writeln('Available fields:');
+
+    properties.forEach((key, value) {
+      final prop = value as Map<String, dynamic>;
+      final type = prop['type'] ?? 'any';
+      final description = prop['description'] ?? '';
+      final isRequired = required.contains(key);
+      buffer.writeln('  - $key ($type)${isRequired ? ' [REQUIRED]' : ''}: $description');
+    });
+
+    return buffer.toString();
+  }
+
   /// Initialize the adapter with configuration.
   ///
-  /// Subclasses should implement this to:
-  /// 1. Parse configuration
+  /// Configuration is automatically validated against configSchema before
+  /// this method is called. Subclasses should implement this to:
+  /// 1. Parse configuration (already validated)
   /// 2. Initialize API clients, connections, etc.
   /// 3. Register repository factories
   ///
   /// **Parameters:**
-  /// - [config]: Configuration map (baseUrl, apiKey, etc.)
+  /// - [config]: Configuration map (baseUrl, apiKey, etc.) - already validated
   ///
   /// **Example:**
   /// ```dart
   /// @override
   /// Future<void> initialize(Map<String, dynamic> config) async {
+  ///   // No need to validate - already done by base class
   ///   _apiClient = await createApiClient(config);
   ///
   ///   registerRepositoryFactory<ProductsRepository>(
@@ -483,6 +595,69 @@ abstract class BackendAdapter {
   /// }
   /// ```
   Future<void> initialize(Map<String, dynamic> config);
+
+  /// Automatically loads configuration from ConfigManager and initializes the adapter.
+  ///
+  /// This method reads the adapter's configuration from the `adapters` section
+  /// of the config using the adapter's name as the key.
+  ///
+  /// **Throws:**
+  /// - [Exception]: If configuration not found or ConfigManager not initialized
+  ///
+  /// **Example:**
+  /// ```dart
+  /// // In environment.json:
+  /// // {
+  /// //   "adapters": {
+  /// //     "shopify": { "storeUrl": "...", "token": "..." },
+  /// //     "judgeme": { "publicApiKey": "...", "shopDomain": "..." }
+  /// //   }
+  /// // }
+  ///
+  /// // Usage:
+  /// final adapter = ShopifyAdapter();
+  /// await adapter.initializeFromConfig();
+  /// // Automatically loads config['adapters']['shopify']
+  /// ```
+  Future<void> initializeFromConfig() async {
+    try {
+      final configManager = _getConfigManager();
+
+      // Get the adapters configuration
+      final adaptersConfig = configManager.get('adapters') as Map<String, dynamic>?;
+
+      if (adaptersConfig == null) {
+        throw Exception(
+          'No adapters configuration found in environment.json.\n'
+          'Expected "adapters" key at root level.'
+        );
+      }
+
+      // Get this adapter's specific configuration using its name
+      final adapterConfig = adaptersConfig[name] as Map<String, dynamic>?;
+
+      if (adapterConfig == null) {
+        throw Exception(
+          'No configuration found for adapter "$name".\n'
+          'Expected "adapters.$name" in environment.json.\n'
+          'Available adapters: ${adaptersConfig.keys.join(", ")}'
+        );
+      }
+
+      // Validate configuration against schema
+      validateConfig(adapterConfig);
+
+      // Call the initialize method with the adapter's configuration
+      await initialize(adapterConfig);
+    } catch (e) {
+      throw Exception('Failed to initialize adapter "$name" from config: $e');
+    }
+  }
+
+  /// Get ConfigManager instance (helper method)
+  ConfigManager _getConfigManager() {
+    return ConfigManager();
+  }
 }
 
 // =============================================================================
@@ -517,4 +692,14 @@ class RepositoryFactoryException implements Exception {
 
   @override
   String toString() => 'RepositoryFactoryException: $message';
+}
+
+/// Exception thrown when adapter configuration validation fails.
+class AdapterConfigValidationException implements Exception {
+  final String message;
+
+  AdapterConfigValidationException(this.message);
+
+  @override
+  String toString() => 'AdapterConfigValidationException: $message';
 }
