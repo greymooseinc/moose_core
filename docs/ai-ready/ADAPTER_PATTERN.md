@@ -481,6 +481,90 @@ class WooProductsRepository extends CoreRepository implements ProductsRepository
 }
 ```
 
+## Repository Catalog & Samples
+
+### Interface Overview
+
+| Interface | Primary Entities | Responsibilities | Common Placements |
+|-----------|------------------|------------------|-------------------|
+| `ProductsRepository` | `Product`, `ProductFilters`, `PaginatedResult<Product>` | Catalog browsing, PDP data, merchandising feeds | Home grids, PDP |
+| `CartRepository` | `Cart`, `CartItem` | Cart CRUD, promo codes, shipping costs | Cart drawer, checkout |
+| `PostRepository` | `Post` | Blog/news listings and detail pages | Blog plugin |
+| `ReviewRepository` | `ProductReview`, `ProductReviewStats` | Product reviews, rating summaries | PDP reviews tab |
+| `SearchRepository` | `SearchResult`, `SearchFilters` | Search suggestions, keyword results, facets | Search screens |
+| `BannerRepository` | `PromoBanner` | Hero banners, placement-aware promos, view/click tracking | Hero carousel, category headers |
+| `PushNotificationRepository` | `PushNotification` | Device registration, topic subscriptions | Notification settings |
+
+Adapters should register implementations for every interface that the active plugins rely on. When in doubt, inspect `widgetRegistry` registrations or plugin READMEs to see which sections pull from which repositories.
+
+### Sample: Registering `BannerRepository`
+
+```dart
+class MarketingAdapter extends BackendAdapter {
+  @override
+  String get name => 'marketing';
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    final dio = Dio(BaseOptions(
+      baseUrl: config['baseUrl'] as String,
+      headers: {'Authorization': 'Bearer ${config['token']}'},
+    ));
+
+    registerRepositoryFactory<BannerRepository>(
+      () => MarketingBannerRepository(dio),
+    );
+  }
+}
+
+class MarketingBannerRepository extends BannerRepository {
+  MarketingBannerRepository(this._client);
+
+  final Dio _client;
+
+  @override
+  Future<List<PromoBanner>> fetchBanners({
+    String? placement,
+    String? locale,
+    Map<String, dynamic>? filters,
+  }) async {
+    final response = await _client.get<List<dynamic>>(
+      '/banners',
+      queryParameters: {
+        if (placement != null) 'placement': placement,
+        if (locale != null) 'locale': locale,
+        if (filters != null) ...filters,
+      },
+    );
+
+    return (response.data ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(PromoBanner.fromJson)
+        .toList();
+  }
+
+  @override
+  Future<void> trackBannerView(String bannerId, {Map<String, dynamic>? metadata}) {
+    return _client.post('/banner-events', data: {
+      'event': 'view',
+      'bannerId': bannerId,
+      if (metadata != null) 'metadata': metadata,
+    });
+  }
+
+  @override
+  Future<void> trackBannerClick(String bannerId, {Map<String, dynamic>? metadata}) {
+    return _client.post('/banner-events', data: {
+      'event': 'click',
+      'bannerId': bannerId,
+      if (metadata != null) 'metadata': metadata,
+    });
+  }
+}
+```
+
+The Flutter `BannerSection` now passes a `sectionKey` (from `settings.key`) so adapters can fetch placement-specific creatives (e.g., `home_hero`, `cart_footer`). Returning `PromoBanner` keeps plugins backend-agnostic while exposing structured `UserInteraction` data, subtitles, metadata, and scheduling info for analytics.
+
 ## Adapter Registry
 
 ### Registering Multiple Adapters
@@ -913,10 +997,14 @@ class CustomApiAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2025-11-10
-**Version:** 2.1.0
+**Last Updated:** 2025-11-12
+**Version:** 2.2.0
 
 **Changelog:**
+- **v2.2.0 (2025-11-12)**:
+  - Added Repository Catalog overview with interface/entity mapping
+  - Provided banner repository registration sample and placement guidance
+  - Documented `PromoBanner` usage for adapters
 - **v2.1.0 (2025-11-10)**:
   - Documented `configSchema`, `getDefaultSettings()`, and `initializeFromConfig()`
   - Updated AdapterRegistry usage to highlight repository-level ownership (no "active adapter")

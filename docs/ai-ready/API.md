@@ -24,8 +24,8 @@ import 'package:moose_core/services.dart';       // Utilities & helpers
 
 | Module | Exports |
 |--------|---------|
-| **entities.dart** | Product, Cart, Order, Category, ProductTag, Collection, Post, ProductReview, SearchResult, PaginatedResult, etc. |
-| **repositories.dart** | ProductsRepository, CartRepository, ReviewRepository, SearchRepository, PostRepository, PushNotificationRepository |
+| **entities.dart** | Product, Cart, Order, Category, ProductTag, Collection, Post, PromoBanner, ProductReview, SearchResult, PaginatedResult, etc. |
+| **repositories.dart** | ProductsRepository, CartRepository, ReviewRepository, SearchRepository, PostRepository, BannerRepository, PushNotificationRepository |
 | **plugin.dart** | FeaturePlugin, PluginRegistry |
 | **widgets.dart** | FeatureSection, WidgetRegistry, AddonRegistry |
 | **adapters.dart** | BackendAdapter, AdapterRegistry |
@@ -220,6 +220,75 @@ class WooProductsRepository extends CoreRepository implements ProductsRepository
   Future<List<Product>> getProducts(ProductFilters? filters) async {
     // Use hookRegistry for transformations
     // Use eventBus for analytics
+  }
+}
+```
+
+### BannerRepository
+
+Handles marketing banners/hero promos that show up across the storefront.
+
+```dart
+abstract class BannerRepository extends CoreRepository {
+  Future<List<PromoBanner>> fetchBanners({
+    String? placement,
+    String? locale,
+    Map<String, dynamic>? filters,
+  });
+
+  Future<void> trackBannerView(
+    String bannerId, {
+    Map<String, dynamic>? metadata,
+  });
+
+  Future<void> trackBannerClick(
+    String bannerId, {
+    Map<String, dynamic>? metadata,
+  });
+}
+
+class RestBannerRepository extends BannerRepository {
+  RestBannerRepository(this._client);
+
+  final Dio _client;
+
+  @override
+  Future<List<PromoBanner>> fetchBanners({
+    String? placement,
+    String? locale,
+    Map<String, dynamic>? filters,
+  }) async {
+    final response = await _client.get<Map<String, dynamic>>(
+      '/banners',
+      queryParameters: {
+        if (placement != null) 'placement': placement,
+        if (locale != null) 'locale': locale,
+        if (filters != null) ...filters,
+      },
+    );
+
+    return (response.data?['items'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(PromoBanner.fromJson)
+        .toList();
+  }
+
+  @override
+  Future<void> trackBannerView(String bannerId, {Map<String, dynamic>? metadata}) {
+    return _client.post('/banner-events', data: {
+      'bannerId': bannerId,
+      'event': 'view',
+      if (metadata != null) 'metadata': metadata,
+    });
+  }
+
+  @override
+  Future<void> trackBannerClick(String bannerId, {Map<String, dynamic>? metadata}) {
+    return _client.post('/banner-events', data: {
+      'bannerId': bannerId,
+      'event': 'click',
+      if (metadata != null) 'metadata': metadata,
+    });
   }
 }
 ```
@@ -684,8 +753,9 @@ void main() async {
 
 ---
 
-**Last Updated:** 2025-11-10
-**Version:** 1.1.0
+**Last Updated:** 2025-11-12
+**Version:** 1.2.0
 
 ### Changelog
-- **1.1.0 (2025-11-10)** – Updated AdapterRegistry API docs to cover repository-level routing, auto-initialization, and adapter accessors.
+- **1.2.0 (2025-11-12)** - Added `BannerRepository` + `PromoBanner` coverage and refreshed module exports and repository samples.
+- **1.1.0 (2025-11-10)** - Updated AdapterRegistry API docs to cover repository-level routing, auto-initialization, and adapter accessors.

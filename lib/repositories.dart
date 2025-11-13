@@ -9,6 +9,7 @@ export 'src/repositories/repository.dart';
 
 // Feature repositories
 export 'src/repositories/auth_repository.dart';
+export 'src/repositories/banner_repository.dart';
 export 'src/repositories/cart_repository.dart';
 export 'src/repositories/post_repository.dart';
 export 'src/repositories/products_repository.dart';
