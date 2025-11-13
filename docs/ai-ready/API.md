@@ -261,10 +261,13 @@ Manages backend adapter registration.
 
 ```dart
 class AdapterRegistry {
-  /// Register an adapter using an async factory
-  Future<void> registerAdapter(Future<BackendAdapter> Function() factory);
+  /// Register an adapter using a factory (sync or async)
+  Future<void> registerAdapter(
+    dynamic Function() factory, {
+    bool autoInitialize = true,
+  });
 
-  /// Get a repository from the active adapter
+  /// Get the repository implementation currently registered for type T
   T getRepository<T extends CoreRepository>();
 
   /// Get a repository asynchronously
@@ -273,22 +276,36 @@ class AdapterRegistry {
   /// Check if repository is available
   bool hasRepository<T extends CoreRepository>();
 
-  /// Get all registered adapters
-  List<BackendAdapter> getAllAdapters();
+  /// Access a specific adapter by name (advanced usage)
+  T getAdapter<T extends BackendAdapter>(String name);
 }
 ```
 
 **Example:**
 ```dart
 final adapterRegistry = AdapterRegistry();
+
+// Simplest path: let the registry load + validate config via initializeFromConfig()
+await adapterRegistry.registerAdapter(
+  () => ShopifyAdapter(),
+  autoInitialize: true,
+);
+
+// Manual configuration still works
 await adapterRegistry.registerAdapter(() async {
   final adapter = WooCommerceAdapter();
-  await adapter.initialize(config);
+  await adapter.initialize({
+    'baseUrl': 'https://mystore.com',
+    'consumerKey': 'ck_xxx',
+    'consumerSecret': 'cs_xxx',
+  });
   return adapter;
 });
 
 final repo = adapterRegistry.getRepository<ProductsRepository>();
 ```
+
+> ⚙️ Repository-Level Routing: there is no "active adapter" concept anymore. Each adapter registers the repository interfaces it implements; the most recently registered implementation for a given type is the one returned by `getRepository<T>()`.
 
 ### WidgetRegistry
 
@@ -667,5 +684,8 @@ void main() async {
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+**Last Updated:** 2025-11-10
+**Version:** 1.1.0
+
+### Changelog
+- **1.1.0 (2025-11-10)** – Updated AdapterRegistry API docs to cover repository-level routing, auto-initialization, and adapter accessors.

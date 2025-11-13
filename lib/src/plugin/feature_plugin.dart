@@ -90,6 +90,60 @@ abstract class FeaturePlugin {
   final ActionRegistry actionRegistry = ActionRegistry();
   final EventBus eventBus = EventBus();
 
+  /// JSON Schema for plugin configuration validation.
+  ///
+  /// Plugins should override this to define their configuration structure.
+  /// This schema follows the JSON Schema specification and is used to validate
+  /// plugin settings in environment.json.
+  ///
+  /// Example:
+  /// ```dart
+  /// @override
+  /// Map<String, dynamic> get configSchema => {
+  ///   'type': 'object',
+  ///   'properties': {
+  ///     'cache': {
+  ///       'type': 'object',
+  ///       'properties': {
+  ///         'productsTTL': {
+  ///           'type': 'integer',
+  ///           'minimum': 0,
+  ///           'description': 'Cache TTL for products in seconds',
+  ///         },
+  ///       },
+  ///     },
+  ///   },
+  /// };
+  /// ```
+  Map<String, dynamic> get configSchema => {'type': 'object'};
+
+  /// Returns default settings for this plugin.
+  ///
+  /// These defaults are used when:
+  /// - The plugin is first installed and no configuration exists
+  /// - A specific setting key is missing from environment.json
+  ///
+  /// Plugins should override this to provide sensible defaults for all
+  /// configuration options defined in their configSchema.
+  ///
+  /// Example:
+  /// ```dart
+  /// @override
+  /// Map<String, dynamic> getDefaultSettings() {
+  ///   return {
+  ///     'cache': {
+  ///       'productsTTL': 300,
+  ///       'categoriesTTL': 600,
+  ///     },
+  ///     'display': {
+  ///       'itemsPerPage': 20,
+  ///       'showOutOfStock': true,
+  ///     },
+  ///   };
+  /// }
+  /// ```
+  Map<String, dynamic> getDefaultSettings() => {};
+
   /// Called when plugin is registered
   void onRegister();
 
@@ -111,4 +165,8 @@ abstract class FeaturePlugin {
   /// The [PluginRegistry] automatically registers the underlying hooks so
   /// individual plugins do not have to interact with `bottom_tabs:filter_tabs`.
   List<BottomTab> get bottomTabs => const [];
+
+  T getSetting<T>(String key) {
+    return ConfigManager().get('plugins:$name:settings:$key');
+  }
 }

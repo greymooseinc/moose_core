@@ -93,6 +93,32 @@ abstract class BackendAdapter {
   /// ```
   Map<String, dynamic> get configSchema;
 
+  /// Returns default settings for this adapter.
+  ///
+  /// These defaults are used when:
+  /// - The adapter is first registered and no configuration exists
+  /// - A specific setting key is missing from environment.json
+  ///
+  /// Adapters should override this to provide sensible defaults for all
+  /// configuration options defined in their configSchema.
+  ///
+  /// **Returns:**
+  /// - [Map<String, dynamic>]: Default configuration values
+  ///
+  /// **Example:**
+  /// ```dart
+  /// @override
+  /// Map<String, dynamic> getDefaultSettings() {
+  ///   return {
+  ///     'baseUrl': 'https://api.example.com',
+  ///     'timeout': 30,
+  ///     'retries': 3,
+  ///     'enableLogging': false,
+  ///   };
+  /// }
+  /// ```
+  Map<String, dynamic> getDefaultSettings() => {};
+
   /// Repository factories storage
   final Map<Type, Object> _factories = {};
 

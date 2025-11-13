@@ -201,6 +201,13 @@ class AdapterRegistry {
 
       final adapterName = adapter.name;
 
+      // Register adapter defaults in ConfigManager
+      final defaults = adapter.getDefaultSettings();
+      if (defaults.isNotEmpty) {
+        ConfigManager().registerAdapterDefaults(adapterName, defaults);
+        _logger.debug('Registered defaults for adapter: $adapterName');
+      }
+
       // Cache the adapter instance
       _adapters[adapterName] = adapter;
 

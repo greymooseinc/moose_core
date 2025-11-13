@@ -63,6 +63,13 @@ class PluginRegistry {
   Future<void> registerPlugin(FeaturePlugin Function() factory) async {
     final plugin = factory();
 
+    // Register plugin defaults in ConfigManager
+    final defaults = plugin.getDefaultSettings();
+    if (defaults.isNotEmpty) {
+      _configManager.registerPluginDefaults(plugin.name, defaults);
+      _logger.info('Registered defaults for plugin: ${plugin.name}');
+    }
+
     // Get plugin configuration from environment.json
     final pluginConfigData = _configManager.get('plugins:${plugin.name}');
     final pluginConfig = pluginConfigData != null && pluginConfigData is Map<String, dynamic>
@@ -210,28 +217,6 @@ class PluginRegistry {
     }
 
     return routes;
-  }
-
-  /// Gets the configuration for a specific plugin from environment.json.
-  ///
-  /// If no configuration exists for the plugin, returns a default active configuration.
-  ///
-  /// **Parameters:**
-  /// - [pluginName]: The name of the plugin
-  ///
-  /// **Returns:**
-  /// - [PluginConfig]: The plugin configuration with active status and settings
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final config = registry.getPluginConfig('products');
-  /// final cacheTTL = config.getSetting<int>('cache.productsTTL');
-  /// ```
-  PluginConfig getPluginConfig(String pluginName) {
-    final pluginConfigData = _configManager.get('plugins:$pluginName');
-    return pluginConfigData != null && pluginConfigData is Map<String, dynamic>
-        ? PluginConfig.fromJson(pluginName, pluginConfigData)
-        : PluginConfig(name: pluginName, active: true);
   }
 
   /// Clears all registered plugins (for testing).

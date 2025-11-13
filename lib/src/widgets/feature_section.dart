@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moose_core/adapters.dart';
+import 'package:moose_core/services.dart';
 
 /// Abstract base class for all feature sections in the application.
 ///
@@ -221,6 +222,10 @@ abstract class FeatureSection extends StatelessWidget {
 
     if (T == int && value is num) {
       return value.toInt() as T;
+    }
+
+    if (T == Color) {
+      return ColorHelper.parse(value) as T;
     }
 
     // Direct type match

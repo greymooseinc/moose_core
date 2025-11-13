@@ -36,22 +36,37 @@ abstract class FeaturePlugin {
   /// Semantic version of the plugin
   String get version;
 
+  /// JSON Schema describing this plugin's configuration surface
+  Map<String, dynamic> get configSchema => {'type': 'object'};
+
+  /// Default settings that are registered with ConfigManager
+  Map<String, dynamic> getDefaultSettings() => const {};
+
   /// Called immediately after plugin registration
-  /// Use this for registering hooks, actions, and other registries
   void onRegister();
 
   /// Called during app initialization
-  /// Use this for async setup, registering sections, and routes
   Future<void> initialize();
 
   /// Return routes provided by this plugin
-  /// Routes will be merged into the app's routing table
   Map<String, WidgetBuilder>? getRoutes();
 
   /// Optional: bottom navigation tabs contributed by this plugin
   List<BottomTab> get bottomTabs => const [];
+
+  /// Helper to read strongly typed settings for this plugin
+  T getSetting<T>(String key) {
+    return ConfigManager().get('plugins:$name:settings:$key');
+  }
 }
 ```
+
+#### Configuration Schema & Defaults
+
+- Override `configSchema` with a JSON Schema definition so tools (and CI) can validate `environment.json`.
+- Override `getDefaultSettings()` with a full tree of sensible defaults. The registry automatically registers these via `ConfigManager.registerPluginDefaults`, so any missing keys fall back to your code-defined values.
+- Use `getSetting<T>('cache:ttl')` (or direct `ConfigManager().get(...)`) to read settings. The helper merges environment overrides with defaults transparently.
+- See [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) for end-to-end examples.
 
 ### Bottom Navigation Tabs (AI Agent Guidance)
 
@@ -74,7 +89,6 @@ class ProductsPlugin extends FeaturePlugin {
           icon: Icons.shopping_bag_outlined,
           activeIcon: Icons.shopping_bag,
           route: '/products',
-          extensions: {'order': 30}, // lower numbers appear left-most
         ),
       ];
 }
@@ -103,7 +117,6 @@ class NotificationsPlugin extends FeaturePlugin {
           icon: Icons.notifications_outlined,
           activeIcon: Icons.notifications,
           route: '/alerts',
-          extensions: {'order': 125},
         );
 
         final index = tabs.indexWhere((t) => t.id == alertsTab.id);
@@ -122,7 +135,28 @@ class NotificationsPlugin extends FeaturePlugin {
 > **AI Agent Checklist:**  
 > - Always start with the `bottomTabs` getter.  
 > - Only fall back to hook registration for runtime/conditional needs.  
-> - Keep `extensions['order']` spaced (10, 20, 30, …) so new tabs can slot in later.
+> - Keep tab ordering data in `environment.json` (`plugins.bottom_tabs.settings.tabs`).
+
+#### Tab Ordering & Enablement
+
+Order, enablement, and other navigation metadata now live in configuration rather than `BottomTab.extensions`:
+
+```json
+"plugins": {
+  "bottom_tabs": {
+    "settings": {
+      "tabs": [
+        { "id": "home", "order": 10, "enabled": true },
+        { "id": "products", "order": 30, "enabled": true },
+        { "id": "search", "order": 50, "enabled": true },
+        { "id": "cart", "order": 100, "enabled": true }
+      ]
+    }
+  }
+}
+```
+
+`BottomTabsPlugin` merges this list with the `bottomTabs` declared by each plugin. Adjust configuration—not source code—when you need to reorder or hide tabs.
 
 ### Plugin Responsibilities
 
@@ -1017,10 +1051,15 @@ Plugins with exemplary documentation:
 
 ---
 
-**Last Updated:** 2025-11-11
-**Version:** 2.2.0
+**Last Updated:** 2025-11-10
+**Version:** 2.3.0
 
 ## Changelog
+
+### Version 2.3.0 (2025-11-10)
+- Documented `configSchema`, `getDefaultSettings()`, and `getSetting()` on `FeaturePlugin`
+- Refreshed bottom tab guidance to remove `extensions['order']` usage and point to `environment.json`
+- Added configuration order/enablement instructions for the `bottom_tabs` plugin
 
 ### Version 2.2.0 (2025-11-11)
 - **Updated Plugin Documentation Standards** section
@@ -1046,7 +1085,3 @@ Plugins with exemplary documentation:
 - Documented plugin configuration best practices
 - Updated section configuration to support `active` flag
 - Moved cache configuration from root level to `settings` section
-
-
-
-

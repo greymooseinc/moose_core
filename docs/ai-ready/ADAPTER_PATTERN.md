@@ -26,6 +26,12 @@ abstract class BackendAdapter {
   /// Semantic version of the adapter
   String get version;
 
+  /// JSON Schema that describes the adapter's configuration surface
+  Map<String, dynamic> get configSchema;
+
+  /// Default configuration merged with environment.json (registered automatically)
+  Map<String, dynamic> getDefaultSettings() => const {};
+
   /// Repository factories storage
   final Map<Type, Object> _factories = {};
 
@@ -86,10 +92,30 @@ abstract class BackendAdapter {
     // Returns cached instance or creates new one
   }
 
-  /// Initialize the adapter with configuration
+  /// Initialize the adapter with configuration (already validated)
   Future<void> initialize(Map<String, dynamic> config);
+
+  /// Convenience helper that loads, validates, and applies config automatically
+  Future<void> initializeFromConfig();
 }
 ```
+
+#### Configuration Schema & Defaults
+
+- Override `configSchema` with a JSON Schema definition. When you call `initializeFromConfig()`, the framework automatically validates `environment.json.adapters.{adapterName}` against this schema before your adapter boots.
+- Override `getDefaultSettings()` with a full tree of sensible defaults. `ConfigManager` registers these values so missing keys in `environment.json` fall back to your code-defined settings.
+- Access merged settings from anywhere via `ConfigManager().get('adapters:$name:some:nested:key')`.
+
+#### `initializeFromConfig()` Shortcut
+
+Call `await adapter.initializeFromConfig()` in `main.dart` (or tests) to:
+
+1. Read `environment.json.adapters.{adapterName}`
+2. Merge it with `getDefaultSettings()`
+3. Validate the result against `configSchema`
+4. Invoke your adapter's `initialize()` with the validated map
+
+This removes boilerplate and guarantees consistent validation across adapters.
 
 ### CoreRepository Base Class
 
@@ -489,7 +515,7 @@ await adapterRegistry.registerAdapter(() async {
 ### Getting Repositories
 
 ```dart
-// Get repository from active adapter
+// Get repository (whichever adapter registered it last will supply the instance)
 final productsRepo = adapterRegistry.getRepository<ProductsRepository>();
 
 // Check if repository is available
@@ -809,13 +835,30 @@ class ShopifyAdapter extends BackendAdapter {
   String get name => 'shopify';
 
   @override
-  String get version => '1.0.0';
+  String get version => '1.1.0';
+
+  @override
+  Map<String, dynamic> get configSchema => {
+        'type': 'object',
+        'required': ['storeUrl', 'storefrontAccessToken'],
+        'properties': {
+          'storeUrl': {'type': 'string', 'format': 'uri'},
+          'storefrontAccessToken': {'type': 'string', 'minLength': 1},
+          'apiVersion': {'type': 'string', 'default': '2024-01'},
+        },
+      };
+
+  @override
+  Map<String, dynamic> getDefaultSettings() => {
+        'apiVersion': '2024-01',
+      };
 
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
     final client = ShopifyApiClient(
-      storeUrl: config['storeUrl'],
-      accessToken: config['accessToken'],
+      storeUrl: config['storeUrl'] as String,
+      accessToken: config['storefrontAccessToken'] as String,
+      apiVersion: config['apiVersion'] as String,
     );
 
     registerRepositoryFactory<ProductsRepository>(
@@ -827,6 +870,13 @@ class ShopifyAdapter extends BackendAdapter {
     );
   }
 }
+
+// main.dart
+await AdapterRegistry().registerAdapter(() async {
+  final adapter = ShopifyAdapter();
+  await adapter.initializeFromConfig();
+  return adapter;
+});
 ```
 
 ### Custom REST API Adapter
@@ -863,10 +913,15 @@ class CustomApiAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2025-11-05
-**Version:** 2.0.0
+**Last Updated:** 2025-11-10
+**Version:** 2.1.0
 
 **Changelog:**
+- **v2.1.0 (2025-11-10)**:
+  - Documented `configSchema`, `getDefaultSettings()`, and `initializeFromConfig()`
+  - Updated AdapterRegistry usage to highlight repository-level ownership (no "active adapter")
+  - Refreshed Shopify adapter example with schema + defaults
+  - Added guidance on configuration validation workflow
 - **v2.0.0 (2025-11-05)**:
   - Added `CoreRepository.initialize()` method documentation
   - Added automatic initialization flow in adapter
