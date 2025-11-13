@@ -68,6 +68,46 @@ abstract class FeaturePlugin {
 - Use `getSetting<T>('cache:ttl')` (or direct `ConfigManager().get(...)`) to read settings. The helper merges environment overrides with defaults transparently.
 - See [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) for end-to-end examples.
 
+#### Distributing Plugin Settings to Internal Layers
+
+Keep the plugin as the single owner of its configuration surface. When downstream widgets/BLoCs need config values:
+
+1. Read settings in the plugin (via `getSetting`).
+2. Pass them down explicitly (as constructor params, resolvers, or value objects).
+3. Avoid letting random layers reach for `ConfigManager`—that couples them to global paths and defaults.
+
+**Example – Blog filters**
+
+```dart
+class BlogPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    widgetRegistry.register(
+      'blog.latest_posts_section',
+      (context, {data, onEvent}) => LatestPostsSection(
+        settings: data?['settings'] as Map<String, dynamic>? ?? {},
+        filterResolver: _getFilterConfig, // plugin-owned resolver
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _getFilterConfig(String key) {
+    final value = getSetting<Map<String, dynamic>>('filters:$key');
+    return value != null ? Map<String, dynamic>.from(value) : null;
+  }
+}
+
+class PostsBloc extends Bloc<PostsEvent, PostsState> {
+  PostsBloc({
+    required PostRepository repository,
+    required HookRegistry hookRegistry,
+    Map<String, dynamic>? Function(String key)? filterResolver,
+  }) : _filterResolver = filterResolver;
+}
+```
+
+This pattern keeps configuration logic in the plugin where it belongs while still giving internal layers the data they need.
+
 ### Bottom Navigation Tabs (AI Agent Guidance)
 
 Bottom tabs are now declared directly on each plugin. **Do not** register the `bottom_tabs:filter_tabs` hook manually unless you have a truly dynamic/conditional scenario. Instead:
