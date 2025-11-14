@@ -1,0 +1,164 @@
+{
+  "blueprintVersion": "2025.02",
+  "metadata": {
+    "project": "moose_extensions",
+    "purpose": "Flutter e-commerce application composed of FeaturePlugins powered by moose_core.",
+    "sourceOfTruth": "ai-ready.json + ai-ready/docs/*"
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "Plugins",
+        "description": "FeaturePlugin implementations that register widgets, hooks, routes.",
+        "keyFiles": [
+          "lib/plugins/**/{plugin}_plugin.dart",
+          "lib/core/plugin/feature_plugin.dart"
+        ]
+      },
+      {
+        "name": "Sections",
+        "description": "UI fragments extending FeatureSection; configurable via JSON.",
+        "keyFiles": [
+          "lib/core/widgets/feature_section.dart",
+          "lib/plugins/**/presentation/sections/*.dart"
+        ]
+      },
+      {
+        "name": "BLoC",
+        "description": "Event-driven logic (Event → Bloc → State). Required for every interactive section.",
+        "keyFiles": [
+          "lib/plugins/**/logic/bloc/**/*_bloc.dart",
+          "lib/plugins/**/logic/bloc/**/*_event.dart",
+          "lib/plugins/**/logic/bloc/**/*_state.dart"
+        ]
+      },
+      {
+        "name": "Repositories",
+        "description": "Abstract data sources defined in moose_core, implemented by adapters.",
+        "keyFiles": [
+          "../ecommerce_core/lib/repositories.dart",
+          "lib/adapters/**"
+        ]
+      },
+      {
+        "name": "Adapters",
+        "description": "Backend-specific implementations (Shopify, WooCommerce, custom) that register repository factories via AdapterRegistry.",
+        "keyFiles": [
+          "../ecommerce_core/lib/src/adapter",
+          "lib/adapters/**/backend_adapter.dart",
+          "lib/adapters/**/repositories/*_repository.dart"
+        ],
+        "notes": [
+          "Adapters must extend BackendAdapter and register repository factories.",
+          "Use AdapterRegistry to register/initialize adapters before plugins rely on repositories."
+        ]
+      }
+    ],
+    "configurationFiles": [
+      "assets/config/environment.json",
+      "ai-ready.json"
+    ],
+    "docsHints": [
+      "ai-ready/docs/ARCHITECTURE.md",
+      "ai-ready/docs/PLUGIN_SYSTEM.md",
+      "ai-ready/docs/API.md"
+    ]
+  },
+  "pluginDevelopment": {
+    "steps": [
+      "Create folder lib/plugins/{plugin_name}/ with subfolders logic/, presentation/, data/ if needed.",
+      "Add {plugin_name}_plugin.dart extending FeaturePlugin; implement name, version, onRegister, initialize, getRoutes.",
+      "Register FeatureSections inside initialize() via widgetRegistry.register().",
+      "Each section extends FeatureSection, overrides getDefaultSettings(), uses getSetting<T>().",
+      "All business logic lives in Bloc classes under logic/bloc/** (events, states, blocs).",
+      "Expose configuration knobs through assets/config/environment.json and document schema."
+    ],
+    "checklist": {
+      "must": [
+        "FeaturePlugin names are unique snake_case strings.",
+        "No business logic inside Widgets; always delegate to Bloc.",
+        "Use repository interfaces from moose_core; never call http directly.",
+        "Provide getDefaultSettings() for every FeatureSection.",
+        "All numeric UI settings stored as double.",
+        "Add docs to ai-ready/docs/PLUGIN_SYSTEM.md when introducing new hooks."
+      ],
+      "mustNot": [
+        "Do not mutate configuration maps in place; copy before editing.",
+        "Do not access adapters directly from widgets; go through repositories.",
+        "Do not create global singletons besides provided registries."
+      ]
+    }
+  },
+  "rules": {
+    "codeStyle": [
+      "Use lint rules from analysis_options.yaml.",
+      "Prefer const constructors where possible.",
+      "Keep files ASCII unless localization requires otherwise."
+    ],
+    "aiSpecific": [
+      "Always cite ai-ready/docs reference when deviating from defaults.",
+      "When unsure, fall back to instructions inside ai-ready.json quickStart.criticalRules."
+    ]
+  },
+  "filesystem": {
+    "pluginPattern": "lib/plugins/{plugin}/(data|logic|presentation)/...",
+    "blocFiles": "logic/bloc/{feature}/{feature}_bloc.dart etc.",
+    "sectionFiles": "presentation/sections/{section}_section.dart (extends FeatureSection)",
+    "assetLocations": [
+      "assets/config/environment.json",
+      "assets/images/",
+      "assets/icons/"
+    ],
+    "testPattern": "test/** Matches plugin-specific blocs/widgets."
+  },
+  "templates": {
+    "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override void onRegister() {} @override Future<void> initialize() async { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } }",
+    "featureSection": "class {SectionWidget} extends FeatureSection { const {SectionWidget}({super.key, super.settings}); @override Map<String, dynamic> getDefaultSettings() => {'title': 'Section Title'}; @override Widget build(BuildContext context) { final title = getSetting<String>('title'); return Text(title); } }",
+    "bloc": "class {Feature}Event extends Equatable { const {Feature}Event(); @override List<Object?> get props => []; } class {Feature}State extends Equatable { const {Feature}State(); @override List<Object?> get props => []; } class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> { {Feature}Bloc() : super(const {Feature}State()) { on<{Feature}Event>(_onEvent); } Future<void> _onEvent({Feature}Event event, Emitter<{Feature}State> emit) async {} }"
+  },
+  "apiSurface": {
+    "coreClasses": [
+      "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart)",
+      "FeatureSection (moose_core/lib/src/widgets/feature_section.dart)",
+      "HookRegistry, AddonRegistry, WidgetRegistry (moose_core/lib/src/widgets)",
+      "Repository interfaces (moose_core/lib/repositories.dart)"
+    ],
+    "configurationKeys": [
+      "plugins.{plugin}.settings.*",
+      "plugins.home.sections",
+      "adapters.*"
+    ]
+  },
+  "cliCommands": [
+    {
+      "tool": "moose",
+      "command": "moose init <project>",
+      "description": "Runs flutter create, adds moose_core git dependency, copies README/docs.",
+      "notes": [
+        "Requires Flutter SDK. Set FLUTTER_ROOT or MOOSE_FLUTTER_BIN if not on PATH."
+      ]
+    },
+    {
+      "tool": "moose",
+      "command": "moose version",
+      "description": "Prints CLI version for telemetry/debug."
+    },
+    {
+      "tool": "moose",
+      "command": "moose --metadata",
+      "description": "Outputs JSON metadata for AI orchestration."
+    }
+  ],
+  "examples": {
+    "addSection": [
+      "1. Create lib/plugins/blog/presentation/sections/latest_posts_section.dart extending FeatureSection.",
+      "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.initialize().",
+      "3. Update assets/config/environment.json -> plugins.home.sections.main[]."
+    ],
+    "referenceDocs": [
+      "ai-ready/docs/ARCHITECTURE.md",
+      "ai-ready/docs/PLUGIN_SYSTEM.md",
+      "ai-ready/docs/API.md"
+    ]
+  }
+}
