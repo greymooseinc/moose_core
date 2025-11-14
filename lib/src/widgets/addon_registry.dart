@@ -27,10 +27,19 @@ class AddonRegistry {
 
   void register(String name, WidgetBuilderFn builder, {int priority = 1}) {
     _addons.putIfAbsent(name, () => []);
-    _addons[name]!.add(Addon(priority, builder));
+    final existing = _addons[name]!;
+    final alreadyRegistered =
+        existing.any((addon) => addon.builder == builder);
+    if (alreadyRegistered) {
+      debugPrint(
+        'AddonRegistry: Duplicate builder ignored for "$name".',
+      );
+      return;
+    }
+    existing.add(Addon(priority, builder));
 
     // sort highest priority first
-    _addons[name]!.sort((a, b) => b.priority.compareTo(a.priority));
+    existing.sort((a, b) => b.priority.compareTo(a.priority));
     print('\'$name\' Addon registered with priority $priority');
   }
 
