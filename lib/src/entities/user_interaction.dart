@@ -17,7 +17,6 @@ class UserInteraction extends CoreEntity {
   final String? url;
   final Map<String, dynamic>? parameters;
   final String? customActionId;
-  final Map<String, dynamic>? extensions;
 
   const UserInteraction({
     required this.interactionType,
@@ -25,7 +24,7 @@ class UserInteraction extends CoreEntity {
     this.url,
     this.parameters,
     this.customActionId,
-    this.extensions,
+    super.extensions,
   });
 
   factory UserInteraction.internal({

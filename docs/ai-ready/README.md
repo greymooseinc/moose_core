@@ -121,9 +121,16 @@ import 'package:moose_core/services.dart';
    - Repository factory pattern
    - Lazy loading and caching
 
+5. **[MANIFEST.md](./MANIFEST.md)** - moose.manifest.json reference
+   - Complete manifest file structure
+   - Field definitions and validation rules
+   - Plugin and adapter manifest examples
+   - Best practices and common patterns
+   - Troubleshooting guide
+
 ### Registry Systems
 
-5. **[REGISTRIES.md](./REGISTRIES.md)** - Complete registry guide
+6. **[REGISTRIES.md](./REGISTRIES.md)** - Complete registry guide
    - WidgetRegistry
    - AdapterRegistry
    - ActionRegistry
@@ -132,7 +139,7 @@ import 'package:moose_core/services.dart';
 
 ### Event-Driven Communication
 
-6. **[EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md)** - ⚡ Complete event system guide for AI agents
+7. **[EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md)** - ⚡ Complete event system guide for AI agents
    - TL;DR decision matrix
    - EventBus: Asynchronous pub/sub for notifications
    - HookRegistry: Synchronous callbacks for data transformation
@@ -145,26 +152,26 @@ import 'package:moose_core/services.dart';
 
 ### Advanced Topics
 
-7. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
+8. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
    - CacheManager
    - MemoryCache
    - PersistentCache
    - TTL configuration
 
-8. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
+9. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
    - State management anti-patterns
    - Architecture violations
    - Common mistakes
    - Quick reference checklist
 
-9. **[API.md](./API.md)** - Public API reference
-   - Exported classes and methods
-   - Usage examples
-   - Type definitions
+10. **[API.md](./API.md)** - Public API reference
+    - Exported classes and methods
+    - Usage examples
+    - Type definitions
 
 ### Authentication & Authorization
 
-10. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
+11. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
     - Multi-provider authentication
     - AuthRepository implementation
     - Provider-specific integration (Firebase, Auth0, custom)
@@ -173,14 +180,14 @@ import 'package:moose_core/services.dart';
 
 ### Domain Entities
 
-11. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
+12. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
     - Dynamic content sections for products
     - Flexible backend mapping
     - Custom section types
     - UI rendering patterns
     - Migration from legacy fields
 
-12. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
+13. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
     - Product sections quick guide
     - Copy-paste templates
     - Common patterns

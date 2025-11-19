@@ -73,6 +73,43 @@ class AppNavigator {
     return result as T?;
   }
 
+  static Future<T?> pushReplacementNamed<T extends Object?, TO extends Object?>(
+    BuildContext context,
+    String routeName, {
+    TO? result,
+    Object? arguments,
+  }) async {
+    bool handled = false;
+    Object? handlerResult;
+
+    _eventBus.fire(
+      'navigation.push_replacement_named',
+      data: {
+        'routeName': routeName,
+        'arguments': arguments,
+        'result': result,
+        'context': context,
+        '_markHandled': (Object? res) {
+          handled = true;
+          handlerResult = res;
+        },
+        'onSwitched': () {
+          Navigator.pushReplacementNamed<T, TO>(context, routeName, result: result, arguments: arguments);
+        },
+      },
+    );
+
+    // Wait a frame to allow listeners to mark as handled
+    await Future.delayed(Duration.zero);
+
+    if (!handled) {
+      // No plugin handled it, use standard Navigator
+      return Navigator.pushReplacementNamed<T, TO>(context, routeName, result: result, arguments: arguments);
+    }
+
+    return handlerResult as T?;
+  }
+
   /// Push a route.
   ///
   /// First fires a navigation event to allow plugins to intercept.

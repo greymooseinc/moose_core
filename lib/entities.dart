@@ -52,9 +52,15 @@ export 'src/entities/auth_credentials.dart';
 export 'src/entities/auth_result.dart';
 export 'src/entities/user.dart';
 
+// Location & Address
+export 'src/entities/address.dart';
+export 'src/entities/country.dart';
+export 'src/entities/postal_code.dart';
+
 // Common entities
 export 'src/entities/bottom_tab.dart';
 export 'src/entities/promo_banner.dart';
+export 'src/entities/short.dart';
 export 'src/entities/paginated_result.dart';
 export 'src/entities/plugin_config.dart';
 export 'src/entities/push_notification.dart';

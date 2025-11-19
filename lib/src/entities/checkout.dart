@@ -4,8 +4,8 @@ import 'package:moose_core/src/entities/core_entity.dart';
 @immutable
 class CheckoutRequest extends CoreEntity {
   final String cartId;
-  final BillingAddress billingAddress;
-  final ShippingAddress shippingAddress;
+  final BillingAddress? billingAddress;
+  final ShippingAddress? shippingAddress;
   final String? shippingMethodId;
   final String? paymentMethodId;
   final String? customerNote;
@@ -13,8 +13,8 @@ class CheckoutRequest extends CoreEntity {
 
   const CheckoutRequest({
     required this.cartId,
-    required this.billingAddress,
-    required this.shippingAddress,
+    this.billingAddress,
+    this.shippingAddress,
     this.shippingMethodId,
     this.paymentMethodId,
     this.customerNote,
@@ -47,8 +47,8 @@ class CheckoutRequest extends CoreEntity {
   Map<String, dynamic> toJson() {
     return {
       'cart_id': cartId,
-      'billing_address': billingAddress.toJson(),
-      'shipping_address': shippingAddress.toJson(),
+      'billing_address': billingAddress?.toJson(),
+      'shipping_address': shippingAddress?.toJson(),
       'shipping_method_id': shippingMethodId,
       'payment_method_id': paymentMethodId,
       'customer_note': customerNote,
@@ -60,10 +60,12 @@ class CheckoutRequest extends CoreEntity {
   factory CheckoutRequest.fromJson(Map<String, dynamic> json) {
     return CheckoutRequest(
       cartId: json['cart_id'] ?? '',
-      billingAddress: BillingAddress.fromJson(
-          json['billing_address'] as Map<String, dynamic>),
-      shippingAddress: ShippingAddress.fromJson(
-          json['shipping_address'] as Map<String, dynamic>),
+      billingAddress: json['billing_address'] != null
+          ? BillingAddress.fromJson(json['billing_address'] as Map<String, dynamic>)
+          : null,
+      shippingAddress: json['shipping_address'] != null
+          ? ShippingAddress.fromJson(json['shipping_address'] as Map<String, dynamic>)
+          : null,
       shippingMethodId: json['shipping_method_id'],
       paymentMethodId: json['payment_method_id'],
       customerNote: json['customer_note'],
@@ -232,6 +234,11 @@ class PaymentMethod extends CoreEntity {
   final int order;
   final Map<String, dynamic>? settings;
 
+  /// Optional addon widget key to display when this method is selected
+  /// Example: 'stripe.card_form', 'paypal.redirect_info'
+  /// The addon will be loaded from WidgetRegistry when method is selected
+  final String? addonKey;
+
   const PaymentMethod({
     required this.id,
     required this.title,
@@ -239,6 +246,7 @@ class PaymentMethod extends CoreEntity {
     this.enabled = true,
     this.order = 0,
     this.settings,
+    this.addonKey,
     super.extensions
   });
 
@@ -250,6 +258,7 @@ class PaymentMethod extends CoreEntity {
       'enabled': enabled,
       'order': order,
       'settings': settings,
+      'addon_key': addonKey,
     };
   }
 
@@ -261,30 +270,42 @@ class PaymentMethod extends CoreEntity {
       enabled: json['enabled'] ?? true,
       order: json['order'] ?? 0,
       settings: json['settings'] as Map<String, dynamic>?,
+      addonKey: json['addon_key'] as String?,
     );
   }
 
   @override
-  List<Object?> get props => [id, title, enabled, order];
+  List<Object?> get props => [id, title, enabled, order, addonKey];
 }
 
-class ShippingMethod extends CoreEntity {
+/// DeliveryMethod represents a method of delivering products to the customer.
+/// This can be traditional shipping (FedEx, UPS, USPS), local delivery,
+/// pickup, digital delivery, or any custom delivery method.
+class DeliveryMethod extends CoreEntity {
   final String id;
   final String title;
   final String description;
   final double cost;
   final String? taxStatus;
   final bool enabled;
+  final int order;
   final Map<String, dynamic>? settings;
 
-  const ShippingMethod({
+  /// Optional addon widget key to display when this method is selected
+  /// Example: 'fedex.delivery_window', 'pickup.location_selector'
+  /// The addon will be loaded from WidgetRegistry when method is selected
+  final String? addonKey;
+
+  const DeliveryMethod({
     required this.id,
     required this.title,
     required this.description,
     required this.cost,
     this.taxStatus,
     this.enabled = true,
+    this.order = 0,
     this.settings,
+    this.addonKey,
     super.extensions
   });
 
@@ -296,12 +317,14 @@ class ShippingMethod extends CoreEntity {
       'cost': cost,
       'tax_status': taxStatus,
       'enabled': enabled,
+      'order': order,
       'settings': settings,
+      'addon_key': addonKey,
     };
   }
 
-  factory ShippingMethod.fromJson(Map<String, dynamic> json) {
-    return ShippingMethod(
+  factory DeliveryMethod.fromJson(Map<String, dynamic> json) {
+    return DeliveryMethod(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
@@ -310,10 +333,16 @@ class ShippingMethod extends CoreEntity {
           : (json['cost'] as num?)?.toDouble() ?? 0.0,
       taxStatus: json['tax_status'],
       enabled: json['enabled'] ?? true,
+      order: json['order'] ?? 0,
       settings: json['settings'] as Map<String, dynamic>?,
+      addonKey: json['addon_key'] as String?,
     );
   }
 
   @override
-  List<Object?> get props => [id, title, cost, enabled];
+  List<Object?> get props => [id, title, cost, enabled, order, addonKey];
 }
+
+/// @deprecated Use DeliveryMethod instead. Will be removed in future versions.
+/// This alias is provided for backward compatibility.
+typedef ShippingMethod = DeliveryMethod;

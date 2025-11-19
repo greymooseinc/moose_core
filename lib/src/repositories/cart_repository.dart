@@ -43,11 +43,18 @@ abstract class CartRepository extends CoreRepository {
     required String shippingMethodId,
   });
 
+  /// Get available delivery methods
+  /// Note: No address required - delivery methods can decide themselves
+  /// what information they need via their addon widgets
+  Future<List<DeliveryMethod>> getDeliveryMethods();
+
+  /// Get available payment methods
+  Future<List<PaymentMethod>> getPaymentMethods();
+
+  /// @deprecated Use getDeliveryMethods() instead
   Future<List<ShippingMethod>> getShippingMethods({
     required ShippingAddress shippingAddress,
-  });
-
-  Future<List<PaymentMethod>> getPaymentMethods();
+  }) => getDeliveryMethods();
 
   Future<CartValidationResult> validateCart();
 

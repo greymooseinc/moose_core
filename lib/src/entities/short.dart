@@ -3,83 +3,116 @@ import 'package:flutter/material.dart';
 import 'core_entity.dart';
 import 'user_interaction.dart';
 
-/// Represents a marketing banner or hero promotion that can be displayed
-/// inside carousel sections, hero areas, or inline placements.
+/// Represents a short-form content item similar to Instagram/Facebook Stories.
+///
+/// Shorts are typically displayed in a vertical scrolling gallery or
+/// full-screen viewer with auto-advance functionality.
 @immutable
-class PromoBanner extends CoreEntity {
-  /// Unique identifier for the banner. Typically matches the backend ID.
+class Short extends CoreEntity {
+  /// Unique identifier for the short. Typically matches the backend ID.
   final String id;
 
-  /// Headline shown on top of the banner artwork.
+  /// Title or caption for the short.
   final String title;
 
-  /// Optional supporting copy placed under the title.
+  /// Optional subtitle or secondary text.
   final String? subtitle;
 
-  /// Optional longer description for accessibility or detail screens.
+  /// Optional longer description for accessibility.
   final String? description;
 
-  /// Image or video thumbnail URL that will be rendered in the UI.
-  final String imageUrl;
+  /// Media URL (image or video) that will be displayed.
+  final String mediaUrl;
 
-  /// Type of banner content (e.g., 'image', 'video', 'gif', etc.).
+  /// Type of media content (e.g., 'image', 'video', 'gif', etc.).
   /// Defaults to 'image' if not specified.
   final String type;
 
-  /// Structured action invoked when the banner is tapped.
+  /// Optional thumbnail URL for video content.
+  /// Falls back to mediaUrl if not provided.
+  final String? thumbnailUrl;
+
+  /// Duration in seconds for how long the short should display.
+  /// Used for auto-advance timing. Defaults to 5 seconds.
+  final int duration;
+
+  /// Structured action invoked when the short is tapped.
   final UserInteraction? action;
 
   /// Arbitrary metadata sent alongside analytics events.
   final Map<String, dynamic>? metadata;
 
-  const PromoBanner({
+  const Short({
     required this.id,
     required this.title,
-    required this.imageUrl,
+    required this.mediaUrl,
     this.type = 'image',
     this.subtitle,
     this.description,
+    this.thumbnailUrl,
+    this.duration = 5,
     this.action,
     this.metadata,
     super.extensions,
   });
 
   /// Convenience parser for adapters that receive JSON payloads.
-  factory PromoBanner.fromJson(Map<String, dynamic> json) {
-    return PromoBanner(
+  factory Short.fromJson(Map<String, dynamic> json) {
+    return Short(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       subtitle: json['subtitle']?.toString(),
       description: json['description']?.toString(),
-      imageUrl: json['image']?.toString() ??
+      mediaUrl: json['media']?.toString() ??
+          json['mediaUrl']?.toString() ??
+          json['image']?.toString() ??
           json['imageUrl']?.toString() ??
+          json['video']?.toString() ??
+          json['videoUrl']?.toString() ??
           json['asset']?.toString() ??
           '',
       type: json['type']?.toString() ?? 'image',
+      thumbnailUrl: json['thumbnail']?.toString() ?? json['thumbnailUrl']?.toString(),
+      duration: _parseDuration(json['duration']),
       action: _parseAction(json),
       metadata: (json['metadata'] as Map?)?.cast<String, dynamic>(),
       extensions: json,
     );
   }
 
-  PromoBanner copyWith({
+  static int _parseDuration(dynamic value) {
+    if (value == null) return 5;
+    if (value is int) return value > 0 ? value : 5;
+    if (value is num) return value.toInt() > 0 ? value.toInt() : 5;
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      return parsed != null && parsed > 0 ? parsed : 5;
+    }
+    return 5;
+  }
+
+  Short copyWith({
     String? id,
     String? title,
     String? subtitle,
     String? description,
-    String? imageUrl,
+    String? mediaUrl,
     String? type,
+    String? thumbnailUrl,
+    int? duration,
     UserInteraction? action,
     Map<String, dynamic>? metadata,
     Map<String, dynamic>? extensions,
   }) {
-    return PromoBanner(
+    return Short(
       id: id ?? this.id,
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       description: description ?? this.description,
-      imageUrl: imageUrl ?? this.imageUrl,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
       type: type ?? this.type,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      duration: duration ?? this.duration,
       action: action ?? this.action,
       metadata: metadata ?? this.metadata,
       extensions: extensions ?? this.extensions,
@@ -92,13 +125,18 @@ class PromoBanner extends CoreEntity {
       'title': title,
       'subtitle': subtitle,
       'description': description,
-      'imageUrl': imageUrl,
+      'mediaUrl': mediaUrl,
       'type': type,
+      'thumbnailUrl': thumbnailUrl,
+      'duration': duration,
       'action': action?.toJson(),
       'metadata': metadata,
       'extensions': extensions,
     };
   }
+
+  /// Get the URL to display (thumbnail for videos, mediaUrl for images).
+  String get displayUrl => thumbnailUrl ?? mediaUrl;
 
   @override
   List<Object?> get props => [
@@ -106,8 +144,10 @@ class PromoBanner extends CoreEntity {
         title,
         subtitle,
         description,
-        imageUrl,
+        mediaUrl,
         type,
+        thumbnailUrl,
+        duration,
         action,
         metadata,
         extensions,
@@ -115,7 +155,7 @@ class PromoBanner extends CoreEntity {
 
   @override
   String toString() {
-    return 'PromoBanner(id: $id, title: $title, action: $action)';
+    return 'Short(id: $id, title: $title, type: $type, duration: ${duration}s)';
   }
 }
 
