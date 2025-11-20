@@ -15,12 +15,6 @@ abstract class BannerRepository extends CoreRepository {
     Map<String, dynamic>? filters,
   });
 
-  /// Track when a banner becomes visible on screen.
-  Future<void> trackBannerView(
-    String bannerId, {
-    Map<String, dynamic>? metadata,
-  });
-
   /// Track when the user taps/clicks a banner.
   Future<void> trackBannerClick(
     String bannerId, {
