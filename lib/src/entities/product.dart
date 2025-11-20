@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core_entity.dart';
+import 'media_item.dart';
 import 'product_attribute.dart';
 import 'product_section.dart';
 import 'product_variation.dart';
@@ -20,7 +21,7 @@ class Product extends CoreEntity {
   final double? salePrice;
   final bool onSale;
   final String? sku;
-  final List<String> images;
+  final List<MediaItem> media;
   final bool inStock;
   final int stockQuantity;
   final String stockStatus;
@@ -46,7 +47,7 @@ class Product extends CoreEntity {
     this.salePrice,
     this.onSale = false,
     this.sku,
-    required this.images,
+    required this.media,
     required this.inStock,
     required this.stockQuantity,
     this.stockStatus = 'instock',
@@ -74,7 +75,7 @@ class Product extends CoreEntity {
     double? salePrice,
     bool? onSale,
     String? sku,
-    List<String>? images,
+    List<MediaItem>? media,
     bool? inStock,
     int? stockQuantity,
     String? stockStatus,
@@ -101,7 +102,7 @@ class Product extends CoreEntity {
       salePrice: salePrice ?? this.salePrice,
       onSale: onSale ?? this.onSale,
       sku: sku ?? this.sku,
-      images: images ?? this.images,
+      media: media ?? this.media,
       inStock: inStock ?? this.inStock,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       stockStatus: stockStatus ?? this.stockStatus,
@@ -131,7 +132,7 @@ class Product extends CoreEntity {
       salePrice: salePrice,
       onSale: onSale,
       sku: sku,
-      images: images,
+      media: media,
       inStock: inStock,
       stockQuantity: stockQuantity,
       stockStatus: stockStatus,
@@ -164,7 +165,7 @@ class Product extends CoreEntity {
       'sale_price': salePrice,
       'on_sale': onSale,
       'sku': sku,
-      'images': images,
+      'media': media.map((m) => m.toJson()).toList(),
       'in_stock': inStock,
       'stock_quantity': stockQuantity,
       'stock_status': stockStatus,
@@ -207,10 +208,7 @@ class Product extends CoreEntity {
           : null,
       onSale: json['on_sale'] ?? false,
       sku: json['sku'],
-      images: (json['images'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      media: _parseMedia(json['media'], json['images']),
       inStock: json['in_stock'] ?? true,
       stockQuantity: json['stock_quantity'] ?? 0,
       stockStatus: json['stock_status'] ?? 'instock',
@@ -257,6 +255,41 @@ class Product extends CoreEntity {
     }
 
     return {};
+  }
+
+  /// Parse media from JSON, supporting both new media format and legacy images array
+  static List<MediaItem> _parseMedia(dynamic mediaJson, dynamic imagesJson) {
+    // If media field exists and is populated, use it
+    if (mediaJson != null && mediaJson is List && mediaJson.isNotEmpty) {
+      return mediaJson
+          .map((m) => m is Map<String, dynamic>
+              ? MediaItem.fromJson(m)
+              : MediaItem.fromUrl(m.toString()))
+          .toList();
+    }
+
+    // Fallback to legacy images field for backward compatibility
+    if (imagesJson != null && imagesJson is List) {
+      return imagesJson
+          .map((url) => MediaItem.fromUrl(
+                url.toString(),
+                type: MediaItem.detectTypeFromUrl(url.toString()),
+              ))
+          .toList();
+    }
+
+    return [];
+  }
+
+  /// Helper getter for backward compatibility - returns list of image/thumbnail URLs
+  List<String> get images {
+    return media.map((m) => m.thumbnail ?? m.url).toList();
+  }
+
+  /// Helper getter - returns the first media item's URL or thumbnail
+  String? get primaryImageUrl {
+    if (media.isEmpty) return null;
+    return media.first.thumbnail ?? media.first.url;
   }
 
   @override

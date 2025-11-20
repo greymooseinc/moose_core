@@ -59,6 +59,7 @@ export 'src/entities/postal_code.dart';
 
 // Common entities
 export 'src/entities/bottom_tab.dart';
+export 'src/entities/media_item.dart';
 export 'src/entities/promo_banner.dart';
 export 'src/entities/short.dart';
 export 'src/entities/paginated_result.dart';
