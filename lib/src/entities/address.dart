@@ -188,52 +188,55 @@ class Address extends CoreEntity {
     return {
       'id': id,
       'type': type,
-      'firstName': firstName,
-      'lastName': lastName,
+      'first_name': firstName,
+      'last_name': lastName,
       'company': company,
-      'address1': address1,
-      'address2': address2,
+      'address_1': address1,
+      'address_2': address2,
       'city': city,
       'state': state,
-      'stateCode': stateCode,
-      'postalCode': postalCode,
-      'country': country?.toJson(),
+      'state_code': stateCode,
+      'postcode': postalCode,
+      'country': country?.code ?? country?.toJson(),
       'phone': phone,
       'email': email,
       'latitude': latitude,
       'longitude': longitude,
-      'isDefault': isDefault,
-      'isVerified': isVerified,
+      'is_default': isDefault,
+      'is_verified': isVerified,
       'instructions': instructions,
-      'formattedAddress': formattedAddress,
+      'formatted_address': formattedAddress,
       'extensions': extensions,
     };
   }
 
   factory Address.fromJson(Map<String, dynamic> json) {
+    // Support both snake_case (API) and camelCase formats
     return Address(
       id: json['id'] as String?,
       type: json['type'] as String?,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
+      firstName: json['firstName'] as String? ?? json['first_name'] as String?,
+      lastName: json['lastName'] as String? ?? json['last_name'] as String?,
       company: json['company'] as String?,
-      address1: json['address1'] as String?,
-      address2: json['address2'] as String?,
+      address1: json['address1'] as String? ?? json['address_1'] as String?,
+      address2: json['address2'] as String? ?? json['address_2'] as String?,
       city: json['city'] as String?,
       state: json['state'] as String?,
-      stateCode: json['stateCode'] as String?,
-      postalCode: json['postalCode'] as String?,
+      stateCode: json['stateCode'] as String? ?? json['state_code'] as String?,
+      postalCode: json['postalCode'] as String? ?? json['postcode'] as String?,
       country: json['country'] != null
-          ? Country.fromJson(json['country'] as Map<String, dynamic>)
+          ? (json['country'] is Map
+              ? Country.fromJson(json['country'] as Map<String, dynamic>)
+              : Country(code: json['country'] as String, name: json['country'] as String))
           : null,
       phone: json['phone'] as String?,
       email: json['email'] as String?,
       latitude: json['latitude'] as double?,
       longitude: json['longitude'] as double?,
-      isDefault: json['isDefault'] as bool? ?? false,
-      isVerified: json['isVerified'] as bool? ?? false,
+      isDefault: json['isDefault'] as bool? ?? json['is_default'] as bool? ?? false,
+      isVerified: json['isVerified'] as bool? ?? json['is_verified'] as bool? ?? false,
       instructions: json['instructions'] as String?,
-      formattedAddress: json['formattedAddress'] as String?,
+      formattedAddress: json['formattedAddress'] as String? ?? json['formatted_address'] as String?,
       extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }

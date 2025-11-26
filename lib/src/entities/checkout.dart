@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/src/entities/core_entity.dart';
 
 @immutable
 class CheckoutRequest extends CoreEntity {
   final String cartId;
-  final BillingAddress? billingAddress;
-  final ShippingAddress? shippingAddress;
+  final Address? billingAddress;
+  final Address? shippingAddress;
   final String? shippingMethodId;
   final String? paymentMethodId;
   final String? customerNote;
@@ -24,8 +25,8 @@ class CheckoutRequest extends CoreEntity {
 
   CheckoutRequest copyWith({
     String? cartId,
-    BillingAddress? billingAddress,
-    ShippingAddress? shippingAddress,
+    Address? billingAddress,
+    Address? shippingAddress,
     String? shippingMethodId,
     String? paymentMethodId,
     String? customerNote,
@@ -61,10 +62,10 @@ class CheckoutRequest extends CoreEntity {
     return CheckoutRequest(
       cartId: json['cart_id'] ?? '',
       billingAddress: json['billing_address'] != null
-          ? BillingAddress.fromJson(json['billing_address'] as Map<String, dynamic>)
+          ? Address.fromJson(json['billing_address'] as Map<String, dynamic>)
           : null,
       shippingAddress: json['shipping_address'] != null
-          ? ShippingAddress.fromJson(json['shipping_address'] as Map<String, dynamic>)
+          ? Address.fromJson(json['shipping_address'] as Map<String, dynamic>)
           : null,
       shippingMethodId: json['shipping_method_id'],
       paymentMethodId: json['payment_method_id'],
@@ -83,146 +84,6 @@ class CheckoutRequest extends CoreEntity {
         shippingAddress,
         shippingMethodId,
         paymentMethodId,
-      ];
-}
-
-/// Represents a billing address for checkout and payment processing.
-class BillingAddress extends CoreEntity {
-  final String firstName;
-  final String lastName;
-  final String? company;
-  final String address1;
-  final String? address2;
-  final String city;
-  final String state;
-  final String postcode;
-  final String country;
-  final String email;
-  final String phone;
-
-  const BillingAddress({
-    required this.firstName,
-    required this.lastName,
-    this.company,
-    required this.address1,
-    this.address2,
-    required this.city,
-    required this.state,
-    required this.postcode,
-    required this.country,
-    required this.email,
-    required this.phone,
-    super.extensions
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'first_name': firstName,
-      'last_name': lastName,
-      'company': company,
-      'address_1': address1,
-      'address_2': address2,
-      'city': city,
-      'state': state,
-      'postcode': postcode,
-      'country': country,
-      'email': email,
-      'phone': phone,
-    };
-  }
-
-  factory BillingAddress.fromJson(Map<String, dynamic> json) {
-    return BillingAddress(
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      company: json['company'],
-      address1: json['address_1'] ?? '',
-      address2: json['address_2'],
-      city: json['city'] ?? '',
-      state: json['state'] ?? '',
-      postcode: json['postcode'] ?? '',
-      country: json['country'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        firstName,
-        lastName,
-        address1,
-        city,
-        state,
-        postcode,
-        country,
-        email,
-        phone,
-      ];
-}
-
-/// Represents a shipping address for order delivery.
-class ShippingAddress extends CoreEntity {
-  final String firstName;
-  final String lastName;
-  final String? company;
-  final String address1;
-  final String? address2;
-  final String city;
-  final String state;
-  final String postcode;
-  final String country;
-
-  const ShippingAddress({
-    required this.firstName,
-    required this.lastName,
-    this.company,
-    required this.address1,
-    this.address2,
-    required this.city,
-    required this.state,
-    required this.postcode,
-    required this.country,
-    super.extensions
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'first_name': firstName,
-      'last_name': lastName,
-      'company': company,
-      'address_1': address1,
-      'address_2': address2,
-      'city': city,
-      'state': state,
-      'postcode': postcode,
-      'country': country,
-    };
-  }
-
-  factory ShippingAddress.fromJson(Map<String, dynamic> json) {
-    return ShippingAddress(
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      company: json['company'],
-      address1: json['address_1'] ?? '',
-      address2: json['address_2'],
-      city: json['city'] ?? '',
-      state: json['state'] ?? '',
-      postcode: json['postcode'] ?? '',
-      country: json['country'] ?? '',
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        firstName,
-        lastName,
-        address1,
-        city,
-        state,
-        postcode,
-        country,
       ];
 }
 
@@ -346,3 +207,11 @@ class DeliveryMethod extends CoreEntity {
 /// @deprecated Use DeliveryMethod instead. Will be removed in future versions.
 /// This alias is provided for backward compatibility.
 typedef ShippingMethod = DeliveryMethod;
+
+/// @deprecated Use Address instead. Will be removed in future versions.
+/// This alias is provided for backward compatibility.
+typedef BillingAddress = Address;
+
+/// @deprecated Use Address instead. Will be removed in future versions.
+/// This alias is provided for backward compatibility.
+typedef ShippingAddress = Address;

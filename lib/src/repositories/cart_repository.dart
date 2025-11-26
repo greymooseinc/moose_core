@@ -1,6 +1,5 @@
-import '../entities/cart.dart';
-import '../entities/checkout.dart';
-import '../entities/order.dart';
+import 'package:moose_core/entities.dart';
+
 import 'repository.dart';
 
 abstract class CartRepository extends CoreRepository {
@@ -36,7 +35,7 @@ abstract class CartRepository extends CoreRepository {
 
   Future<Cart> calculateTotals({
     String? shippingMethodId,
-    ShippingAddress? shippingAddress,
+    Address? shippingAddress,
   });
 
   Future<Cart> setShippingMethod({
@@ -53,7 +52,7 @@ abstract class CartRepository extends CoreRepository {
 
   /// @deprecated Use getDeliveryMethods() instead
   Future<List<ShippingMethod>> getShippingMethods({
-    required ShippingAddress shippingAddress,
+    required Address shippingAddress,
   }) => getDeliveryMethods();
 
   Future<CartValidationResult> validateCart();

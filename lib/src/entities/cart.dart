@@ -4,34 +4,71 @@ import 'package:flutter/material.dart';
 import 'cart_item.dart';
 import 'core_entity.dart';
 
+/// Represents an amount line item in the cart (shipping, tax, discount, etc.)
+@immutable
+class CartAmount extends Equatable {
+  final double amount;
+  final String type;
+  final String title;
+  final String? subtitle;
+  final bool isDeduction;
+
+  const CartAmount({
+    required this.amount,
+    required this.type,
+    required this.title,
+    this.subtitle,
+    this.isDeduction = false,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'type': type,
+      'title': title,
+      'subtitle': subtitle,
+      'is_deduction': isDeduction,
+    };
+  }
+
+  factory CartAmount.fromJson(Map<String, dynamic> json) {
+    return CartAmount(
+      amount: (json['amount'] is String)
+          ? double.tryParse(json['amount']) ?? 0.0
+          : (json['amount'] as num?)?.toDouble() ?? 0.0,
+      type: json['type'] ?? '',
+      title: json['title'] ?? '',
+      subtitle: json['subtitle'],
+      isDeduction: json['is_deduction'] ?? false,
+    );
+  }
+
+  @override
+  List<Object?> get props => [amount, type, title, subtitle, isDeduction];
+}
+
 /// Represents a shopping cart.
 ///
-/// Contains cart items, pricing calculations (subtotal, tax, shipping, discount),
-/// applied coupons, and shipping information.
+/// Contains cart items, total amount, applied coupons, shipping information,
+/// and a flexible list of amounts (fees, taxes, discounts, etc.).
 @immutable
 class Cart extends CoreEntity {
   final String id;
   final List<CartItem> items;
-  final double subtotal;
-  final double tax;
-  final double shipping;
-  final double discount;
   final double total;
   final String currency;
   final List<AppliedCoupon>? appliedCoupons;
   final ShippingInfo? shippingInfo;
+  final List<CartAmount> amounts;
 
   const Cart({
     required this.id,
     required this.items,
-    required this.subtotal,
-    this.tax = 0.0,
-    this.shipping = 0.0,
-    this.discount = 0.0,
     required this.total,
     this.currency = 'USD',
     this.appliedCoupons,
     this.shippingInfo,
+    this.amounts = const [],
     super.extensions,
   });
 
@@ -44,27 +81,21 @@ class Cart extends CoreEntity {
   Cart copyWith({
     String? id,
     List<CartItem>? items,
-    double? subtotal,
-    double? tax,
-    double? shipping,
-    double? discount,
     double? total,
     String? currency,
     List<AppliedCoupon>? appliedCoupons,
     ShippingInfo? shippingInfo,
+    List<CartAmount>? amounts,
     Map<String, dynamic>? extensions,
   }) {
     return Cart(
       id: id ?? this.id,
       items: items ?? this.items,
-      subtotal: subtotal ?? this.subtotal,
-      tax: tax ?? this.tax,
-      shipping: shipping ?? this.shipping,
-      discount: discount ?? this.discount,
       total: total ?? this.total,
       currency: currency ?? this.currency,
       appliedCoupons: appliedCoupons ?? this.appliedCoupons,
       shippingInfo: shippingInfo ?? this.shippingInfo,
+      amounts: amounts ?? this.amounts,
       extensions: extensions ?? this.extensions,
     );
   }
@@ -73,14 +104,11 @@ class Cart extends CoreEntity {
     return {
       'id': id,
       'items': items.map((item) => item.toJson()).toList(),
-      'subtotal': subtotal,
-      'tax': tax,
-      'shipping': shipping,
-      'discount': discount,
       'total': total,
       'currency': currency,
       'applied_coupons': appliedCoupons?.map((c) => c.toJson()).toList(),
       'shipping_info': shippingInfo?.toJson(),
+      'amounts': amounts.map((a) => a.toJson()).toList(),
       'extensions': extensions,
     };
   }
@@ -92,18 +120,6 @@ class Cart extends CoreEntity {
               ?.map((item) => CartItem.fromJson(item as Map<String, dynamic>))
               .toList() ??
           [],
-      subtotal: (json['subtotal'] is String)
-          ? double.tryParse(json['subtotal']) ?? 0.0
-          : (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-      tax: (json['tax'] is String)
-          ? double.tryParse(json['tax']) ?? 0.0
-          : (json['tax'] as num?)?.toDouble() ?? 0.0,
-      shipping: (json['shipping'] is String)
-          ? double.tryParse(json['shipping']) ?? 0.0
-          : (json['shipping'] as num?)?.toDouble() ?? 0.0,
-      discount: (json['discount'] is String)
-          ? double.tryParse(json['discount']) ?? 0.0
-          : (json['discount'] as num?)?.toDouble() ?? 0.0,
       total: (json['total'] is String)
           ? double.tryParse(json['total']) ?? 0.0
           : (json['total'] as num?)?.toDouble() ?? 0.0,
@@ -114,6 +130,10 @@ class Cart extends CoreEntity {
       shippingInfo: json['shipping_info'] != null
           ? ShippingInfo.fromJson(json['shipping_info'] as Map<String, dynamic>)
           : null,
+      amounts: (json['amounts'] as List<dynamic>?)
+              ?.map((a) => CartAmount.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
       extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
@@ -122,10 +142,6 @@ class Cart extends CoreEntity {
     return const Cart(
       id: '',
       items: [],
-      subtotal: 0.0,
-      tax: 0.0,
-      shipping: 0.0,
-      discount: 0.0,
       total: 0.0,
     );
   }
@@ -134,12 +150,9 @@ class Cart extends CoreEntity {
   List<Object?> get props => [
         id,
         items,
-        subtotal,
-        tax,
-        shipping,
-        discount,
         total,
         currency,
+        amounts,
       ];
 
   @override

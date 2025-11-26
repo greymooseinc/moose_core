@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'address.dart';
 import 'cart_item.dart';
-import 'checkout.dart';
 import 'core_entity.dart';
 
 /// Represents a customer order.
@@ -23,8 +23,8 @@ class Order extends CoreEntity {
   final double discount;
   final double total;
   final List<OrderLineItem> lineItems;
-  final BillingAddress billingAddress;
-  final ShippingAddress shippingAddress;
+  final Address billingAddress;
+  final Address shippingAddress;
   final String? paymentMethod;
   final String? paymentMethodTitle;
   final String? shippingMethod;
@@ -85,8 +85,8 @@ class Order extends CoreEntity {
     double? discount,
     double? total,
     List<OrderLineItem>? lineItems,
-    BillingAddress? billingAddress,
-    ShippingAddress? shippingAddress,
+    Address? billingAddress,
+    Address? shippingAddress,
     String? paymentMethod,
     String? paymentMethodTitle,
     String? shippingMethod,
@@ -183,9 +183,9 @@ class Order extends CoreEntity {
                   OrderLineItem.fromJson(item as Map<String, dynamic>))
               .toList() ??
           [],
-      billingAddress: BillingAddress.fromJson(
+      billingAddress: Address.fromJson(
           json['billing_address'] as Map<String, dynamic>),
-      shippingAddress: ShippingAddress.fromJson(
+      shippingAddress: Address.fromJson(
           json['shipping_address'] as Map<String, dynamic>),
       paymentMethod: json['payment_method'],
       paymentMethodTitle: json['payment_method_title'],
