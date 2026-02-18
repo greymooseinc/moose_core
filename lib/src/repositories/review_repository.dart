@@ -30,7 +30,7 @@ abstract class ReviewRepository extends CoreRepository {
   /// [status] - Review status filter: 'approved', 'pending', 'all' (default: 'approved')
   /// [sortBy] - Sort order: 'newest', 'oldest', 'highest_rating', 'lowest_rating' (default: 'newest')
   ///
-  /// Returns PaginatedResult<ProductReview> with:
+  /// Returns `PaginatedResult<ProductReview>` with:
   /// - List of reviews for current page (sorted by specified order)
   /// - Pagination metadata (currentPage, totalPages, hasMore, etc.)
   /// - Total count of reviews

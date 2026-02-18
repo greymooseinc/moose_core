@@ -16,7 +16,7 @@ abstract class PostRepository extends CoreRepository {
   /// [status] - Post status filter: 'publish', 'draft', 'pending', etc.
   /// [metadataFilter] - Additional metadata filters
   ///
-  /// Returns PaginatedResult<Post> with posts and pagination metadata
+  /// Returns `PaginatedResult<Post>` with posts and pagination metadata
   Future<PaginatedResult<Post>> getPosts({
     int page = 1,
     int perPage = 20,
