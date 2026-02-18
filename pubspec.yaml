@@ -41,7 +41,6 @@ topics:
   - plugin
   - repository-pattern
   - bloc
-  - modular
 
 platforms:
   android:
