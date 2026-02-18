@@ -1,0 +1,12 @@
+name: moose_core_example
+description: Demonstrates moose_core package usage for building modular Flutter e-commerce apps.
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  moose_core:
+    path: ../

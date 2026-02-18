@@ -1,6 +1,6 @@
 name: moose_core
 description: Core architecture for modular Flutter e-commerce applications with plugin-based architecture, repository pattern, and configurable UI sections.
-version: 1.1.0
+version: 0.1.0
 repository: https://github.com/greymooseinc/moose_core
 issue_tracker: https://github.com/greymooseinc/moose_core/issues
 documentation: https://github.com/greymooseinc/moose_core/blob/main/README.md

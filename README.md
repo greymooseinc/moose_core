@@ -327,19 +327,19 @@ The package is organized into focused modules for better maintainability and sel
 | **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
 | **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
 
-See [Migration Guide](docs/MIGRATION_MODULAR_STRUCTURE.md) for details on using modular imports.
+See [Migration Guide](doc/MIGRATION_MODULAR_STRUCTURE.md) for details on using modular imports.
 
 ## Documentation
 
-- [Architecture Guide](docs/ai-ready/ARCHITECTURE.md) - Complete architectural patterns
-- [Plugin System](docs/ai-ready/PLUGIN_SYSTEM.md) - Creating and using plugins
-- [FeatureSection Guide](docs/ai-ready/FEATURE_SECTION.md) - Building configurable sections
-- [Adapter Pattern](docs/ai-ready/ADAPTER_PATTERN.md) - Backend adapter implementation
-- [Event System Guide](docs/ai-ready/EVENT_SYSTEM_GUIDE.md) - EventBus and HookRegistry usage
-- [Registries](docs/ai-ready/REGISTRIES.md) - Using registry systems
-- [Anti-Patterns](docs/ai-ready/ANTI_PATTERNS.md) - What to avoid
-- [API Reference](docs/ai-ready/API.md) - Complete API documentation
-- [Migration Guide](docs/MIGRATION_MODULAR_STRUCTURE.md) - Modular structure migration
+- [Architecture Guide](doc/ai-ready/ARCHITECTURE.md) - Complete architectural patterns
+- [Plugin System](doc/ai-ready/PLUGIN_SYSTEM.md) - Creating and using plugins
+- [FeatureSection Guide](doc/ai-ready/FEATURE_SECTION.md) - Building configurable sections
+- [Adapter Pattern](doc/ai-ready/ADAPTER_PATTERN.md) - Backend adapter implementation
+- [Event System Guide](doc/ai-ready/EVENT_SYSTEM_GUIDE.md) - EventBus and HookRegistry usage
+- [Registries](doc/ai-ready/REGISTRIES.md) - Using registry systems
+- [Anti-Patterns](doc/ai-ready/ANTI_PATTERNS.md) - What to avoid
+- [API Reference](doc/ai-ready/API.md) - Complete API documentation
+- [Migration Guide](doc/MIGRATION_MODULAR_STRUCTURE.md) - Modular structure migration
 
 ## Example Projects
 
@@ -351,7 +351,7 @@ See the [example](example/) directory for complete working examples:
 
 ## AI-Assisted Development
 
-This package is designed for AI-assisted development with comprehensive AI-ready documentation. See [docs/ai-ready/README.md](docs/ai-ready/README.md) for:
+This package is designed for AI-assisted development with comprehensive AI-ready documentation. See [doc/ai-ready/README.md](doc/ai-ready/README.md) for:
 - Architectural patterns for AI agents
 - Code generation guidelines
 - Anti-patterns to avoid
@@ -380,9 +380,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- [Documentation](https://github.com/yourusername/moose_core)
-- [Issue Tracker](https://github.com/yourusername/moose_core/issues)
-- [Discussions](https://github.com/yourusername/moose_core/discussions)
+- [Documentation](https://github.com/greymooseinc/moose_core)
+- [Issue Tracker](https://github.com/greymooseinc/moose_core/issues)
+- [Discussions](https://github.com/greymooseinc/moose_core/discussions)
 
 ## Changelog
 

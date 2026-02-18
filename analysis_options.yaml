@@ -1,0 +1,18 @@
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
+# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
+# invoked from the command line by running `flutter analyze`.
+
+# Activates recommended lints for Flutter packages and plugins.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Disabled: many public entity fields and generated methods lack /// comments.
+    # Enabling this would produce hundreds of warnings across the entities module.
+    public_member_api_docs: false
+
+    # Disabled: debug print statements are used intentionally in several places.
+    avoid_print: false

@@ -1,0 +1,6 @@
+# Exclude build artifacts and IDE files from the published package.
+# These files are tracked in git but should not be included in the pub.dev package.
+
+build/
+.dart_tool/
+.vscode/
