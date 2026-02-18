@@ -14,7 +14,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core: ^0.1.2
+  moose_core: ^0.1.3
 ```
 
 ### Basic Usage
@@ -411,7 +411,7 @@ When contributing to the core package:
 
 ---
 
-**Version:** 0.1.2
+**Version:** 0.1.3
 **Last Updated:** 2026-02-18
 **License:** MIT
 

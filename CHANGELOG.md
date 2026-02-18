@@ -5,6 +5,12 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-02-18
+
+### Fixed
+- Raised `json_schema` minimum constraint to `>=5.2.2` to prevent downgrade analysis failure (`instancePath` nullable in older versions)
+- Added `context.mounted` guards in `AppNavigator` before using `BuildContext` after async gaps
+
 ## [0.1.2] - 2026-02-18
 
 ### Fixed

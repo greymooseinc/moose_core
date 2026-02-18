@@ -25,7 +25,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core: ^0.1.2
+  moose_core: ^0.1.3
 ```
 
 ### Import Options

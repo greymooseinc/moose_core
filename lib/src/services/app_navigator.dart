@@ -65,7 +65,7 @@ class AppNavigator {
     // Wait a frame to allow listeners to mark as handled
     await Future.delayed(Duration.zero);
 
-    if (!handled) {
+    if (!handled && context.mounted) {
       // No plugin handled it, use standard Navigator
       return Navigator.pushNamed<T>(context, routeName, arguments: arguments);
     }
@@ -102,7 +102,7 @@ class AppNavigator {
     // Wait a frame to allow listeners to mark as handled
     await Future.delayed(Duration.zero);
 
-    if (!handled) {
+    if (!handled && context.mounted) {
       // No plugin handled it, use standard Navigator
       return Navigator.pushReplacementNamed<T, TO>(context, routeName, result: result, arguments: arguments);
     }
@@ -139,7 +139,7 @@ class AppNavigator {
     // Wait a frame to allow listeners to mark as handled
     await Future.delayed(Duration.zero);
 
-    if (!handled) {
+    if (!handled && context.mounted) {
       // No plugin handled it, use standard Navigator
       return Navigator.push<T>(context, route);
     }
@@ -201,7 +201,7 @@ class AppNavigator {
     // Wait a frame to allow listeners to mark as handled
     await Future.delayed(Duration.zero);
 
-    if (!handled) {
+    if (!handled && context.mounted) {
       // Fallback: try to navigate to the tab's route
       // This works if the tab route is registered normally
       await pushNamed(context, '/$tabId');
