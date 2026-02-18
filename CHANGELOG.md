@@ -5,6 +5,12 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-02-18
+
+### Fixed
+- Updated `intl` constraint from `^0.19.0` to `^0.20.2` to support latest stable version
+- Fixed angle-bracket HTML warnings in `PostRepository` and `ReviewRepository` doc comments
+
 ## [0.1.1] - 2026-02-18
 
 ### Changed
