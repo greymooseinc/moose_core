@@ -150,5 +150,5 @@ class UserInteraction extends CoreEntity {
   }
   
   @override
-  List<Object?> get props => [interactionType, route, url];
+  List<Object?> get props => [interactionType, route, url, customActionId, parameters];
 }

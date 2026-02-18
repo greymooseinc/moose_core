@@ -149,5 +149,66 @@ void main() {
 
       expect(() => adapter.validateConfig(config), returnsNormally);
     });
+
+    test('should fail when both required fields are missing', () {
+      final config = <String, dynamic>{};
+
+      expect(
+        () => adapter.validateConfig(config),
+        throwsA(isA<AdapterConfigValidationException>()),
+      );
+    });
+
+    test('error message should include the adapter name', () {
+      try {
+        adapter.validateConfig(<String, dynamic>{});
+        fail('Should have thrown');
+      } catch (e) {
+        expect(e.toString(), contains('"test"'));
+      }
+    });
+
+    test('error message should list all available fields', () {
+      try {
+        adapter.validateConfig(<String, dynamic>{});
+        fail('Should have thrown');
+      } catch (e) {
+        expect(e.toString(), contains('Available fields'));
+        expect(e.toString(), contains('apiKey'));
+        expect(e.toString(), contains('baseUrl'));
+        expect(e.toString(), contains('timeout'));
+      }
+    });
+
+    test('should accept timeout at boundary minimum value (0)', () {
+      final config = {
+        'apiKey': 'valid-api-key-12345',
+        'baseUrl': 'https://api.example.com',
+        'timeout': 0,
+      };
+
+      expect(() => adapter.validateConfig(config), returnsNormally);
+    });
+
+    test('should fail when apiKey is one char below minLength (9 chars)', () {
+      final config = {
+        'apiKey': '123456789', // 9 chars, minLength is 10
+        'baseUrl': 'https://api.example.com',
+      };
+
+      expect(
+        () => adapter.validateConfig(config),
+        throwsA(isA<AdapterConfigValidationException>()),
+      );
+    });
+
+    test('should pass when apiKey is exactly at minLength (10 chars)', () {
+      final config = {
+        'apiKey': '1234567890',
+        'baseUrl': 'https://api.example.com',
+      };
+
+      expect(() => adapter.validateConfig(config), returnsNormally);
+    });
   });
 }
