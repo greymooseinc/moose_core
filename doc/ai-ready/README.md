@@ -14,10 +14,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core:
-    git:
-      url: https://github.com/greymooseinc/moose_core.git
-      ref: main
+  moose_core: ^0.1.1
 ```
 
 ### Basic Usage
@@ -414,8 +411,8 @@ When contributing to the core package:
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2025-11-09
+**Version:** 0.1.1
+**Last Updated:** 2026-02-18
 **License:** MIT
 
 ---
