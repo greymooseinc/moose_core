@@ -1,11 +1,12 @@
 # Registry Systems Guide
 
-> Comprehensive guide to the three core registry systems: HookRegistry, WidgetRegistry, and ActionRegistry
+> Comprehensive guide to the four core registry systems: HookRegistry, WidgetRegistry, AddonRegistry, and ActionRegistry
 
 ## Table of Contents
 - [Overview](#overview)
 - [HookRegistry](#hookregistry)
 - [WidgetRegistry](#widgetregistry)
+- [AddonRegistry](#addonregistry)
 - [ActionRegistry](#actionregistry)
 - [Best Practices](#best-practices)
 
@@ -18,7 +19,8 @@ The application uses three singleton registry systems to provide extensibility, 
 | Registry | Purpose | Use When |
 |----------|---------|----------|
 | **HookRegistry** | Data transformation and event interception | Need to modify data flow without changing source code |
-| **WidgetRegistry** | Dynamic widget creation and composition | Building configurable UI from JSON config |
+| **WidgetRegistry** | Dynamic section creation and composition | Building configurable UI screens from JSON config |
+| **AddonRegistry** | Injecting optional UI widgets into named slots | Adding supplementary widgets (badges, banners, overlays) to existing sections |
 | **ActionRegistry** | User interaction handling | Processing taps, clicks, and custom actions |
 
 ---
@@ -455,6 +457,209 @@ Examples:
 
 ---
 
+## AddonRegistry
+
+### Purpose
+AddonRegistry enables **slot-based UI injection** — plugins can register optional widgets into named slots that existing sections expose. Unlike WidgetRegistry (which owns the full section), AddonRegistry is for _supplementary_ content: badges, banners, overlays, or any widget added on top of an existing component.
+
+Multiple addons can be registered for the same slot; they are rendered in **descending priority order** (highest priority first). Each builder may return `null` to opt out of rendering for a particular call.
+
+### Location
+```
+lib/src/widgets/addon_registry.dart
+```
+
+### Core API
+
+```dart
+/// Addon builder function type - may return null to skip rendering
+typedef WidgetBuilderFn = Widget? Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String event, dynamic payload)? onEvent,
+});
+
+class Addon {
+  final int priority;
+  final WidgetBuilderFn builder;
+}
+
+class AddonRegistry {
+  // Singleton instance
+  factory AddonRegistry() => _instance;
+  static AddonRegistry get instance => _instance;
+
+  /// Register an addon builder for a named slot.
+  /// @param name     - Slot identifier (e.g., 'product.card:badge')
+  /// @param builder  - Builder that returns a Widget or null
+  /// @param priority - Render order; higher = rendered first (default: 1)
+  /// Duplicate builders (same function reference) for the same slot are ignored.
+  void register(String name, WidgetBuilderFn builder, {int priority = 1});
+
+  /// Build all addons for a named slot.
+  /// Returns a list of non-null widgets in priority order.
+  /// Builder errors are caught and logged; other addons continue rendering.
+  List<Widget> build<T>(String name, BuildContext context, {
+    Map<String, dynamic>? data,
+    void Function(String event, dynamic payload)? onEvent,
+  });
+
+  /// Remove a specific builder from a slot
+  void removeAddon(String name, WidgetBuilderFn builder);
+
+  /// Remove all builders from a slot
+  void clearAddons(String name);
+
+  /// Remove all builders from all slots
+  void clearAllAddons();
+
+  /// Get all registered slot names
+  List<String> getRegisteredAddons();
+
+  /// Count of registered builders for a slot
+  int getAddonCount(String name);
+
+  /// Whether a slot has at least one registered builder
+  bool hasAddon(String name);
+}
+```
+
+### Key Differences from WidgetRegistry
+
+| | WidgetRegistry | AddonRegistry |
+|---|---|---|
+| **Returns** | Single `Widget` | `List<Widget>` (zero or more) |
+| **Builder return** | Always a `FeatureSection` | `Widget?` (null = skip) |
+| **Multiple registrations** | Not recommended (last wins) | Designed for multiple (priority-ordered) |
+| **Use case** | Full section owning a screen area | Supplementary widgets injected into slots |
+
+### Usage Examples
+
+#### Example 1: Adding a Sale Badge to Product Cards
+
+**Register the addon (in plugin):**
+```dart
+class PromotionsPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    // Inject a sale badge into every product card that shows a product on sale
+    addonRegistry.register(
+      'product.card:badge',
+      (context, {data, onEvent}) {
+        final product = data?['product'] as Product?;
+        if (product == null || !product.onSale) return null; // opt out
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text('SALE', style: TextStyle(color: Colors.white, fontSize: 10)),
+        );
+      },
+      priority: 10,
+    );
+  }
+}
+```
+
+**Render the slot (in the section/widget):**
+```dart
+class ProductCard extends StatelessWidget {
+  final Product product;
+  const ProductCard({super.key, required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = AddonRegistry().build(
+      'product.card:badge',
+      context,
+      data: {'product': product},
+    );
+
+    return Stack(
+      children: [
+        ProductImage(product: product),
+        if (badges.isNotEmpty)
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Column(children: badges),
+          ),
+      ],
+    );
+  }
+}
+```
+
+#### Example 2: Priority-Ordered Addons
+
+```dart
+// Register multiple addons for the same slot with different priorities
+addonRegistry.register(
+  'checkout:summary_extras',
+  (context, {data, onEvent}) => LoyaltyPointsWidget(data: data),
+  priority: 20, // renders first
+);
+
+addonRegistry.register(
+  'checkout:summary_extras',
+  (context, {data, onEvent}) => GiftMessageWidget(data: data),
+  priority: 10, // renders second
+);
+
+// Render all - returns [LoyaltyPointsWidget, GiftMessageWidget]
+final extras = AddonRegistry().build('checkout:summary_extras', context);
+```
+
+#### Example 3: Conditional Rendering with Null
+
+```dart
+addonRegistry.register(
+  'product.card:overlay',
+  (context, {data, onEvent}) {
+    final product = data?['product'] as Product?;
+    // Return null when condition isn't met - this addon is skipped entirely
+    if (product == null || product.inStock) return null;
+
+    return const OutOfStockOverlay();
+  },
+);
+```
+
+### Slot Naming Convention
+
+Use namespaced dot-notation with a colon separating the component from the slot:
+
+```
+{plugin_or_component}.{widget_name}:{slot_name}
+
+Examples:
+- product.card:badge          // badge slot on product cards
+- product.card:overlay        // overlay slot on product cards
+- cart.item:actions           // extra action buttons on cart items
+- checkout:summary_extras     // extra rows in checkout summary
+- home.hero:overlay           // overlay on the hero section
+```
+
+### Best Practices
+
+✅ **DO:**
+- Return `null` when the addon should not render (e.g., condition not met)
+- Use namespaced slot names to avoid conflicts between plugins
+- Use priority to control render order when multiple addons share a slot
+- Keep addon builders lightweight — they may be called on every rebuild
+- Register addons in `onRegister()` (not `initialize()`)
+
+❌ **DON'T:**
+- Use AddonRegistry to own a full section area — use WidgetRegistry for that
+- Register the same builder function reference twice (silently ignored)
+- Throw exceptions from builders — return `null` instead to skip gracefully
+- Assume any addon will be present — always guard with `hasAddon()` or check list length
+
+---
+
 ## ActionRegistry
 
 ### Purpose
@@ -728,9 +933,15 @@ ActionRegistry().registerCustomHandler('show_modal', (context, params) {
 
 **Use WidgetRegistry when:**
 - Building UI from configuration files
-- Creating plugin-based widget systems
+- Creating plugin-based section systems
 - Supporting runtime UI composition
-- Need dynamic widget selection
+- Need dynamic section selection
+
+**Use AddonRegistry when:**
+- Injecting supplementary widgets into slots exposed by existing sections
+- Multiple plugins need to contribute to the same UI area (badges, overlays, extras)
+- The additions are optional — builders can return null to opt out
+- You need priority-ordered rendering of multiple injected widgets
 
 **Use ActionRegistry when:**
 - Handling user interactions (taps, clicks)
@@ -878,11 +1089,27 @@ bool exists = hookRegistry.hasHook('hook_name');
 // Register
 widgetRegistry.register('widget_name', builder);
 
-// Build
+// Build single section
 widget = widgetRegistry.build('widget_name', context, data: {...});
+
+// Build all sections in a plugin group
+widgets = widgetRegistry.buildSectionGroup(context, pluginName: 'home', groupName: 'main');
 
 // Check
 bool exists = widgetRegistry.isRegistered('widget_name');
+```
+
+### AddonRegistry
+```dart
+// Register
+addonRegistry.register('slot.name:zone', builder, priority: 10);
+
+// Build all addons for a slot
+List<Widget> addons = AddonRegistry().build('slot.name:zone', context, data: {...});
+
+// Check
+bool exists = AddonRegistry().hasAddon('slot.name:zone');
+int count = AddonRegistry().getAddonCount('slot.name:zone');
 ```
 
 ### ActionRegistry
