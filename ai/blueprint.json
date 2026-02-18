@@ -71,7 +71,8 @@
       "Register FeatureSections inside initialize() via widgetRegistry.register().",
       "Each section extends FeatureSection, overrides getDefaultSettings(), uses getSetting<T>().",
       "All business logic lives in Bloc classes under logic/bloc/** (events, states, blocs).",
-      "Expose configuration knobs through assets/config/environment.json and document schema."
+      "Expose configuration knobs through assets/config/environment.json and document schema.",
+      "Optionally register addon builders inside onRegister() via addonRegistry.register('slot.name:zone', builder, priority: N) to inject supplementary widgets (badges, overlays) into slots exposed by other sections."
     ],
     "checklist": {
       "must": [
@@ -85,7 +86,9 @@
       "mustNot": [
         "Do not mutate configuration maps in place; copy before editing.",
         "Do not access adapters directly from widgets; go through repositories.",
-        "Do not create global singletons besides provided registries."
+        "Do not create global singletons besides provided registries.",
+        "Do not throw exceptions from AddonRegistry builders; return null to skip rendering gracefully.",
+        "Do not use AddonRegistry to own a full screen area; use WidgetRegistry for that."
       ]
     }
   },
@@ -114,13 +117,18 @@
   "templates": {
     "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override void onRegister() {} @override Future<void> initialize() async { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } }",
     "featureSection": "class {SectionWidget} extends FeatureSection { const {SectionWidget}({super.key, super.settings}); @override Map<String, dynamic> getDefaultSettings() => {'title': 'Section Title'}; @override Widget build(BuildContext context) { final title = getSetting<String>('title'); return Text(title); } }",
+    "addonRegistration": "@override void onRegister() { addonRegistry.register('{component}.{widget}:{slot}', (context, {data, onEvent}) { final item = data?['{dataKey}'] as {Type}?; if (item == null || !{condition}) return null; return {AddonWidget}(); }, priority: 10); }",
+    "addonSlotRender": "final addons = AddonRegistry().build('{component}.{widget}:{slot}', context, data: {'{dataKey}': item}); if (addons.isNotEmpty) Column(children: addons)",
     "bloc": "class {Feature}Event extends Equatable { const {Feature}Event(); @override List<Object?> get props => []; } class {Feature}State extends Equatable { const {Feature}State(); @override List<Object?> get props => []; } class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> { {Feature}Bloc() : super(const {Feature}State()) { on<{Feature}Event>(_onEvent); } Future<void> _onEvent({Feature}Event event, Emitter<{Feature}State> emit) async {} }"
   },
   "apiSurface": {
     "coreClasses": [
       "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart)",
       "FeatureSection (moose_core/lib/src/widgets/feature_section.dart)",
-      "HookRegistry, AddonRegistry, WidgetRegistry (moose_core/lib/src/widgets)",
+      "WidgetRegistry (moose_core/lib/src/widgets/widget_registry.dart) — registers full FeatureSections by name; used in initialize()",
+      "AddonRegistry (moose_core/lib/src/widgets/addon_registry.dart) — registers slot-based supplementary widgets; used in onRegister(); builders may return null to opt out; multiple builders per slot rendered in descending priority order",
+      "HookRegistry (moose_core/lib/src/events/hook_registry.dart) — synchronous data-transformation hooks",
+      "ActionRegistry (moose_core/lib/src/actions/action_registry.dart) — handles UserInteraction (navigate, openUrl, custom)",
       "Repository interfaces (moose_core/lib/repositories.dart)"
     ],
     "configurationKeys": [
@@ -154,6 +162,13 @@
       "1. Create lib/plugins/blog/presentation/sections/latest_posts_section.dart extending FeatureSection.",
       "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.initialize().",
       "3. Update assets/config/environment.json -> plugins.home.sections.main[]."
+    ],
+    "addAddon": [
+      "1. Decide the slot name using the convention '{component}.{widget}:{slot}' (e.g., 'product.card:badge').",
+      "2. In the plugin that owns the UI widget, call AddonRegistry().build('product.card:badge', context, data: {'product': product}) and render the returned list.",
+      "3. In any plugin that wants to inject content, register inside onRegister(): addonRegistry.register('product.card:badge', (context, {data, onEvent}) { ... return null or Widget; }, priority: 10).",
+      "4. Return null from the builder when the addon should not appear (e.g., product is not on sale).",
+      "5. Higher priority value = rendered first. Default priority is 1."
     ],
     "referenceDocs": [
       "ai-ready/docs/ARCHITECTURE.md",

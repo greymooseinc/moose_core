@@ -14,7 +14,7 @@
 
 ## Overview
 
-The application uses three singleton registry systems to provide extensibility, modularity, and loose coupling between components:
+The application uses four singleton registry systems to provide extensibility, modularity, and loose coupling between components:
 
 | Registry | Purpose | Use When |
 |----------|---------|----------|
