@@ -209,8 +209,11 @@ class WooProductsRepository extends CoreRepository implements ProductsRepository
     final response = await _apiClient.get('/products', params: filters);
     final products = response.map((json) => Product.fromWooDTO(json)).toList();
 
-    // Use eventBus to fire analytics events
-    eventBus.fire(AppProductSearchedEvent(...));
+    // Use eventBus to fire analytics events (string-based, dot notation)
+    eventBus.fire('product.searched', data: {
+      'filters': filters?.toJson(),
+      'resultCount': products.length,
+    });
 
     return products;
   }

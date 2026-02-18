@@ -46,6 +46,20 @@ abstract class FeaturePlugin {
   /// Semantic version of the plugin
   String get version;
 
+  /// JSON Schema for this plugin's configuration (optional; defaults to empty object schema)
+  Map<String, dynamic> get configSchema;
+
+  /// Default settings for this plugin.
+  /// Registered automatically by PluginRegistry - no manual registration needed.
+  Map<String, dynamic> getDefaultSettings();
+
+  /// Access a plugin setting via ConfigManager (falls back to getDefaultSettings()).
+  /// Path format: 'plugins:{name}:settings:{key}'
+  T getSetting<T>(String key);
+
+  /// Bottom navigation tabs provided by this plugin (empty by default)
+  List<BottomTab> get bottomTabs;
+
   /// Called immediately after plugin registration
   /// Use this for registering hooks, actions, and other registries
   void onRegister();
@@ -56,6 +70,14 @@ abstract class FeaturePlugin {
 
   /// Return routes provided by this plugin
   Map<String, WidgetBuilder>? getRoutes();
+
+  // Built-in registry accessors (all singletons):
+  // HookRegistry hookRegistry
+  // AddonRegistry addonRegistry
+  // WidgetRegistry widgetRegistry
+  // AdapterRegistry adapterRegistry
+  // ActionRegistry actionRegistry
+  // EventBus eventBus
 }
 ```
 
@@ -140,6 +162,13 @@ abstract class BackendAdapter {
   /// Semantic version of the adapter
   String get version;
 
+  /// JSON Schema definition for this adapter's configuration (REQUIRED - must override)
+  Map<String, dynamic> get configSchema;
+
+  /// Default settings for this adapter.
+  /// Registered automatically by AdapterRegistry - no manual registration needed.
+  Map<String, dynamic> getDefaultSettings();
+
   /// Register a synchronous repository factory
   void registerRepositoryFactory<T extends CoreRepository>(
     T Function() factory,
@@ -159,8 +188,14 @@ abstract class BackendAdapter {
   /// Check if repository factory is registered
   bool hasRepository<T extends CoreRepository>();
 
-  /// Initialize the adapter with configuration
+  /// Validate configuration against configSchema - throws AdapterConfigValidationException on failure
+  void validateConfig(Map<String, dynamic> config);
+
+  /// Initialize the adapter with validated configuration
   Future<void> initialize(Map<String, dynamic> config);
+
+  /// Load config from ConfigManager and call initialize() - called automatically by AdapterRegistry
+  Future<void> initializeFromConfig();
 }
 ```
 
@@ -339,14 +374,23 @@ class AdapterRegistry {
   /// Get the repository implementation currently registered for type T
   T getRepository<T extends CoreRepository>();
 
-  /// Get a repository asynchronously
-  Future<T> getRepositoryAsync<T extends CoreRepository>();
-
   /// Check if repository is available
   bool hasRepository<T extends CoreRepository>();
 
+  /// List all available repository types
+  List<Type> getAvailableRepositories();
+
+  /// List all initialized adapter names
+  List<String> getInitializedAdapters();
+
   /// Access a specific adapter by name (advanced usage)
   T getAdapter<T extends BackendAdapter>(String name);
+
+  /// Whether any adapters have been registered
+  bool get isInitialized;
+
+  /// Clear all adapters and repositories (for testing)
+  void clearAll();
 }
 ```
 
@@ -381,33 +425,36 @@ final repo = adapterRegistry.getRepository<ProductsRepository>();
 Manages dynamic widget registration and building.
 
 ```dart
-class WidgetRegistry {
-  /// Widget builder function type
-  typedef WidgetBuilderFn = Widget Function(
-    BuildContext context, {
-    Map<String, dynamic>? data,
-    Function(String, dynamic)? onEvent,
-  });
+/// Section builder function type - returns a FeatureSection (not a plain Widget)
+typedef SectionBuilderFn = FeatureSection Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String event, dynamic payload)? onEvent,
+});
 
-  /// Register a widget builder
-  void register(String name, WidgetBuilderFn builder);
+class WidgetRegistry {
+  /// Register a section builder
+  void register(String name, SectionBuilderFn builder);
 
   /// Build a single widget by name
   Widget build(
     String name,
     BuildContext context, {
     Map<String, dynamic>? data,
-    Function(String, dynamic)? onEvent,
+    void Function(String event, dynamic payload)? onEvent,
   });
 
-  /// Build multiple widgets as a group
+  /// Build multiple widgets from a plugin's section group config (reads from environment.json)
   List<Widget> buildSectionGroup(
     BuildContext context, {
     required String pluginName,
     required String groupName,
     Map<String, dynamic>? data,
-    Function(String, dynamic)? onEvent,
+    void Function(String event, dynamic payload)? onEvent,
   });
+
+  /// Get section configs for a plugin's group
+  List<SectionConfig> getSections(String pluginName, String groupName);
 
   /// Check if widget is registered
   bool isRegistered(String name);
@@ -529,14 +576,23 @@ Central manager for all caching operations.
 
 ```dart
 class CacheManager {
-  /// In-memory cache
-  static MemoryCache memory = MemoryCache();
+  /// Get the shared MemoryCache instance
+  static MemoryCache memoryCacheInstance();
 
-  /// Persistent cache (requires initialization)
-  static PersistentCache? persistent;
+  /// Get the shared PersistentCache instance (must call initPersistentCache() first)
+  static PersistentCache persistentCacheInstance();
 
-  /// Initialize persistent cache
+  /// Initialize persistent cache - call in main() before use
   static Future<void> initPersistentCache() async;
+
+  /// Clear both memory and persistent caches
+  static Future<void> clearAll() async;
+
+  /// Clear only memory cache
+  static void clearMemoryCache();
+
+  /// Clear only persistent cache
+  static Future<bool> clearPersistentCache() async;
 }
 ```
 
@@ -659,31 +715,9 @@ class UserInteraction {
 
 ## Exceptions
 
-### MissingSettingException
-
-Thrown when a required setting is not found.
-
-```dart
-class MissingSettingException implements Exception {
-  final String message;
-  MissingSettingException(this.message);
-}
-```
-
-### SettingTypeMismatchException
-
-Thrown when a setting has wrong type.
-
-```dart
-class SettingTypeMismatchException implements Exception {
-  final String message;
-  SettingTypeMismatchException(this.message);
-}
-```
-
 ### RepositoryNotRegisteredException
 
-Thrown when requested repository is not registered.
+Thrown when requested repository is not registered with any adapter.
 
 ```dart
 class RepositoryNotRegisteredException implements Exception {
@@ -692,16 +726,29 @@ class RepositoryNotRegisteredException implements Exception {
 }
 ```
 
-### AdapterConfigurationException
+### AdapterConfigValidationException
 
-Thrown when adapter configuration is invalid.
+Thrown when adapter configuration fails JSON schema validation.
 
 ```dart
-class AdapterConfigurationException implements Exception {
+class AdapterConfigValidationException implements Exception {
   final String message;
-  AdapterConfigurationException(this.message);
+  AdapterConfigValidationException(this.message);
 }
 ```
+
+### RepositoryTypeMismatchException
+
+Thrown when the repository factory returns an incompatible type.
+
+```dart
+class RepositoryTypeMismatchException implements Exception {
+  final String message;
+  RepositoryTypeMismatchException(this.message);
+}
+```
+
+> **Note:** `FeatureSection.getSetting<T>()` throws a generic `Exception` (not a typed exception class) when a setting key is missing or the value type is incompatible.
 
 ## Usage Examples
 

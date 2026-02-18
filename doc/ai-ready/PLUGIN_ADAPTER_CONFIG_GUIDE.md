@@ -166,12 +166,15 @@ class MyBackendAdapter extends BackendAdapter {
   late final int _timeout;
 
   @override
-  Future<void> initialize() async {
-    final configManager = ConfigManager();
+  Future<void> initialize(Map<String, dynamic> config) async {
+    // Config is already validated against configSchema before this is called.
+    // Values in config come from environment.json (or getDefaultSettings() fallback).
+    _baseUrl = config['baseUrl'] as String;
+    _timeout = config['timeout'] as int? ?? 30;
 
-    // Access adapter settings - falls back to getDefaultSettings()
-    _baseUrl = configManager.get('adapters:my_backend:baseUrl');
-    _timeout = configManager.get('adapters:my_backend:timeout');
+    // Alternatively, access via ConfigManager (same values):
+    // _baseUrl = ConfigManager().get('adapters:my_backend:baseUrl');
+    // _timeout = ConfigManager().get('adapters:my_backend:timeout');
   }
 }
 ```
@@ -193,14 +196,21 @@ Examples:
 The `AdapterRegistry` automatically registers your defaults during adapter registration:
 
 ```dart
-void registerAdapter(BackendAdapter adapter, String adapterName) {
-  // Automatically registers defaults
+// Inside AdapterRegistry.registerAdapter():
+Future<void> registerAdapter(dynamic Function() factory, {bool autoInitialize = true}) async {
+  final adapter = factory() as BackendAdapter;
+
+  // If autoInitialize, calls adapter.initializeFromConfig() which validates config
+  // and then calls adapter.initialize(config)
+  if (autoInitialize) await adapter.initializeFromConfig();
+
+  // Automatically registers defaults from getDefaultSettings()
   final defaults = adapter.getDefaultSettings();
   if (defaults.isNotEmpty) {
-    ConfigManager().registerAdapterDefaults(adapterName, defaults);
+    ConfigManager().registerAdapterDefaults(adapter.name, defaults);
   }
 
-  // ... rest of registration
+  // ... extract and register all repositories
 }
 ```
 
@@ -530,9 +540,20 @@ class ShopifyAdapter extends BackendAdapter {
   }
 
   @override
-  Future<void> initialize() async {
-    final configManager = ConfigManager();
-    final apiVersion = configManager.get('adapters:shopify:apiVersion');
+  Map<String, dynamic> get configSchema => {
+    'type': 'object',
+    'required': ['storeUrl', 'storefrontAccessToken'],
+    'properties': {
+      'storeUrl': {'type': 'string', 'description': 'Shopify store domain'},
+      'storefrontAccessToken': {'type': 'string', 'description': 'Storefront API token'},
+      'apiVersion': {'type': 'string', 'description': 'API version (e.g., 2024-01)'},
+    },
+  };
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    final apiVersion = config['apiVersion'] as String? ??
+        ConfigManager().get('adapters:shopify:apiVersion');
 
     // Use apiVersion...
   }
@@ -549,9 +570,10 @@ When creating or modifying plugins:
 5. Document configuration in plugin class comments
 
 When creating or modifying adapters:
-1. Add `getDefaultSettings()` method with sensible defaults
-2. Access config using `ConfigManager().get('adapters:{name}:{key}')`
-3. Defaults are auto-registered - no manual registration needed
-4. Initialize configuration in `initialize()` method
+1. Add `configSchema` getter with JSON Schema definition (REQUIRED - abstract in BackendAdapter)
+2. Add `getDefaultSettings()` method with sensible defaults
+3. Implement `initialize(Map<String, dynamic> config)` - config is pre-validated and merged with defaults
+4. Defaults are auto-registered by AdapterRegistry - no manual registration needed
+5. Use `ConfigManager().get('adapters:{name}:{key}')` as an alternative way to access config
 
 The system handles the rest automatically!

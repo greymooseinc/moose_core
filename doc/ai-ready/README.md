@@ -16,7 +16,7 @@ Add to your `pubspec.yaml`:
 dependencies:
   moose_core:
     git:
-      url: https://github.com/your-org/moose_core.git
+      url: https://github.com/greymooseinc/moose_core.git
       ref: main
 ```
 
@@ -408,9 +408,9 @@ When contributing to the core package:
 
 ## Support
 
-- GitHub Issues: https://github.com/your-org/moose_core/issues
-- Documentation: https://github.com/your-org/moose_core/docs
-- Examples: https://github.com/your-org/moose_core/examples
+- GitHub Issues: https://github.com/greymooseinc/moose_core/issues
+- Documentation: https://github.com/greymooseinc/moose_core/blob/main/README.md
+- Examples: https://github.com/greymooseinc/moose_core/tree/main/example
 
 ---
 

@@ -36,27 +36,33 @@ abstract class FeatureSection extends StatelessWidget {
   Map<String, dynamic> getDefaultSettings();
 
   /// Get a setting value with type safety
-  /// Throws if key is missing or type mismatches
+  /// Throws [Exception] if key is missing or type mismatches.
+  /// Also handles automatic numeric conversions (num→double, num→int) and Color parsing.
   T getSetting<T>(String key) {
-    final defaults = getDefaultSettings();
-    final merged = {...defaults, ...?settings};
+    final config = {...getDefaultSettings(), ...(settings ?? {})};
+    final value = config[key];
 
-    if (!merged.containsKey(key)) {
-      throw MissingSettingException(
-        'Setting "$key" not found in ${runtimeType}. '
-        'Available settings: ${merged.keys.join(", ")}',
+    // Fail fast if key not found
+    if (value == null) {
+      throw Exception(
+        'Setting "$key" not found in $runtimeType. '
+        'Ensure the key exists in getDefaultSettings() or settings.',
       );
     }
 
-    final value = merged[key];
+    // Handle automatic number conversions
+    if (T == double && value is num) return value.toDouble() as T;
+    if (T == int && value is num) return value.toInt() as T;
+    if (T == Color) return ColorHelper.parse(value) as T;
 
-    if (value is! T) {
-      throw SettingTypeMismatchException(
-        'Setting "$key" in ${runtimeType} expected type $T but got ${value.runtimeType}',
-      );
-    }
+    // Direct type match
+    if (value is T) return value;
 
-    return value;
+    // Fail fast if type mismatch
+    throw Exception(
+      'Setting "$key" in $runtimeType has type ${value.runtimeType} '
+      'but expected type $T',
+    );
   }
 }
 ```
@@ -633,7 +639,7 @@ void main() {
 
       expect(
         () => section.getSetting<String>('nonExistent'),
-        throwsA(isA<MissingSettingException>()),
+        throwsA(isA<Exception>()),
       );
     });
   });

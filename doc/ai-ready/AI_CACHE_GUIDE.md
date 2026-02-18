@@ -12,7 +12,7 @@ Both caches are accessed through the `CacheManager` class.
 ## Quick Reference
 
 ```dart
-import 'package:ecommerce_ai/core/cache/cache_manager.dart';
+import 'package:moose_core/cache.dart';
 
 // In-memory cache (temporary, fast)
 CacheManager.memoryCacheInstance().set('key', 'value');
@@ -581,10 +581,11 @@ Future<void> reload()
 
 ## File Locations
 
-- **CacheManager**: `lib/core/cache/cache_manager.dart`
-- **MemoryCache**: `lib/core/cache/memory_cache.dart`
-- **PersistentCache**: `lib/core/cache/persistent_cache.dart`
-- **This Guide**: `lib/core/cache/AI_CACHE_GUIDE.md`
+- **CacheManager**: `lib/src/cache/cache_manager.dart`
+- **MemoryCache**: `lib/src/cache/memory_cache.dart`
+- **PersistentCache**: `lib/src/cache/persistent_cache.dart`
+- **This Guide**: `doc/ai-ready/AI_CACHE_GUIDE.md`
+- **Public import**: `import 'package:moose_core/cache.dart';`
 
 ## Advanced Features (NEW)
 

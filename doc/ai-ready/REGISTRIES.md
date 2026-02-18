@@ -30,7 +30,7 @@ HookRegistry provides a **filter/action hook system** similar to WordPress hooks
 
 ### Location
 ```
-lib/core/events/hook_registry.dart
+lib/src/events/hook_registry.dart
 ```
 
 ### Core API
@@ -238,7 +238,7 @@ WidgetRegistry enables **dynamic widget composition** from JSON configuration. I
 
 ### Location
 ```
-lib/core/widgets/widget_registry.dart
+lib/src/widgets/widget_registry.dart
 ```
 
 ### Core API
@@ -249,10 +249,10 @@ class WidgetRegistry {
   factory WidgetRegistry() => _instance;
   static WidgetRegistry get instance => _instance;
 
-  /// Register a widget builder
-  /// @param name - Unique identifier for the widget
-  /// @param builder - Function that builds the widget
-  void register(String name, WidgetBuilderFn builder);
+  /// Register a section builder
+  /// @param name - Unique identifier for the section
+  /// @param builder - Function that builds the FeatureSection
+  void register(String name, SectionBuilderFn builder);
 
   /// Build a single widget by name
   /// @param name - Widget identifier
@@ -261,17 +261,24 @@ class WidgetRegistry {
   /// @param onEvent - Optional event callback
   Widget build(String name, BuildContext context, {
     Map<String, dynamic>? data,
-    Function(String, dynamic)? onEvent,
+    void Function(String event, dynamic payload)? onEvent,
   });
 
-  /// Build multiple widgets as a group
+  /// Build multiple widgets from a plugin's section group config
   /// @param context - Build context
-  /// @param sectionGroup - List of section configurations
-  /// @param onEvent - Optional event callback
+  /// @param pluginName - Plugin name (matches plugin key in environment.json)
+  /// @param groupName - Section group name (e.g., 'main', 'featured')
+  /// @param data - Optional shared data passed to all sections
+  /// @param onEvent - Optional event callback passed to all sections
   List<Widget> buildSectionGroup(BuildContext context, {
-    required List<dynamic> sectionGroup,
-    Function(String, dynamic)? onEvent,
+    required String pluginName,
+    required String groupName,
+    Map<String, dynamic>? data,
+    void Function(String event, dynamic payload)? onEvent,
   });
+
+  /// Get section configs for a plugin's group from environment.json
+  List<SectionConfig> getSections(String pluginName, String groupName);
 
   /// Check if widget is registered
   bool isRegistered(String name);
@@ -283,11 +290,11 @@ class WidgetRegistry {
   void unregister(String name);
 }
 
-/// Widget builder function type
-typedef WidgetBuilderFn = Widget Function(
+/// Section builder function type - returns a FeatureSection (not a plain Widget)
+typedef SectionBuilderFn = FeatureSection Function(
   BuildContext context, {
   Map<String, dynamic>? data,
-  Function(String, dynamic)? onEvent,
+  void Function(String event, dynamic payload)? onEvent,
 });
 ```
 
@@ -371,14 +378,12 @@ class ProductsPlugin extends FeaturePlugin {
 class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final sections = ConfigManager().get('plugins:home:sections:main',
-                                         defaultValue: []) as List<dynamic>;
-
     return Scaffold(
       body: ListView(
         children: WidgetRegistry().buildSectionGroup(
           context,
-          sectionGroup: sections,
+          pluginName: 'home',
+          groupName: 'main',
         ),
       ),
     );
@@ -457,7 +462,7 @@ ActionRegistry provides a **centralized system for handling user interactions** 
 
 ### Location
 ```
-lib/core/actions/action_registry.dart
+lib/src/actions/action_registry.dart
 ```
 
 ### Core API
@@ -827,7 +832,7 @@ test('widget builds correctly', () {
   final widgetRegistry = WidgetRegistry();
 
   widgetRegistry.register('test_widget', (context, {data, onEvent}) {
-    return Text(data?['title'] ?? 'Default');
+    return MySection(settings: data?['settings']);
   });
 
   final widget = widgetRegistry.build('test_widget', context,
