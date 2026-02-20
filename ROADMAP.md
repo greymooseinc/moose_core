@@ -1,12 +1,12 @@
-# 🛍️ Moose Core – Product Roadmap
+# Moose Core – Product Roadmap
 
-## 📅 Overview
+## Overview
 A structured roadmap for developing **moose_core**: a Flutter-based shopping app framework designed for AI agents.
 This framework enables AI agents to understand, build, and customize ecommerce applications through a plugin-based architecture with comprehensive AI-ready documentation.
 
 ---
 
-## 🎯 Vision
+## Vision
 **"Enable AI agents to build complete shopping applications from natural language descriptions"**
 
 The framework provides:
@@ -18,12 +18,14 @@ The framework provides:
 
 ---
 
-## 🚀 Phase 1: Foundation (Current)
+## Phase 1: Foundation
 **Goal:** Establish core architecture and AI-agent-friendly patterns.
 
-### 🔹 Core Architecture
+**Status: Complete** — published to pub.dev v0.1.3
+
+### Core Architecture
 - [x] **Entity System**
-  - [x] Platform-agnostic domain entities
+  - [x] Platform-agnostic domain entities (41 entities)
   - [x] CoreEntity base class with extensions support
   - [x] Comprehensive entity documentation
   - [x] Type-safe entity serialization
@@ -39,7 +41,7 @@ The framework provides:
   - [x] Plugin-level configuration
   - [x] Section-level configuration with active flags
 
-### 🔹 Widget & Section System
+### Widget & Section System
 - [x] **Widget Registry**
   - [x] Dynamic widget registration
   - [x] Configuration-driven section building
@@ -48,36 +50,79 @@ The framework provides:
   - [x] SectionConfig entity
   - [x] Settings support for each section
   - [x] Active flag for conditional rendering
+- [x] **Addon Registry**
+  - [x] Slot-based supplementary widget injection
+  - [x] Priority-based rendering
+  - [x] Duplicate detection
 
-### 🔹 Backend Adapters
+### Backend Adapters
 - [x] **Adapter Architecture**
   - [x] Repository pattern with adapters
-  - [x] WooCommerce adapter implementation
-  - [x] Shopify adapter implementation
+  - [x] Abstract BackendAdapter base class with lazy repository manager
+  - [x] AdapterRegistry for managing multiple backends
   - [x] Platform-agnostic service layer
 - [x] **Data Mappers**
-  - [x] Backend-to-entity mapping
+  - [x] Backend-to-entity mapping (12 repository interfaces)
   - [x] Entity-to-backend mapping
   - [x] Extensions field for platform-specific data
+- [x] **Schema Validation**
+  - [x] JSON schema validation integrated into BackendAdapter
+  - [x] Plugin and adapter configuration validation
 
-### 🔹 AI-Ready Documentation
-- [x] **Documentation Structure**
-  - [x] ARCHITECTURE.md - System overview
-  - [x] PLUGIN_SYSTEM.md - Plugin development guide
-  - [x] ENTITY_EXTENSIONS.md - Extensions field usage
+### Services & Utilities
+- [x] **EventBus** — pub/sub messaging for decoupled plugin communication
+- [x] **HookRegistry** — priority-based synchronous data transformation hooks
+- [x] **ActionRegistry** — custom user interaction handling (internal/external/custom)
+- [x] **AppNavigator** — EventBus-based navigation with context.mounted guards
+- [x] **ApiClient** — Dio-based HTTP client with retry, progress tracking, cancellation
+- [x] **CacheManager** — unified memory + persistent cache (SharedPreferences)
+- [x] **AppLogger** — colour-output application logger
+
+### AI-Ready Documentation
+- [x] **Documentation Structure** (18 documents in `doc/ai-ready/`)
+  - [x] ARCHITECTURE.md — System overview
+  - [x] PLUGIN_SYSTEM.md — Plugin development guide
+  - [x] ENTITY_EXTENSIONS.md — Extensions field usage
+  - [x] ADAPTER_PATTERN.md — Backend adapter implementation guide
+  - [x] ADAPTER_SCHEMA_VALIDATION.md — JSON schema validation
+  - [x] AI_CACHE_GUIDE.md — Caching strategy and best practices
+  - [x] ANTI_PATTERNS.md — Common mistakes to avoid
+  - [x] API.md — Complete API reference
+  - [x] ATTRIBUTE_SELECTION_GUIDE.md — Product attribute handling
+  - [x] AUTH_ADAPTER_GUIDE.md — Authentication adapter implementation
+  - [x] CACHE_SYSTEM.md — Cache system deep dive
+  - [x] EVENT_SYSTEM_GUIDE.md — EventBus and hook systems
+  - [x] FEATURE_SECTION.md — FeatureSection development guide
+  - [x] MANIFEST.md — Plugin/adapter manifest documentation
+  - [x] PLUGIN_ADAPTER_CONFIG_GUIDE.md — Configuration management
+  - [x] PRODUCT_SECTIONS.md — E-commerce product UI sections
+  - [x] REGISTRIES.md — All registries reference
+  - [x] README.md — Documentation index
   - [x] Comprehensive code examples
-  - [x] Best practices and anti-patterns
+  - [x] Best practices and anti-patterns (ANTI_PATTERNS.md)
+
+### Testing Infrastructure
+- [x] **Test Coverage**
+  - [x] ActionRegistry and UserInteraction tests
+  - [x] BackendAdapter and AdapterRegistry tests (including schema validation)
+  - [x] MemoryCache tests
+  - [x] EventBus and HookRegistry tests
+  - [x] WidgetRegistry, AddonRegistry, FeatureSection tests
+  - [x] MockRepository and TestAdapter utilities in test suite
+- [x] **Testing Guide** (`doc/TESTING_GUIDE.md`)
 
 ---
 
-## 🌱 Phase 2: Enhanced AI Integration (Q1 2026)
+## Phase 2: Enhanced AI Integration (Q1 2026)
 **Goal:** Improve AI agent understanding and code generation capabilities.
 
-### 🔹 Documentation Enhancements
+**Status: In Progress**
+
+### Documentation Enhancements
 - [ ] **Schema Documentation**
-  - [ ] JSON schema definitions for all entities
-  - [ ] Configuration schema with validation rules
-  - [ ] API contract documentation
+  - [x] JSON schema validation integrated into adapter/plugin config (`ADAPTER_SCHEMA_VALIDATION.md`)
+  - [ ] Standalone JSON schema definition files for all entities
+  - [ ] API contract documentation (OpenAPI/Swagger style)
 - [ ] **Code Generation Guides**
   - [ ] Plugin scaffolding templates
   - [ ] Common pattern libraries
@@ -87,56 +132,48 @@ The framework provides:
   - [ ] Visual architecture diagrams
   - [ ] Decision trees for common scenarios
 
-### 🔹 Enhanced Registries
-- [ ] **Hook System Documentation**
-  - [ ] Complete hook catalog
-  - [ ] Hook execution flow diagrams
-  - [ ] Plugin communication patterns
+### Enhanced Registries
+- [x] **Hook System** — fully implemented with priority execution and documentation
+- [x] **Event Bus** — fully implemented with async support and documentation (`EVENT_SYSTEM_GUIDE.md`)
 - [ ] **Action Registry Enhancement**
-  - [ ] Custom action patterns
+  - [x] Custom action patterns implemented
   - [ ] Deep linking support
   - [ ] Navigation action standardization
-- [ ] **Event Bus Documentation**
-  - [ ] Event catalog and schemas
-  - [ ] Cross-plugin communication examples
-  - [ ] Event-driven architecture patterns
 
-### 🔹 Testing Infrastructure
-- [ ] **Test Utilities**
-  - [ ] Mock adapters for testing
-  - [ ] Plugin testing framework
-  - [ ] Configuration test helpers
-- [ ] **Example Tests**
-  - [ ] Unit test examples
-  - [ ] Integration test patterns
-  - [ ] Widget test templates
+### Shared Test Utilities Module
+- [x] Mock adapters and repositories exist within the test suite
+- [ ] Extract shared test utilities into a standalone `test/helpers/` module
+- [ ] Pre-built mock implementations for WooCommerce/Shopify adapters
+- [ ] Widget test templates
 
 ---
 
-## 💎 Phase 3: Advanced Features (Q2 2026)
+## Phase 3: Advanced Features (Q2 2026)
 **Goal:** Add sophisticated ecommerce capabilities and AI-assisted customization.
 
-### 🔹 Advanced Commerce Features
+### Advanced Commerce Features
 - [ ] **Product Variants System**
-  - [ ] Complex variant relationships
+  - [x] ProductVariation entity exists
+  - [x] VariationSelectorService implemented
   - [ ] Variant selection UI components
   - [ ] Inventory tracking per variant
 - [ ] **Advanced Filtering**
+  - [x] FilterPreset, CollectionFilters, ProductFilters, SearchFilters entities exist
   - [ ] Faceted search support
   - [ ] Dynamic filter generation
-  - [ ] Filter preset management
 - [ ] **Promotions Engine**
+  - [x] PromoBanner entity exists
   - [ ] Discount rule configuration
   - [ ] Bundle/combo deals
   - [ ] Loyalty points integration
 
-### 🔹 AI-Assisted Customization
+### AI-Assisted Customization
 - [ ] **Visual Component Library**
   - [ ] Pre-built section components
   - [ ] Theme system with presets
   - [ ] Customizable UI patterns
 - [ ] **Smart Configuration**
-  - [ ] Configuration validation
+  - [x] Configuration validation (JSON schema in BackendAdapter)
   - [ ] Suggested settings based on use case
   - [ ] Performance optimization hints
 - [ ] **Code Analysis Tools**
@@ -144,24 +181,25 @@ The framework provides:
   - [ ] Performance profiling utilities
   - [ ] Code quality metrics
 
-### 🔹 Multi-Backend Support
+### Multi-Backend Support
 - [ ] **Additional Adapters**
   - [ ] BigCommerce adapter
   - [ ] Magento adapter
   - [ ] Custom REST API adapter
 - [ ] **Adapter Development Kit**
+  - [x] BackendAdapter abstract base class (foundation in place)
+  - [x] AUTH_ADAPTER_GUIDE.md — adapter authoring guide
   - [ ] Adapter scaffolding tools
-  - [ ] Testing utilities for adapters
-  - [ ] Adapter documentation generator
+  - [ ] Testing utilities package for adapters
 
 ---
 
-## 🧩 Phase 4: Ecosystem & Community (Q3-Q4 2026)
+## Phase 4: Ecosystem & Community (Q3-Q4 2026)
 **Goal:** Build a thriving ecosystem of plugins and extensions.
 
-### 🔹 Plugin Marketplace Preparation
+### Plugin Marketplace Preparation
 - [ ] **Plugin Standards**
-  - [ ] Plugin packaging format
+  - [x] moose.manifest.json format defined (`MANIFEST.md`)
   - [ ] Version compatibility matrix
   - [ ] Security review guidelines
 - [ ] **Plugin Discovery**
@@ -169,9 +207,10 @@ The framework provides:
   - [ ] Dependency management
   - [ ] Plugin installation system
 
-### 🔹 Developer Tools
+### Developer Tools
 - [ ] **CLI Tools**
-  - [ ] Project scaffolding CLI
+  - [x] CLI design specified in `ai/blueprint.json`
+  - [ ] Project scaffolding CLI (implementation)
   - [ ] Plugin generator CLI
   - [ ] Configuration validator CLI
 - [ ] **IDE Extensions**
@@ -179,7 +218,7 @@ The framework provides:
   - [ ] Configuration file intellisense
   - [ ] Live documentation in IDE
 
-### 🔹 AI Agent Improvements
+### AI Agent Improvements
 - [ ] **Semantic Code Search**
   - [ ] Natural language code search
   - [ ] Intent-based pattern matching
@@ -191,38 +230,35 @@ The framework provides:
 
 ---
 
-## 🗺️ Release Timeline
+## Release Timeline
 
 | Phase | Focus Area | Target | Status |
 |-------|-----------|--------|--------|
-| Phase 1 – Foundation | Core architecture & plugin system | Q4 2025 | 🟢 95% Complete |
-| Phase 2 – AI Integration | Documentation & testing | Q1 2026 | ⚪ Planned |
-| Phase 3 – Advanced Features | Commerce features & customization | Q2 2026 | ⚪ Planned |
-| Phase 4 – Ecosystem | Community & developer tools | Q3-Q4 2026 | ⚪ Planned |
+| Phase 1 – Foundation | Core architecture & plugin system | Q4 2025 | Complete (v0.1.3 on pub.dev) |
+| Phase 2 – AI Integration | Documentation & testing enhancements | Q1 2026 | In Progress |
+| Phase 3 – Advanced Features | Commerce features & customization | Q2 2026 | Planned |
+| Phase 4 – Ecosystem | Community & developer tools | Q3-Q4 2026 | Planned |
 
 ---
 
-## 🎯 Current Focus (Phase 1 Completion)
+## Current Focus (Phase 2)
 
 ### Immediate Priorities
-- [x] Plugin configuration with active/inactive support ✅
-- [x] Section configuration with active flags ✅
-- [x] FeaturePlugin comprehensive documentation ✅
-- [x] PLUGIN_SYSTEM.md update for AI agents ✅
-- [ ] Complete remaining entity documentation
-- [ ] Add configuration validation
-- [ ] Create plugin development examples
-- [ ] Write adapter development guide
+- [ ] Extract shared test utilities into `test/helpers/` module
+- [ ] Standalone JSON schema definition files for entities
+- [ ] Plugin scaffolding templates / code generation guides
+- [ ] Deep linking support in ActionRegistry
+- [ ] Migration guide for v0.1.x → future breaking changes
 
-### Near-Term Goals (Next 2 Weeks)
-- [ ] Entity factory pattern documentation
+### Near-Term Goals
+- [ ] Visual architecture diagrams for AI-ready docs
+- [ ] Decision trees for common plugin/adapter scenarios
+- [ ] Additional runnable example: complex multi-plugin app
 - [ ] Error handling best practices guide
-- [ ] State management integration guide
-- [ ] Performance optimization guide
 
 ---
 
-## 📘 Future Considerations
+## Future Considerations
 
 ### AI-Specific Features
 - [ ] Natural language configuration generation
@@ -244,13 +280,13 @@ The framework provides:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This is a framework designed for AI agents, but human contributions are welcome!
 
 ### How to Contribute
-1. Review [ARCHITECTURE.md](docs/ai-ready/ARCHITECTURE.md) to understand the system
-2. Check [PLUGIN_SYSTEM.md](docs/ai-ready/PLUGIN_SYSTEM.md) for plugin development
+1. Review [ARCHITECTURE.md](doc/ai-ready/ARCHITECTURE.md) to understand the system
+2. Check [PLUGIN_SYSTEM.md](doc/ai-ready/PLUGIN_SYSTEM.md) for plugin development
 3. Follow the existing patterns and documentation style
 4. Ensure all code includes comprehensive documentation
 5. Update relevant AI-ready documentation
@@ -264,7 +300,7 @@ This is a framework designed for AI agents, but human contributions are welcome!
 
 ---
 
-**Last Updated:** 2025-11-06
+**Last Updated:** 2026-02-19
 **Maintainer:** Moose Core Framework Team
-**Framework Version:** 1.0.0
+**Framework Version:** 0.1.3
 **Target Flutter Version:** 3.24+
