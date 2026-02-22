@@ -5,6 +5,51 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-02-22
+
+### Breaking Changes
+
+- **Singletons removed**: Global singleton constructors removed from all registry and
+  manager classes. `WidgetRegistry()`, `HookRegistry()`, `AddonRegistry()`,
+  `ActionRegistry()`, `AdapterRegistry()`, `EventBus()`, `PluginRegistry()`, and
+  `ConfigManager()` no longer return a shared instance — each call creates a new
+  independent object.
+- **`MooseAppContext` replaces singletons**: All registries are now owned by a
+  `MooseAppContext` instance. Construct one at app startup and expose via `MooseScope`.
+- **`CoreRepository` constructor**: Now requires `{required HookRegistry hookRegistry,
+  required EventBus eventBus}` named parameters. All concrete subclasses must forward
+  via `super`.
+- **`FeaturePlugin` field injection**: Registry fields (`hookRegistry`, `addonRegistry`,
+  `widgetRegistry`, `adapterRegistry`, `actionRegistry`, `eventBus`) are now getters
+  delegating to an injected `appContext` set by `PluginRegistry.register()`.
+- **`PluginRegistry`**: `registerPlugin()` split into sync `register(plugin, {required appContext})`
+  and async `initializeAll()`.
+- **`FeatureSection.adapters` getter removed**: Replaced by `adaptersOf(BuildContext)`
+  method. Call inside `build(context)`.
+- **`BackendAdapter`**: `hookRegistry` and `eventBus` are now settable fields (set by
+  `AdapterRegistry` before `initializeFromConfig`). Method signature changed to
+  `Future<void> initializeFromConfig({ConfigManager? configManager})`.
+- **`AppNavigator`**: No longer holds a static singleton `EventBus`. Call
+  `AppNavigator.setEventBus(eventBus)` before navigation (done automatically by
+  `MooseBootstrapper`).
+
+### Added
+
+- **`MooseAppContext`** (`package:moose_core/app.dart`): App-scoped container owning
+  all registries. Supports optional constructor parameters for testing and DI.
+- **`MooseScope`** (`package:moose_core/app.dart`): `InheritedWidget` that exposes
+  `MooseAppContext` down the widget tree. Use the `context.moose` extension from any
+  widget to access registries.
+- **`MooseBootstrapper`** (`package:moose_core/app.dart`): Orchestrates 5-step startup
+  (config → EventBus wiring → adapters → plugin registration → plugin initialization)
+  and returns a `BootstrapReport` with per-plugin timings and failure details.
+- **`BootstrapReport`**: Exposes `totalTime`, `pluginTimings`, `failures`, `succeeded`.
+- **`UnknownSectionWidget`** (`package:moose_core/widgets.dart`): Displayed in debug
+  mode when `WidgetRegistry.build()` is called with an unregistered section name.
+- **`WidgetRegistry.setConfigManager()`** and **`AdapterRegistry.setDependencies()`**:
+  Post-construction wiring methods used internally by `MooseAppContext`.
+- New barrel `lib/app.dart`, re-exported from `lib/moose_core.dart`.
+
 ## [0.1.3] - 2026-02-18
 
 ### Fixed

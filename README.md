@@ -25,7 +25,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core: ^0.1.3
+  moose_core: ^1.0.0
 ```
 
 ### Import Options
@@ -35,6 +35,7 @@ dependencies:
 import 'package:moose_core/moose_core.dart';
 
 // Option 2: Import specific modules (for optimized builds)
+import 'package:moose_core/app.dart';            // MooseAppContext, MooseScope, MooseBootstrapper
 import 'package:moose_core/entities.dart';       // Domain entities
 import 'package:moose_core/repositories.dart';   // Repository interfaces
 import 'package:moose_core/plugin.dart';         // Plugin system
@@ -49,68 +50,86 @@ import 'package:moose_core/services.dart';       // Utilities & helpers
 ```dart
 import 'package:moose_core/moose_core.dart';
 
-// 1. Create a plugin
-class ProductsPlugin extends FeaturePlugin {
-  ProductsRepository? _productsRepository;
+// 1. Bootstrap the app with MooseAppContext + MooseScope
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CacheManager.initPersistentCache();
+  final appContext = MooseAppContext();
+  runApp(MooseScope(
+    appContext: appContext,
+    child: AppBootstrap(appContext: appContext),
+  ));
+}
 
-  ProductsRepository _repository() {
-    _productsRepository ??= adapterRegistry.getRepository<ProductsRepository>();
-    return _productsRepository!;
+class AppBootstrap extends StatefulWidget {
+  final MooseAppContext appContext;
+  const AppBootstrap({super.key, required this.appContext});
+  @override State<AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends State<AppBootstrap> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    MooseBootstrapper(appContext: widget.appContext).run(
+      config: {'adapters': {'woocommerce': {'baseUrl': 'https://mystore.com'}}},
+      adapters: [WooCommerceAdapter()],
+      plugins: [() => ProductsPlugin()],
+    ).then((_) { if (mounted) setState(() => _ready = true); });
   }
 
   @override
-  String get name => 'products';
+  Widget build(BuildContext context) => _ready
+      ? const MyApp()
+      : const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
 
-  @override
-  String get version => '1.0.0';
+// 2. Create a plugin — use inherited registry getters (hookRegistry, widgetRegistry, etc.)
+class ProductsPlugin extends FeaturePlugin {
+  @override String get name => 'products';
+  @override String get version => '1.0.0';
 
   @override
   void onRegister() {
-    // Register sections and pass dependencies explicitly
+    // widgetRegistry, hookRegistry, addonRegistry, etc. delegate to injected appContext
     widgetRegistry.register(
       'products.featured',
       (context, {data, onEvent}) => FeaturedProductsSection(
-        repository: _repository(),
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
   }
 
+  @override Future<void> initialize() async {}
+
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
-        '/products': (context) => ProductsListScreen(),
-      };
+    '/products': (_) => ProductsListScreen(),
+  };
 }
 
-// 2. Create a FeatureSection
+// 3. Create a FeatureSection — use adaptersOf(context) inside build()
 class FeaturedProductsSection extends FeatureSection {
-  final ProductsRepository repository;
-
-  const FeaturedProductsSection({
-    super.key,
-    super.settings,
-    required this.repository,
-  });
+  const FeaturedProductsSection({super.key, super.settings});
 
   @override
   Map<String, dynamic> getDefaultSettings() => {
-        'title': 'FEATURED PRODUCTS',
-        'itemCount': 10,
-      };
+    'title': 'FEATURED PRODUCTS',
+    'itemCount': 10,
+  };
 
   @override
   Widget build(BuildContext context) {
+    final repository = adaptersOf(context).getRepository<ProductsRepository>();
     return BlocProvider(
       create: (_) => FeaturedProductsBloc(repository)
         ..add(const LoadFeaturedProducts()),
       child: BlocBuilder<FeaturedProductsBloc, FeaturedProductsState>(
         builder: (context, state) {
-          if (state is FeaturedProductsLoaded) {
-            return _buildProducts(state.products);
-          }
-          if (state is FeaturedProductsError) {
-            return Text(state.message);
-          }
+          if (state is FeaturedProductsLoaded) return _buildProducts(state.products);
+          if (state is FeaturedProductsError) return Text(state.message);
           return const CircularProgressIndicator();
         },
       ),
@@ -118,22 +137,18 @@ class FeaturedProductsSection extends FeatureSection {
   }
 }
 
-// 3. Create a backend adapter
+// 4. Create a backend adapter — hookRegistry and eventBus are set before initializeFromConfig
 class WooCommerceAdapter extends BackendAdapter {
-  @override
-  String get name => 'woocommerce';
+  @override String get name => 'woocommerce';
+  @override String get version => '1.0.0';
 
   @override
-  String get version => '1.0.0';
-
-  @override
-  Future<void> initialize(Map<String, dynamic> config) async {
-    // Register repository implementations
+  Future<void> initializeFromConfig({ConfigManager? configManager}) async {
     registerRepositoryFactory<ProductsRepository>(
-      () => WooProductsRepository(apiClient),
+      () => WooProductsRepository(apiClient, hookRegistry: hookRegistry, eventBus: eventBus),
     );
     registerRepositoryFactory<CartRepository>(
-      () => WooCartRepository(apiClient),
+      () => WooCartRepository(apiClient, hookRegistry: hookRegistry, eventBus: eventBus),
     );
   }
 }
@@ -151,19 +166,23 @@ class MyPlugin extends FeaturePlugin {
   String get name => 'my_plugin';
 
   @override
-  Future<void> initialize() async {
-    // Initialize plugin resources
-  }
-
-  @override
   void onRegister() {
-    // Register widgets, actions, hooks
+    // widgetRegistry, hookRegistry, actionRegistry, etc. are available as
+    // inherited getters backed by the injected MooseAppContext
+    widgetRegistry.register('my.section', (ctx, {data, onEvent}) => MySection());
+    hookRegistry.register('my:hook', (data) => processData(data));
+    actionRegistry.register('my.action', (ctx, payload) async { /* ... */ });
   }
 
   @override
-  Map<String, WidgetBuilder>? getRoutes() {
-    // Define navigation routes
+  Future<void> initialize() async {
+    // Async initialization (called after all plugins are registered)
   }
+
+  @override
+  Map<String, WidgetBuilder>? getRoutes() => {
+    '/my-route': (_) => MyScreen(),
+  };
 }
 ```
 
@@ -172,16 +191,23 @@ class MyPlugin extends FeaturePlugin {
 Abstract interfaces with backend-specific implementations:
 
 ```dart
-// Core repository interface
-abstract class ProductsRepository {
-  Future<List<Product>> getProducts(ProductFilters? filters);
+// Core repository interface (abstract, defined in moose_core)
+abstract class ProductsRepository extends CoreRepository {
+  Future<ProductListResult> getProducts({ProductFilters? filters});
   Future<Product> getProductById(String id);
 }
 
-// Backend implementation
-class WooProductsRepository implements ProductsRepository {
+// Backend implementation — forward hookRegistry and eventBus to super
+class WooProductsRepository extends ProductsRepository {
+  final ApiClient _apiClient;
+
+  WooProductsRepository(this._apiClient, {
+    required super.hookRegistry,
+    required super.eventBus,
+  });
+
   @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
+  Future<ProductListResult> getProducts({ProductFilters? filters}) async {
     // WooCommerce-specific implementation
   }
 }
@@ -215,58 +241,59 @@ class MySection extends FeatureSection {
 ### Registry Systems
 
 #### WidgetRegistry
-Dynamic widget composition:
+Dynamic widget composition. In plugins use the inherited getter; in widgets use `context.moose`:
 ```dart
-WidgetRegistry().register('my.widget', (context, {data, onEvent}) => MyWidget());
-final widget = WidgetRegistry().build('my.widget', context);
+// In a plugin's onRegister():
+widgetRegistry.register('my.widget', (context, {data, onEvent}) => MyWidget());
+
+// In any widget's build(context):
+final widget = context.moose.widgetRegistry.build('my.widget', context);
 ```
 
 #### AdapterRegistry
-Backend adapter management:
+Backend adapter management. In `FeatureSection.build()` use `adaptersOf(context)`:
 ```dart
-await AdapterRegistry().registerAdapter(() async {
-  final adapter = WooCommerceAdapter();
-  await adapter.initialize(config['woocommerce']);
-  return adapter;
-});
+// In a FeatureSection's build(context):
+final repo = adaptersOf(context).getRepository<ProductsRepository>();
 
-final repo = AdapterRegistry().getRepository<ProductsRepository>();
+// In any other widget's build(context):
+final repo = context.moose.adapterRegistry.getRepository<ProductsRepository>();
 ```
 
 #### ActionRegistry
 Custom action handling:
 ```dart
-ActionRegistry().register('custom_action', (context, payload) async {
+// In a plugin's onRegister():
+actionRegistry.register('custom_action', (context, payload) async {
   // Handle action
 });
-ActionRegistry().execute('custom_action', context, payload);
+
+// In any widget's build(context):
+context.moose.actionRegistry.execute('custom_action', context, payload);
 ```
 
 #### EventBus
 Asynchronous event-driven communication between plugins:
 ```dart
-// Fire events (fire-and-forget)
-EventBus().fire(
+// In a plugin — fire events using the inherited getter:
+eventBus.fire(
   'cart.item.added',
-  data: {
-    'productId': 'prod-123',
-    'quantity': 2,
-  },
-  metadata: {
-    'cartTotal': 99.99,
-  },
+  data: {'productId': 'prod-123', 'quantity': 2},
+  metadata: {'cartTotal': 99.99},
 );
 
-// Subscribe to events
-final subscription = EventBus().on('cart.item.added', (event) {
+// In a plugin — subscribe to events:
+final subscription = eventBus.on('cart.item.added', (event) {
   final productId = event.data['productId'];
-  print('Item added: $productId');
 });
 
-// Async event handlers
-EventBus().onAsync('order.placed', (event) async {
+// Async event handlers:
+eventBus.onAsync('order.placed', (event) async {
   await sendConfirmationEmail(event.data['orderId']);
 });
+
+// In a widget — use context.moose:
+context.moose.eventBus.fire('my.event', data: {});
 
 // Clean up
 await subscription.cancel();
@@ -275,7 +302,7 @@ await subscription.cancel();
 #### HookRegistry
 Synchronous data transformation and service hooks:
 ```dart
-// Cart plugin exposes hooks
+// In a plugin's onRegister() — expose hooks using inherited getter:
 hookRegistry.register('cart:get_cart_item_count', (data) {
   if (state is CartLoaded) return state.cart.itemCount;
   return 0;
@@ -285,9 +312,9 @@ hookRegistry.register('cart:item_count_stream', (data) {
   return cartBloc.stream.map((state) => state.totalItems).distinct();
 });
 
-// Other plugins consume hooks
-final count = hookRegistry.execute<int>('cart:get_cart_item_count', 0);
-final stream = hookRegistry.execute<Stream<int>>(
+// In a widget — consume hooks via context.moose:
+final count = context.moose.hookRegistry.execute<int>('cart:get_cart_item_count', 0);
+final stream = context.moose.hookRegistry.execute<Stream<int>>(
   'cart:item_count_stream',
   const Stream<int>.empty(),
 );
@@ -321,6 +348,7 @@ The package is organized into focused modules for better maintainability and sel
 
 | Module | Description | Key Exports |
 |--------|-------------|-------------|
+| **app.dart** | Scoped architecture | MooseAppContext, MooseScope, MooseBootstrapper |
 | **entities.dart** | Domain entities | Product, Cart, Order, Category, etc. |
 | **repositories.dart** | Repository interfaces | ProductsRepository, CartRepository, etc. |
 | **plugin.dart** | Plugin system | FeaturePlugin, PluginRegistry |
