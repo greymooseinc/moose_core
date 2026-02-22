@@ -30,6 +30,8 @@ import 'repository.dart';
 /// }
 /// ```
 abstract class PushNotificationRepository extends CoreRepository {
+  PushNotificationRepository({required super.hookRegistry, required super.eventBus});
+
   /// Request notification permissions from the user
   ///
   /// Returns the permission status after the request.

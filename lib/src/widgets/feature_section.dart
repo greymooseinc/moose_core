@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/services.dart';
 
+import '../app/moose_scope.dart';
+
 /// Abstract base class for all feature sections in the application.
 ///
 /// Feature sections are special, reusable, and configurable UI components
@@ -133,24 +135,23 @@ abstract class FeatureSection extends StatelessWidget {
 
   const FeatureSection({super.key, this.settings});
 
-  /// Gets the active adapter for accessing repositories
+  /// Returns the scoped [AdapterRegistry] from the nearest [MooseScope].
   ///
-  /// This is a convenience getter that all sections can use to access
-  /// the active adapter without needing to import AdapterRegistry.
+  /// Call this inside [build] to access repositories:
   ///
-  /// Example:
   /// ```dart
   /// @override
   /// Widget build(BuildContext context) {
   ///   return BlocProvider(
-  ///     create: (context) => MyBloc(
-  ///       repository: adapters.getRepository<ProductsRepository>(),
+  ///     create: (_) => MyBloc(
+  ///       repository: adaptersOf(context).getRepository<MyRepository>(),
   ///     )..add(LoadData()),
   ///     child: ...,
   ///   );
   /// }
   /// ```
-  AdapterRegistry get adapters => AdapterRegistry();
+  AdapterRegistry adaptersOf(BuildContext context) =>
+      MooseScope.adapterRegistryOf(context);
 
   /// Returns the default settings for this feature section.
   ///

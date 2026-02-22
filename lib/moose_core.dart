@@ -22,6 +22,7 @@
 /// ```
 library moose_core;
 
+export 'app.dart';
 export 'entities.dart';
 export 'repositories.dart';
 export 'plugin.dart';

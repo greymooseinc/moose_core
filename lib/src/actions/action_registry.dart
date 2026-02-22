@@ -8,13 +8,7 @@ typedef CustomActionHandler = void Function(
 );
 
 class ActionRegistry {
-  static final ActionRegistry _instance = ActionRegistry._internal();
-
-  factory ActionRegistry() => _instance;
-
-  static ActionRegistry get instance => _instance;
-
-  ActionRegistry._internal();
+  ActionRegistry();
 
   final Map<String, CustomActionHandler> _customHandlers = {};
 

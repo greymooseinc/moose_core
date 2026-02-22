@@ -3,26 +3,111 @@ import 'package:moose_core/moose_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CacheManager.initPersistentCache();
+  runApp(const AppRoot());
+}
 
-  // Initialize configuration
-  ConfigManager().initialize({
-    'plugins': {
-      'demo': {
-        'active': true,
-        'settings': {
-          'greeting': 'Welcome to moose_core!',
+/// Root widget that creates [MooseAppContext] and wraps the app in [MooseScope].
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ctx = MooseAppContext();
+    return MooseScope(
+      appContext: ctx,
+      child: MaterialApp(
+        title: 'moose_core Example',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+          useMaterial3: true,
+        ),
+        home: AppBootstrapScreen(appContext: ctx),
+      ),
+    );
+  }
+}
+
+/// Displays an animated splash screen while [MooseBootstrapper] runs.
+///
+/// Navigates to [DemoScreen] once bootstrap completes.
+class AppBootstrapScreen extends StatefulWidget {
+  final MooseAppContext appContext;
+  const AppBootstrapScreen({super.key, required this.appContext});
+
+  @override
+  State<AppBootstrapScreen> createState() => _AppBootstrapScreenState();
+}
+
+class _AppBootstrapScreenState extends State<AppBootstrapScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  BootstrapReport? _report;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+      config: {
+        'plugins': {
+          'demo': {
+            'active': true,
+            'settings': {'greeting': 'Welcome to moose_core!'},
+          },
         },
       },
-    },
-  });
+      plugins: [() => DemoPlugin()],
+    );
+    if (mounted) setState(() => _report = report);
+  }
 
-  // Initialize persistent cache (required before using PersistentCache)
-  await CacheManager.initPersistentCache();
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-  // Register plugins
-  await PluginRegistry().registerPlugin(() => DemoPlugin());
+  @override
+  Widget build(BuildContext context) {
+    if (_report != null) {
+      // Navigate after the current frame to avoid build-phase navigation.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => MooseScope(
+                appContext: widget.appContext,
+                child: const DemoScreen(),
+              ),
+            ),
+          );
+        }
+      });
+    }
 
-  runApp(const MooseCoreExampleApp());
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RotationTransition(
+              turns: _controller,
+              child: const Icon(Icons.settings, size: 48, color: Colors.green),
+            ),
+            const SizedBox(height: 16),
+            const Text('Bootstrapping moose_core\u2026'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// A minimal example plugin demonstrating the [FeaturePlugin] pattern.
@@ -43,7 +128,7 @@ class DemoPlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    // Register a widget that can be rendered anywhere by name
+    // Register a widget that can be rendered anywhere by name.
     widgetRegistry.register(
       'demo.greeting',
       (context, {data, onEvent}) => const GreetingSection(),
@@ -95,23 +180,6 @@ class GreetingSection extends FeatureSection {
   }
 }
 
-class MooseCoreExampleApp extends StatelessWidget {
-  const MooseCoreExampleApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'moose_core Example',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      routes: PluginRegistry().getAllRoutes(),
-      home: const DemoScreen(),
-    );
-  }
-}
-
 class DemoScreen extends StatelessWidget {
   const DemoScreen({super.key});
 
@@ -124,11 +192,12 @@ class DemoScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // Render the registered widget dynamically by name
-          WidgetRegistry().build('demo.greeting', context),
+          // Render the registered widget dynamically by name via MooseScope.
+          context.moose.widgetRegistry.build('demo.greeting', context),
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -151,7 +220,7 @@ class DemoScreen extends StatelessWidget {
                 ),
                 _conceptTile(
                   'BackendAdapter',
-                  'Backend-agnostic repository implementation (WooCommerce, Shopify…)',
+                  'Backend-agnostic repository implementation (WooCommerce, Shopify\u2026)',
                 ),
                 _conceptTile(
                   'EventBus',
@@ -160,6 +229,10 @@ class DemoScreen extends StatelessWidget {
                 _conceptTile(
                   'HookRegistry',
                   'Synchronous data transformation hooks',
+                ),
+                _conceptTile(
+                  'MooseScope',
+                  'InheritedWidget providing MooseAppContext to the widget tree',
                 ),
               ],
             ),
@@ -175,14 +248,14 @@ class DemoScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('\u2022 ', style: TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
             child: RichText(
               text: TextSpan(
                 style: const TextStyle(color: Colors.black87),
                 children: [
                   TextSpan(
-                    text: '$title — ',
+                    text: '$title \u2014 ',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   TextSpan(text: description),

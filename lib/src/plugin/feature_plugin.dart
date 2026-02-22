@@ -4,6 +4,8 @@ import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 import 'package:moose_core/widgets.dart';
 
+import '../app/moose_app_context.dart';
+
 /// Base class for all feature plugins in the application.
 ///
 /// Feature plugins are self-contained modules that provide specific functionality
@@ -83,12 +85,18 @@ import 'package:moose_core/widgets.dart';
 abstract class FeaturePlugin {
   String get name;
   String get version;
-  final HookRegistry hookRegistry = HookRegistry();
-  final AddonRegistry addonRegistry = AddonRegistry();
-  final WidgetRegistry widgetRegistry = WidgetRegistry();
-  final AdapterRegistry adapterRegistry = AdapterRegistry();
-  final ActionRegistry actionRegistry = ActionRegistry();
-  final EventBus eventBus = EventBus();
+
+  /// Injected by [PluginRegistry.register] before [onRegister] is called.
+  /// All registry access goes through this scoped context.
+  late MooseAppContext appContext;
+
+  // Convenience getters — delegate to the injected appContext.
+  HookRegistry get hookRegistry => appContext.hookRegistry;
+  AddonRegistry get addonRegistry => appContext.addonRegistry;
+  WidgetRegistry get widgetRegistry => appContext.widgetRegistry;
+  AdapterRegistry get adapterRegistry => appContext.adapterRegistry;
+  ActionRegistry get actionRegistry => appContext.actionRegistry;
+  EventBus get eventBus => appContext.eventBus;
 
   /// JSON Schema for plugin configuration validation.
   ///
@@ -167,6 +175,6 @@ abstract class FeaturePlugin {
   List<BottomTab> get bottomTabs => const [];
 
   T getSetting<T>(String key) {
-    return ConfigManager().get('plugins:$name:settings:$key');
+    return appContext.configManager.get('plugins:$name:settings:$key');
   }
 }

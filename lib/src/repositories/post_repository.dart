@@ -3,6 +3,8 @@ import '../entities/paginated_result.dart';
 import 'repository.dart';
 
 abstract class PostRepository extends CoreRepository {
+  PostRepository({required super.hookRegistry, required super.eventBus});
+
   /// Get paginated posts with optional filters
   ///
   /// [page] - Page number for pagination (default: 1)

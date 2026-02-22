@@ -6,4 +6,5 @@ library widgets;
 
 export 'src/widgets/addon_registry.dart';
 export 'src/widgets/feature_section.dart';
+export 'src/widgets/unknown_section_widget.dart';
 export 'src/widgets/widget_registry.dart';

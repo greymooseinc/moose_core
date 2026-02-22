@@ -2,100 +2,76 @@ import 'package:flutter/material.dart';
 import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 
+import '../app/moose_app_context.dart';
 import 'feature_plugin.dart';
 
-/// Singleton registry for managing feature plugins.
+/// App-scoped registry for managing feature plugins.
 ///
-/// The PluginRegistry provides centralized management of feature plugins,
-/// allowing plugins to be registered and initialized on-the-fly.
+/// Create one [PluginRegistry] per [MooseAppContext] (done automatically).
+/// Use [MooseBootstrapper] to register and initialize plugins.
 ///
-/// ## Key Features:
-/// - **Singleton Pattern**: Only one registry instance exists
-/// - **Factory-Based Registration**: Plugins registered via factory functions
-/// - **Immediate Initialization**: Plugins are initialized as they are registered
-/// - **Type Safety**: Generic methods for type-safe plugin retrieval
-///
-/// ## Example Usage:
-/// ```dart
-/// final registry = PluginRegistry();
-///
-/// // Register and initialize plugins
-/// await registry.registerPlugin(() => HomePlugin());
-/// await registry.registerPlugin(() => ProductsPlugin());
-/// await registry.registerPlugin(() => CartPlugin());
-///
-/// // Get plugin if needed
-/// final homePlugin = registry.getPlugin<HomePlugin>('home');
-/// ```
+/// ## Lifecycle:
+/// 1. [register] — sync: inject [MooseAppContext], call [FeaturePlugin.onRegister]
+/// 2. [initializeAll] — async: call [FeaturePlugin.initialize] on every active plugin
 class PluginRegistry {
-  static final PluginRegistry _instance = PluginRegistry._internal();
-  factory PluginRegistry() => _instance;
-  PluginRegistry._internal();
+  PluginRegistry();
 
   final Map<String, FeaturePlugin> _plugins = {};
   final _logger = AppLogger('PluginRegistry');
-  final _configManager = ConfigManager();
   final List<BottomTab> _bottomTabs = [];
   bool _bottomTabsHookRegistered = false;
 
-  /// Registers and initializes a feature plugin.
+  /// Synchronously registers a plugin and injects the [appContext].
   ///
-  /// The plugin is created and initialized immediately when this method is called.
-  /// If the plugin is configured as inactive in environment.json, registration is skipped.
-  /// If no plugin configuration exists in environment.json, the plugin is considered active.
+  /// - Reads plugin active/inactive state from [MooseAppContext.configManager].
+  /// - Registers plugin defaults in the config manager.
+  /// - Injects [appContext] into the plugin **before** calling [FeaturePlugin.onRegister],
+  ///   so the plugin can access registries inside `onRegister`.
+  /// - Registers any bottom-navigation tabs the plugin declares.
   ///
-  /// **Parameters:**
-  /// - [factory]: Function that creates the plugin instance
-  ///
-  /// **Behavior:**
-  /// 1. Creates the plugin instance from the factory
-  /// 2. Checks plugin configuration in environment.json (plugins:{pluginName})
-  /// 3. If active: false, skips registration and logs a message
-  /// 4. If active: true or no config, proceeds with registration:
-  ///    - Calls plugin.onRegister()
-  ///    - Calls plugin.initialize() and awaits completion
-  ///    - Caches the plugin instance
-  ///
-  /// **Example:**
-  /// ```dart
-  /// await registry.registerPlugin(() => ProductsPlugin());
-  /// ```
-  Future<void> registerPlugin(FeaturePlugin Function() factory) async {
-    final plugin = factory();
-
-    // Register plugin defaults in ConfigManager
+  /// Inactive plugins (configured with `active: false`) are silently skipped.
+  void register(FeaturePlugin plugin, {required MooseAppContext appContext}) {
     final defaults = plugin.getDefaultSettings();
     if (defaults.isNotEmpty) {
-      _configManager.registerPluginDefaults(plugin.name, defaults);
+      appContext.configManager.registerPluginDefaults(plugin.name, defaults);
       _logger.info('Registered defaults for plugin: ${plugin.name}');
     }
 
-    // Get plugin configuration from environment.json
-    final pluginConfigData = _configManager.get('plugins:${plugin.name}');
-    final pluginConfig = pluginConfigData != null && pluginConfigData is Map<String, dynamic>
+    final pluginConfigData = appContext.configManager.get('plugins:${plugin.name}');
+    final pluginConfig = pluginConfigData is Map<String, dynamic>
         ? PluginConfig.fromJson(plugin.name, pluginConfigData)
         : PluginConfig(name: plugin.name, active: true);
 
-    // Skip registration if plugin is inactive
     if (!pluginConfig.active) {
       _logger.info('Skipping inactive plugin: ${plugin.name}');
       return;
     }
 
+    // Inject context BEFORE onRegister so the plugin can use registries inside it.
+    plugin.appContext = appContext;
     _plugins[plugin.name] = plugin;
 
-    // Call onRegister hook
     plugin.onRegister();
     _logger.success('Registered plugin: ${plugin.name} (${plugin.version})');
 
-    // Initialize the plugin
-    await plugin.initialize();
-    _logger.success('Initialized plugin: ${plugin.name}');
-
-    _registerBottomTabs(plugin);
+    _registerBottomTabs(plugin, appContext.hookRegistry);
   }
 
-  void _registerBottomTabs(FeaturePlugin plugin) {
+  /// Asynchronously initializes every registered plugin in registration order.
+  ///
+  /// Optionally collects per-plugin timing into [timings] (populated by
+  /// [MooseBootstrapper] for the [BootstrapReport]).
+  Future<void> initializeAll({Map<String, Duration>? timings}) async {
+    for (final plugin in _plugins.values) {
+      final sw = Stopwatch()..start();
+      await plugin.initialize();
+      sw.stop();
+      timings?[plugin.name] = sw.elapsed;
+      _logger.success('Initialized plugin: ${plugin.name}');
+    }
+  }
+
+  void _registerBottomTabs(FeaturePlugin plugin, HookRegistry hookRegistry) {
     final tabs = plugin.bottomTabs;
     if (tabs.isEmpty) return;
 
@@ -108,15 +84,12 @@ class PluginRegistry {
       }
     }
 
-    if (_bottomTabsHookRegistered) {
-      return;
-    }
+    if (_bottomTabsHookRegistered) return;
 
-    HookRegistry().register(
+    hookRegistry.register(
       'bottom_tabs:filter_tabs',
       (existingTabs) {
         if (existingTabs is! List<BottomTab>) return existingTabs;
-
         final merged = List<BottomTab>.from(existingTabs);
         for (final tab in _bottomTabs) {
           final idx = merged.indexWhere((t) => t.id == tab.id);
@@ -126,7 +99,6 @@ class PluginRegistry {
             merged.add(tab);
           }
         }
-
         return merged;
       },
       priority: 10,
@@ -135,94 +107,48 @@ class PluginRegistry {
     _bottomTabsHookRegistered = true;
   }
 
-  /// Retrieves a registered plugin by name with type safety.
+  /// Returns the registered plugin for [name], cast to [T].
   ///
-  /// **Type Parameters:**
-  /// - [T]: The specific plugin type (must extend [FeaturePlugin])
-  ///
-  /// **Parameters:**
-  /// - [name]: The name of the plugin to retrieve
-  ///
-  /// **Returns:**
-  /// - [T]: The plugin cast to the specified type
-  ///
-  /// **Throws:**
-  /// - [Exception]: If plugin with given name is not registered
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final productsPlugin = registry.getPlugin<ProductsPlugin>('products');
-  /// ```
+  /// Throws if no plugin with that name has been registered.
   T getPlugin<T extends FeaturePlugin>(String name) {
     if (!_plugins.containsKey(name)) {
-      throw Exception('Plugin $name not registered');
+      throw Exception('Plugin "$name" not registered');
     }
     return _plugins[name] as T;
   }
 
-  /// Checks if a plugin with the given name is registered.
-  ///
-  /// **Parameters:**
-  /// - [name]: The plugin name to check
-  ///
-  /// **Returns:**
-  /// - [bool]: true if plugin is registered, false otherwise
   bool hasPlugin(String name) => _plugins.containsKey(name);
 
-  /// Returns a list of all registered plugin names.
-  ///
-  /// **Returns:**
-  /// - [List<String>]: Names of all registered plugins
   List<String> getRegisteredPlugins() => _plugins.keys.toList();
 
-  /// Returns the total number of registered plugins.
-  ///
-  /// **Returns:**
-  /// - [int]: Count of registered plugins
   int get pluginCount => _plugins.length;
 
-  /// Returns all routes from all registered plugins.
+  /// Collects routes from all registered plugins into a single map.
   ///
-  /// Collects routes from each plugin's getRoutes() method and merges them
-  /// into a single map. If multiple plugins define the same route, the last
-  /// plugin's route will take precedence.
-  ///
-  /// **Returns:**
-  /// - [Map<String, WidgetBuilder>]: Combined routes from all plugins
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final allRoutes = registry.getAllRoutes();
-  /// // Returns: {'/home': ..., '/products': ..., '/cart': ...}
-  /// ```
+  /// If no plugin registers `/home`, a minimal placeholder is added.
   Map<String, WidgetBuilder> getAllRoutes() {
     final routes = <String, WidgetBuilder>{};
-
     for (final plugin in _plugins.values) {
       final pluginRoutes = plugin.getRoutes();
-      if (pluginRoutes != null) {
-        routes.addAll(pluginRoutes);
-      }
+      if (pluginRoutes != null) routes.addAll(pluginRoutes);
     }
-
-    if (!routes.containsKey('/home')) { 
+    if (!routes.containsKey('/home')) {
       routes['/home'] = (context) => Scaffold(
-        body: Center(
-          child: Text(
-            'Hello!',
-            style: Theme.of(context).textTheme.headlineLarge,
-          ),
-        ),
-      );
+            body: Center(
+              child: Text(
+                'Hello!',
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
+            ),
+          );
     }
-
     return routes;
   }
 
-  /// Clears all registered plugins (for testing).
-  ///
-  /// **Warning:** Use with caution - this will remove all plugins.
+  /// Clears all registered plugins. Use in tests only.
   void clearAll() {
     _plugins.clear();
+    _bottomTabs.clear();
+    _bottomTabsHookRegistered = false;
   }
 }

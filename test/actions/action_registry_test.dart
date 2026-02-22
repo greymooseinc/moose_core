@@ -11,21 +11,23 @@ void main() {
       registry = ActionRegistry();
       // Clear any previously registered handlers
       registry.clearCustomHandlers();
+      // AppNavigator requires a scoped EventBus in tests
+      AppNavigator.setEventBus(EventBus());
     });
 
     tearDown(() {
       registry.clearCustomHandlers();
     });
 
-    group('Singleton Pattern', () {
-      test('should return the same instance', () {
+    group('Instance Isolation', () {
+      test('each ActionRegistry() creates an independent instance', () {
         final instance1 = ActionRegistry();
         final instance2 = ActionRegistry();
-        final instance3 = ActionRegistry.instance;
 
-        expect(instance1, equals(instance2));
-        expect(instance2, equals(instance3));
-        expect(identical(instance1, instance2), isTrue);
+        // Registering on one should not affect the other
+        instance1.registerCustomHandler('action_a', (ctx, params) {});
+        expect(instance1.hasCustomHandler('action_a'), isTrue);
+        expect(instance2.hasCustomHandler('action_a'), isFalse);
       });
     });
 

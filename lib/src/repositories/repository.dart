@@ -4,8 +4,13 @@ import 'package:moose_core/services.dart';
 ///
 /// Provides common functionality and lifecycle management for repositories.
 abstract class CoreRepository {
-  final HookRegistry hookRegistry = HookRegistry();
-  final EventBus eventBus = EventBus();
+  final HookRegistry hookRegistry;
+  final EventBus eventBus;
+
+  CoreRepository({
+    required this.hookRegistry,
+    required this.eventBus,
+  });
 
   /// Initialize the repository
   ///
@@ -38,9 +43,7 @@ abstract class CoreRepository {
   /// }
   /// ```
   void initialize() {
-    // Default implementation: do nothing
-    // Subclasses can override to perform initialization tasks
-
-    print('repository initialize: $runtimeType');
+    // Default implementation: no-op.
+    // Subclasses override to perform synchronous initialization.
   }
 }

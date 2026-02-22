@@ -1,15 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/repositories.dart';
+import 'package:moose_core/services.dart';
 
 /// Mock repository for testing
 class MockRepository extends CoreRepository {
+  MockRepository()
+      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+
   @override
   void initialize() {}
 }
 
 /// Another mock for testing
 class AnotherMockRepository extends CoreRepository {
+  AnotherMockRepository()
+      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+
   @override
   void initialize() {}
 }
@@ -89,12 +96,12 @@ void main() {
       AdapterRegistry().clearAll();
     });
 
-    group('Singleton Pattern', () {
-      test('should return same instance', () {
+    group('Instance Isolation', () {
+      test('each AdapterRegistry() creates an independent instance', () {
         final registry1 = AdapterRegistry();
         final registry2 = AdapterRegistry();
 
-        expect(identical(registry1, registry2), true);
+        expect(identical(registry1, registry2), isFalse);
       });
     });
 

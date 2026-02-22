@@ -32,7 +32,22 @@ import '../events/event_bus.dart';
 /// });
 /// ```
 class AppNavigator {
-  static final EventBus _eventBus = EventBus();
+  static EventBus? _eventBus;
+
+  /// Wire the scoped [EventBus] from [MooseAppContext].
+  ///
+  /// Called automatically by [MooseBootstrapper.run] before any navigation
+  /// is attempted. Must be called before using any navigation method.
+  static void setEventBus(EventBus eventBus) => _eventBus = eventBus;
+
+  static EventBus get _bus {
+    assert(
+      _eventBus != null,
+      'AppNavigator used before an EventBus was set.\n'
+      'Ensure MooseBootstrapper.run() is called at app startup.',
+    );
+    return _eventBus!;
+  }
 
   /// Push a named route.
   ///
@@ -46,7 +61,7 @@ class AppNavigator {
     bool handled = false;
     Object? result;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.push_named',
       data: {
         'routeName': routeName,
@@ -82,7 +97,7 @@ class AppNavigator {
     bool handled = false;
     Object? handlerResult;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.push_replacement_named',
       data: {
         'routeName': routeName,
@@ -121,7 +136,7 @@ class AppNavigator {
     bool handled = false;
     Object? result;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.push',
       data: {
         'route': route,
@@ -154,7 +169,7 @@ class AppNavigator {
   static void pop<T extends Object?>(BuildContext context, [T? result]) {
     bool handled = false;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.pop',
       data: {
         'result': result,
@@ -187,7 +202,7 @@ class AppNavigator {
   ) async {
     bool handled = false;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.switch_to_tab',
       data: {
         'tabId': tabId,
@@ -217,7 +232,7 @@ class AppNavigator {
   ) async {
     bool handled = false;
 
-    _eventBus.fire(
+    _bus.fire(
       'navigation.switch_to_tab_index',
       data: {
         'index': index,
@@ -244,5 +259,5 @@ class AppNavigator {
   /// Get the EventBus instance for advanced use cases.
   ///
   /// Plugins can use this to listen to navigation events directly.
-  static EventBus get eventBus => _eventBus;
+  static EventBus get eventBus => _bus;
 }

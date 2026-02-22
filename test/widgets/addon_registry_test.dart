@@ -16,19 +16,14 @@ void main() {
       registry.clearAllAddons();
     });
 
-    group('Singleton Pattern', () {
-      test('should return same instance', () {
+    group('Instance Isolation', () {
+      test('each AddonRegistry() creates an independent instance', () {
         final registry1 = AddonRegistry();
         final registry2 = AddonRegistry();
 
-        expect(identical(registry1, registry2), true);
-      });
-
-      test('should access via instance getter', () {
-        final registry1 = AddonRegistry.instance;
-        final registry2 = AddonRegistry();
-
-        expect(identical(registry1, registry2), true);
+        registry1.register('zone.a', (ctx, {data, onEvent}) => const SizedBox());
+        expect(registry1.hasAddon('zone.a'), isTrue);
+        expect(registry2.hasAddon('zone.a'), isFalse);
       });
     });
 

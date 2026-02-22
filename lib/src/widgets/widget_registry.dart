@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
 import '../config/config_manager.dart';
 import '../entities/section_config.dart';
+import '../utils/logger.dart';
 import 'feature_section.dart';
-import 'package:flutter/material.dart';
+import 'unknown_section_widget.dart';
 
 typedef SectionBuilderFn = FeatureSection Function(
   BuildContext context, {
@@ -10,22 +14,19 @@ typedef SectionBuilderFn = FeatureSection Function(
 });
 
 class WidgetRegistry {
-  static final WidgetRegistry _instance = WidgetRegistry._internal();
-
-  /// Get the singleton instance
-  factory WidgetRegistry() => _instance;
-
-  /// Named constructor for explicit access
-  static WidgetRegistry get instance => _instance;
-
-  WidgetRegistry._internal();
+  WidgetRegistry();
 
   final Map<String, SectionBuilderFn> _registry = {};
-  final ConfigManager _configManager = ConfigManager();
+  ConfigManager _configManager = ConfigManager();
+  final _logger = AppLogger('WidgetRegistry');
+
+  /// Called by [MooseAppContext] after construction to wire the scoped
+  /// [ConfigManager] in place of the default instance.
+  void setConfigManager(ConfigManager cm) => _configManager = cm;
 
   void register(String name, SectionBuilderFn builder) {
     _registry[name] = builder;
-    print('\'$name\' widget registered');
+    _logger.debug('\'$name\' widget registered');
   }
 
   bool isRegistered(String name) {
@@ -48,7 +49,13 @@ class WidgetRegistry {
   }) {
     final builder = _registry[name];
     if (builder == null) {
-      return Container();
+      if (kDebugMode) {
+        return UnknownSectionWidget(
+          requestedName: name,
+          availableKeys: _registry.keys.toList(),
+        );
+      }
+      return const SizedBox.shrink();
     }
     return builder(context, data: data, onEvent: onEvent);
   }

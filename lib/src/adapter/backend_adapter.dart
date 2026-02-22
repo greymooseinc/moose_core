@@ -119,6 +119,15 @@ abstract class BackendAdapter {
   /// ```
   Map<String, dynamic> getDefaultSettings() => {};
 
+  /// Scoped [HookRegistry] injected by [AdapterRegistry] before initialization.
+  ///
+  /// Concrete adapters can pass this to repository factories so repositories
+  /// use the same scoped instance rather than a global singleton.
+  late HookRegistry hookRegistry;
+
+  /// Scoped [EventBus] injected by [AdapterRegistry] before initialization.
+  late EventBus eventBus;
+
   /// Repository factories storage
   final Map<Type, Object> _factories = {};
 
@@ -645,12 +654,12 @@ abstract class BackendAdapter {
   /// await adapter.initializeFromConfig();
   /// // Automatically loads config['adapters']['shopify']
   /// ```
-  Future<void> initializeFromConfig() async {
+  Future<void> initializeFromConfig({ConfigManager? configManager}) async {
     try {
-      final configManager = _getConfigManager();
+      final cm = configManager ?? _getConfigManager();
 
       // Get the adapters configuration
-      final adaptersConfig = configManager.get('adapters') as Map<String, dynamic>?;
+      final adaptersConfig = cm.get('adapters') as Map<String, dynamic>?;
 
       if (adaptersConfig == null) {
         throw Exception(

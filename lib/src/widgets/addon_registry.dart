@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/logger.dart';
+
 typedef WidgetBuilderFn = Widget? Function(
   BuildContext context, {
   Map<String, dynamic>? data,
@@ -13,17 +15,10 @@ class Addon {
 }
 
 class AddonRegistry {
-  static final AddonRegistry _instance = AddonRegistry._internal();
-
-  /// Get the singleton instance
-  factory AddonRegistry() => _instance;
-
-  /// Named constructor for explicit access
-  static AddonRegistry get instance => _instance;
-
-  AddonRegistry._internal();
+  AddonRegistry();
 
   final Map<String, List<Addon>> _addons = {};
+  final _logger = AppLogger('AddonRegistry');
 
   void register(String name, WidgetBuilderFn builder, {int priority = 1}) {
     _addons.putIfAbsent(name, () => []);
@@ -40,7 +35,7 @@ class AddonRegistry {
 
     // sort highest priority first
     existing.sort((a, b) => b.priority.compareTo(a.priority));
-    print('\'$name\' Addon registered with priority $priority');
+    _logger.debug('\'$name\' Addon registered with priority $priority');
   }
 
   List<Widget> build<T>(String name, BuildContext context, {

@@ -14,6 +14,8 @@ import '../entities/product_availability.dart';
 import 'repository.dart';
 
 abstract class ProductsRepository extends CoreRepository {
+  ProductsRepository({required super.hookRegistry, required super.eventBus});
+
   Future<ProductListResult> getProducts({
     ProductFilters? filters,
     Duration? cacheTTL,

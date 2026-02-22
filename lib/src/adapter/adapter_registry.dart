@@ -77,30 +77,7 @@ import 'backend_adapter.dart';
 /// - Registry manages repository lifecycle and provides access
 /// - No coupling between plugins and specific adapters
 class AdapterRegistry {
-  // =========================================================================
-  // SINGLETON IMPLEMENTATION
-  // =========================================================================
-
-  /// Private static instance of the registry (singleton pattern)
-  static final AdapterRegistry _instance = AdapterRegistry._internal();
-
-  /// Factory constructor that returns the singleton instance
-  ///
-  /// This ensures that all calls to `AdapterRegistry()` return the same instance.
-  ///
-  /// Example:
-  /// ```dart
-  /// final registry1 = AdapterRegistry();
-  /// final registry2 = AdapterRegistry();
-  /// assert(identical(registry1, registry2)); // true - same instance
-  /// ```
-  factory AdapterRegistry() => _instance;
-
-  /// Private constructor for singleton pattern
-  ///
-  /// This constructor is called only once when the static instance is created.
-  /// It cannot be called from outside this class.
-  AdapterRegistry._internal();
+  AdapterRegistry();
 
   // =========================================================================
   // PRIVATE PROPERTIES
@@ -127,9 +104,28 @@ class AdapterRegistry {
   /// Logger instance for the registry
   final _logger = AppLogger('AdapterRegistry');
 
+  // Scoped dependencies set by MooseAppContext after construction.
+  ConfigManager? _configManager;
+  HookRegistry? _hookRegistry;
+  EventBus? _eventBus;
+
   // =========================================================================
   // PUBLIC METHODS
   // =========================================================================
+
+  /// Wires scoped dependencies into this registry.
+  ///
+  /// Called automatically by [MooseAppContext] immediately after construction.
+  /// These are forwarded to each [BackendAdapter] before it is initialized.
+  void setDependencies({
+    required ConfigManager configManager,
+    required HookRegistry hookRegistry,
+    required EventBus eventBus,
+  }) {
+    _configManager = configManager;
+    _hookRegistry = hookRegistry;
+    _eventBus = eventBus;
+  }
 
   /// Registers and initializes a backend adapter.
   ///
@@ -194,9 +190,14 @@ class AdapterRegistry {
         );
       }
 
+      // Inject scoped dependencies before initialization so the adapter and the
+      // repositories it creates can use the app-scoped hook/event instances.
+      if (_hookRegistry != null) adapter.hookRegistry = _hookRegistry!;
+      if (_eventBus != null) adapter.eventBus = _eventBus!;
+
       // Auto-initialize if requested
       if (autoInitialize) {
-        await adapter.initializeFromConfig();
+        await adapter.initializeFromConfig(configManager: _configManager);
       }
 
       final adapterName = adapter.name;
@@ -204,7 +205,7 @@ class AdapterRegistry {
       // Register adapter defaults in ConfigManager
       final defaults = adapter.getDefaultSettings();
       if (defaults.isNotEmpty) {
-        ConfigManager().registerAdapterDefaults(adapterName, defaults);
+        (_configManager ?? ConfigManager()).registerAdapterDefaults(adapterName, defaults);
         _logger.debug('Registered defaults for adapter: $adapterName');
       }
 

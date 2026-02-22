@@ -18,14 +18,12 @@ void main() {
     // Singleton
     // =========================================================================
 
-    group('Singleton Pattern', () {
-      test('should return the same instance', () {
+    group('Instance Isolation', () {
+      test('each EventBus() creates an independent instance', () {
         final a = EventBus();
         final b = EventBus();
-        final c = EventBus.instance;
 
-        expect(identical(a, b), isTrue);
-        expect(identical(b, c), isTrue);
+        expect(identical(a, b), isFalse);
       });
     });
 

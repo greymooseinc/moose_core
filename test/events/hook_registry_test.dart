@@ -18,14 +18,12 @@ void main() {
     // Singleton
     // =========================================================================
 
-    group('Singleton Pattern', () {
-      test('should return the same instance', () {
+    group('Instance Isolation', () {
+      test('each HookRegistry() creates an independent instance', () {
         final a = HookRegistry();
         final b = HookRegistry();
-        final c = HookRegistry.instance;
 
-        expect(identical(a, b), isTrue);
-        expect(identical(b, c), isTrue);
+        expect(identical(a, b), isFalse);
       });
     });
 

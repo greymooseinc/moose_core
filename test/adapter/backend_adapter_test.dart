@@ -1,9 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/repositories.dart';
+import 'package:moose_core/services.dart';
 
 /// Minimal mock repository for testing - only implements what's needed
 class MockRepository extends CoreRepository {
+  MockRepository()
+      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+
   bool _initialized = false;
 
   @override
@@ -16,6 +20,9 @@ class MockRepository extends CoreRepository {
 
 /// Another mock repository for testing multiple repository types
 class AnotherMockRepository extends CoreRepository {
+  AnotherMockRepository()
+      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+
   @override
   void initialize() {}
 }

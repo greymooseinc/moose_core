@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 /// Event - Represents an event in the system
 ///
 /// Events are identified by name (string) and carry a data payload.
@@ -112,15 +114,7 @@ class EventSubscription {
 /// });
 /// ```
 class EventBus {
-  static final EventBus _instance = EventBus._internal();
-
-  /// Get the singleton instance
-  factory EventBus() => _instance;
-
-  /// Named constructor for explicit access
-  static EventBus get instance => _instance;
-
-  EventBus._internal();
+  EventBus();
 
   // Map of event name to stream controller
   final Map<String, StreamController<Event>> _controllers = {};
@@ -200,7 +194,7 @@ class EventBus {
           if (onError != null) {
             onError(e);
           } else {
-            print('Error in async event handler for "$eventName": $e');
+            debugPrint('Error in async event handler for "$eventName": $e');
           }
         }
       },
@@ -240,7 +234,7 @@ class EventBus {
     if (!controller.isClosed) {
       controller.add(event);
     } else {
-      print('Warning: Attempted to fire event on closed controller: $eventName');
+      debugPrint('Warning: Attempted to fire event on closed controller: $eventName');
     }
   }
 

@@ -34,6 +34,8 @@ import '../entities/short.dart';
 /// }
 /// ```
 abstract class ShortsRepository extends CoreRepository {
+  ShortsRepository({required super.hookRegistry, required super.eventBus});
+
   /// Fetch a paginated list of shorts.
   ///
   /// Parameters:

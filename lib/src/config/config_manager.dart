@@ -1,9 +1,7 @@
 
 
 class ConfigManager {
-  static final ConfigManager _instance = ConfigManager._internal();
-  factory ConfigManager() => _instance;
-  ConfigManager._internal();
+  ConfigManager();
 
   Map<String, dynamic> _config = {};
   final Map<String, Map<String, dynamic>> _pluginDefaults = {};

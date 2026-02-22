@@ -1,3 +1,5 @@
+import '../utils/logger.dart';
+
 class Hook {
   final int priority;
   final dynamic Function(dynamic) callback;
@@ -5,17 +7,10 @@ class Hook {
 }
 
 class HookRegistry {
-  static final HookRegistry _instance = HookRegistry._internal();
-
-  /// Get the singleton instance
-  factory HookRegistry() => _instance;
-
-  /// Named constructor for explicit access
-  static HookRegistry get instance => _instance;
-
-  HookRegistry._internal();
+  HookRegistry();
 
   final Map<String, List<Hook>> _hooks = {};
+  final _logger = AppLogger('HookRegistry');
 
   void register(String hookName, dynamic Function(dynamic) callback, {int priority = 1}) {
     _hooks.putIfAbsent(hookName, () => []);
@@ -23,7 +18,7 @@ class HookRegistry {
 
     // sort highest priority first
     _hooks[hookName]!.sort((a, b) => b.priority.compareTo(a.priority));
-    print('\'$hookName\' hook registered with priority $priority');
+    _logger.debug('\'$hookName\' hook registered with priority $priority');
   }
 
   T execute<T>(String hookName, T data) {
@@ -34,7 +29,7 @@ class HookRegistry {
       try {
         result = hook.callback(result);
       } catch (e, stack) {
-        print('Error executing hook "$hookName": $e\n$stack');
+        _logger.error('Error executing hook "$hookName"', e, stack);
         // Continue executing other hooks even if one fails
       }
     }

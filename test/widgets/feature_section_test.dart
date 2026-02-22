@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moose_core/adapters.dart';
+import 'package:moose_core/app.dart';
 import 'package:moose_core/widgets.dart';
 
 /// Concrete test implementation of FeatureSection
@@ -155,10 +157,27 @@ void main() {
     });
 
     group('Adapter Access', () {
-      test('should provide access to AdapterRegistry', () {
-        const section = TestFeatureSection();
+      testWidgets('adaptersOf(context) returns AdapterRegistry from MooseScope', (tester) async {
+        final appContext = MooseAppContext();
+        AdapterRegistry? captured;
 
-        expect(section.adapters, isNotNull);
+        await tester.pumpWidget(
+          MooseScope(
+            appContext: appContext,
+            child: MaterialApp(
+              home: Builder(
+                builder: (ctx) {
+                  const section = TestFeatureSection();
+                  captured = section.adaptersOf(ctx);
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        );
+
+        expect(captured, isNotNull);
+        expect(identical(captured, appContext.adapterRegistry), isTrue);
       });
     });
 

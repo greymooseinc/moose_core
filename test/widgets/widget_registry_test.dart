@@ -30,19 +30,14 @@ void main() {
       }
     });
 
-    group('Singleton Pattern', () {
-      test('should return same instance', () {
+    group('Instance Isolation', () {
+      test('each WidgetRegistry() creates an independent instance', () {
         final registry1 = WidgetRegistry();
         final registry2 = WidgetRegistry();
 
-        expect(identical(registry1, registry2), true);
-      });
-
-      test('should access via instance getter', () {
-        final registry1 = WidgetRegistry.instance;
-        final registry2 = WidgetRegistry();
-
-        expect(identical(registry1, registry2), true);
+        registry1.register('widget.a', (ctx, {data, onEvent}) => const TestWidget());
+        expect(registry1.isRegistered('widget.a'), isTrue);
+        expect(registry2.isRegistered('widget.a'), isFalse);
       });
     });
 
