@@ -1,3 +1,6 @@
 .claude/
 .dart_tool/
 .vscode/
+/build/
+/example/build/
+/example/.idea
