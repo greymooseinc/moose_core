@@ -27,9 +27,10 @@ abstract class FeatureSection extends StatelessWidget {
 
   const FeatureSection({super.key, this.settings});
 
-  /// Convenient getter for accessing the AdapterRegistry instance
-  /// No need to import AdapterRegistry in your sections!
-  AdapterRegistry get adapters => AdapterRegistry();
+  /// Access the scoped AdapterRegistry from the widget tree.
+  /// Call this inside build(context) — requires a MooseScope ancestor.
+  AdapterRegistry adaptersOf(BuildContext context) =>
+      MooseScope.adapterRegistryOf(context);
 
   /// Define default settings for this section
   /// All configurable values MUST be defined here
@@ -92,8 +93,8 @@ class FeaturedProductsSection extends FeatureSection {
 
   @override
   Widget build(BuildContext context) {
-    // Use adapters getter from FeatureSection base class
-    final repository = adapters.getRepository<ProductsRepository>();
+    // Access AdapterRegistry from the widget tree via MooseScope
+    final repository = adaptersOf(context).getRepository<ProductsRepository>();
 
     return BlocProvider(
       create: (context) => ProductsBloc(repository)
@@ -159,10 +160,12 @@ class FeaturedProductsSection extends FeatureSection {
 
 ### Step 2: Register the Section
 
+Register sections in `onRegister()` (sync), not `initialize()` (reserved for async I/O):
+
 ```dart
 class ProductsPlugin extends FeaturePlugin {
   @override
-  Future<void> initialize() async {
+  void onRegister() {
     widgetRegistry.register(
       'products.featured_section',
       (context, {data, onEvent}) => FeaturedProductsSection(
@@ -442,7 +445,7 @@ class ReviewListSection extends FeatureSection {
       return SizedBox.shrink();
     }
 
-    final repository = adapters.getRepository<ReviewRepository>();
+    final repository = adaptersOf(context).getRepository<ReviewRepository>();
 
     return BlocProvider(
       create: (context) => ReviewsBloc(repository)
@@ -502,8 +505,8 @@ return BlocProvider(
   child: BlocBuilder<MyBloc, MyState>(...),
 );
 
-// ✅ Use adapters getter for repositories
-final repository = adapters.getRepository<ProductsRepository>();
+// ✅ Use adaptersOf(context) for repositories (inside build())
+final repository = adaptersOf(context).getRepository<ProductsRepository>();
 ```
 
 ### DON'T

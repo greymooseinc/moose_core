@@ -414,7 +414,7 @@ class _RecentlyViewedSectionState extends State<RecentlyViewedSection> {
     super.initState();
     _bloc = RecentlyViewedBloc(/* ... */);
 
-    // ❌ EventBus subscription in widget state
+    // ❌ EventBus subscription in widget state (and using EventBus() as singleton)
     _eventSubscription = EventBus().on('product.viewed', (event) {
       _bloc.add(LoadRecentlyViewed());
     });
@@ -445,8 +445,8 @@ class RecentlyViewedBloc extends Bloc<RecentlyViewedEvent, RecentlyViewedState> 
         super(const RecentlyViewedState()) {
     on<LoadRecentlyViewed>(_onLoadRecentlyViewed);
 
-    // ✅ EventBus subscription in BLoC (string-based events)
-    _eventSubscription = EventBus().on('product.viewed', (event) {
+    // ✅ EventBus subscription in BLoC — receive eventBus via constructor injection
+    _eventSubscription = eventBus.on('product.viewed', (event) {
       add(LoadRecentlyViewed(
         maxAge: state.maxAge,
         cacheTTL: state.cacheTTL,

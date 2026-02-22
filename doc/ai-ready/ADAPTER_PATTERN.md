@@ -104,7 +104,7 @@ abstract class BackendAdapter {
 
 - Override `configSchema` with a JSON Schema definition. When you call `initializeFromConfig()`, the framework automatically validates `environment.json.adapters.{adapterName}` against this schema before your adapter boots.
 - Override `getDefaultSettings()` with a full tree of sensible defaults. `ConfigManager` registers these values so missing keys in `environment.json` fall back to your code-defined settings.
-- Access merged settings from anywhere via `ConfigManager().get('adapters:$name:some:nested:key')`.
+- Access merged settings via the scoped ConfigManager: `appContext.configManager.get('adapters:$name:some:nested:key')` (or through `MooseScope.configManagerOf(context)` in widgets).
 
 #### `initializeFromConfig()` Shortcut
 
@@ -126,8 +126,10 @@ All repository interfaces must extend `CoreRepository`:
 ///
 /// Provides common functionality and lifecycle management for repositories.
 abstract class CoreRepository {
-  final HookRegistry hookRegistry = HookRegistry();
-  final EventBus eventBus = EventBus();
+  final HookRegistry hookRegistry;
+  final EventBus eventBus;
+
+  CoreRepository({required this.hookRegistry, required this.eventBus});
 
   /// Initialize the repository
   ///
@@ -150,22 +152,27 @@ abstract class CoreRepository {
 
 **Key Features:**
 - **Automatic Initialization**: `initialize()` is called automatically by the adapter
-- **HookRegistry Access**: Every repository has access to `hookRegistry` for data transformations
-- **EventBus Access**: Every repository has access to `eventBus` for firing events
+- **HookRegistry Access**: Injected via constructor; available as `hookRegistry` field
+- **EventBus Access**: Injected via constructor; available as `eventBus` field
+- **Injected by AdapterRegistry**: `AdapterRegistry.setDependencies()` provides the scoped `HookRegistry` and `EventBus` before any adapter is registered. Factories close over adapter's own fields.
 
 ## Creating a Custom Adapter
 
 ### Step 1: Define Repository Interfaces
 
+All concrete repository subclasses must pass `hookRegistry` and `eventBus` up to `CoreRepository`:
+
 ```dart
 // In core package
 abstract class ProductsRepository extends CoreRepository {
+  ProductsRepository({required super.hookRegistry, required super.eventBus});
   Future<List<Product>> getProducts(ProductFilters? filters);
   Future<Product> getProductById(String id);
   Future<List<Category>> getCategories();
 }
 
 abstract class CartRepository extends CoreRepository {
+  CartRepository({required super.hookRegistry, required super.eventBus});
   Future<Cart> getCart();
   Future<Cart> addToCart(String productId, int quantity);
   Future<Cart> updateCartItem(String itemId, int quantity);
@@ -177,10 +184,10 @@ abstract class CartRepository extends CoreRepository {
 
 ```dart
 // In your adapter package/directory
-class WooProductsRepository implements ProductsRepository {
+class WooProductsRepository extends ProductsRepository {
   final WooCommerceApiClient _apiClient;
 
-  WooProductsRepository(this._apiClient);
+  WooProductsRepository(this._apiClient, {required super.hookRegistry, required super.eventBus});
 
   @override
   Future<List<Product>> getProducts(ProductFilters? filters) async {
@@ -350,27 +357,31 @@ class WooCommerceAdapter extends BackendAdapter {
 }
 ```
 
-### Step 4: Register with AdapterRegistry
+### Step 4: Register with AdapterRegistry via MooseBootstrapper
 
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CacheManager.initPersistentCache();
 
-  // Load configuration
-  final config = await loadConfiguration();
+  final ctx = MooseAppContext();
 
-  final adapterRegistry = AdapterRegistry();
-
-  // Register WooCommerce adapter
-  await adapterRegistry.registerAdapter(() async {
-    final adapter = WooCommerceAdapter();
-    await adapter.initialize(config['woocommerce']);
-    return adapter;
-  });
-
-  runApp(MyApp(adapterRegistry: adapterRegistry));
+  runApp(MooseScope(
+    appContext: ctx,
+    child: MaterialApp(home: _BootstrapScreen(appContext: ctx)),
+  ));
 }
+
+// In bootstrap screen:
+final report = await MooseBootstrapper(appContext: ctx).run(
+  config: await loadConfiguration(),
+  // Pass adapter instances directly — MooseBootstrapper registers them:
+  adapters: [WooCommerceAdapter()],
+  plugins: [() => ProductsPlugin()],
+);
 ```
+
+> **Note:** `MooseBootstrapper` calls `appContext.adapterRegistry.registerAdapter(() => adapter)` internally after calling `setDependencies()` so adapters receive the scoped `HookRegistry`/`EventBus`. For manual registration outside a bootstrapper, call `appContext.adapterRegistry.registerAdapter(factory)` directly.
 
 ## Repository Factory Pattern
 
@@ -572,28 +583,16 @@ The Flutter `BannerSection` now passes a `sectionKey` (from `settings.key`) so a
 You can register multiple adapters for different purposes:
 
 ```dart
-final adapterRegistry = AdapterRegistry();
-
-// Register WooCommerce for e-commerce operations
-await adapterRegistry.registerAdapter(() async {
-  final adapter = WooCommerceAdapter();
-  await adapter.initialize(config['woocommerce']);
-  return adapter;
-});
-
-// Register OneSignal for push notifications
-await adapterRegistry.registerAdapter(() async {
-  final adapter = OneSignalAdapter();
-  await adapter.initialize(config['onesignal']);
-  return adapter;
-});
-
-// Register Stripe for payments
-await adapterRegistry.registerAdapter(() async {
-  final adapter = StripeAdapter();
-  await adapter.initialize(config['stripe']);
-  return adapter;
-});
+// Pass all adapters to MooseBootstrapper — it registers them with the scoped AdapterRegistry
+final report = await MooseBootstrapper(appContext: ctx).run(
+  config: config,
+  adapters: [
+    WooCommerceAdapter(),   // e-commerce operations
+    OneSignalAdapter(),     // push notifications
+    StripeAdapter(),        // payments
+  ],
+  plugins: [...],
+);
 ```
 
 ### Getting Repositories
@@ -808,12 +807,13 @@ class MockAdapter extends BackendAdapter {
 }
 
 class MockProductsRepository extends CoreRepository implements ProductsRepository {
+  MockProductsRepository() : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+
   bool _initialized = false;
 
   @override
   void initialize() {
     _initialized = true;
-    print('MockProductsRepository initialized');
   }
 
   @override
@@ -955,12 +955,12 @@ class ShopifyAdapter extends BackendAdapter {
   }
 }
 
-// main.dart
-await AdapterRegistry().registerAdapter(() async {
-  final adapter = ShopifyAdapter();
-  await adapter.initializeFromConfig();
-  return adapter;
-});
+// main.dart — pass via MooseBootstrapper
+final report = await MooseBootstrapper(appContext: ctx).run(
+  config: config,
+  adapters: [ShopifyAdapter()],  // initializeFromConfig() called automatically
+  plugins: [...],
+);
 ```
 
 ### Custom REST API Adapter
@@ -997,10 +997,11 @@ class CustomApiAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2025-11-12
-**Version:** 2.2.0
+**Last Updated:** 2026-02-22
+**Version:** 3.0.0
 
 **Changelog:**
+- **v3.0.0 (2026-02-22)**: `CoreRepository` now requires `hookRegistry`/`eventBus` constructor params. All concrete repo subclasses need forwarding constructors. `AdapterRegistry()` singleton removed — use `MooseBootstrapper` or `appContext.adapterRegistry`. `ConfigManager().get()` → `appContext.configManager.get()`. MockProductsRepository updated with constructor.
 - **v2.2.0 (2025-11-12)**:
   - Added Repository Catalog overview with interface/entity mapping
   - Provided banner repository registration sample and placement guidance

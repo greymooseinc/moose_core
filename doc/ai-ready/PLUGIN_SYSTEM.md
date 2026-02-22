@@ -54,9 +54,10 @@ abstract class FeaturePlugin {
   /// Optional: bottom navigation tabs contributed by this plugin
   List<BottomTab> get bottomTabs => const [];
 
-  /// Helper to read strongly typed settings for this plugin
+  /// Helper to read strongly typed settings for this plugin.
+  /// Reads from the scoped ConfigManager injected via appContext.
   T getSetting<T>(String key) {
-    return ConfigManager().get('plugins:$name:settings:$key');
+    return appContext.configManager.get('plugins:$name:settings:$key');
   }
 }
 ```
@@ -284,20 +285,50 @@ class ProductsPlugin extends FeaturePlugin {
 }
 ```
 
-### Step 2: Register the Plugin
+### Step 2: Bootstrap the Plugin
+
+Plugins are registered and initialized through `MooseBootstrapper`, not `PluginRegistry` directly:
 
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CacheManager.initPersistentCache();
 
-  final pluginRegistry = PluginRegistry();
+  final ctx = MooseAppContext();
 
-  // Register plugins
-  await pluginRegistry.registerPlugin(() => ProductsPlugin());
-  await pluginRegistry.registerPlugin(() => CartPlugin());
-  await pluginRegistry.registerPlugin(() => CheckoutPlugin());
+  runApp(
+    MooseScope(
+      appContext: ctx,
+      child: MaterialApp(home: AppBootstrapScreen(appContext: ctx)),
+    ),
+  );
+}
 
-  runApp(MyApp(pluginRegistry: pluginRegistry));
+class AppBootstrapScreen extends StatefulWidget {
+  final MooseAppContext appContext;
+  const AppBootstrapScreen({super.key, required this.appContext});
+  @override State<AppBootstrapScreen> createState() => _State();
+}
+
+class _State extends State<AppBootstrapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+      config: await loadConfig(), // your config map
+      adapters: [WooCommerceAdapter()],
+      plugins: [
+        () => ProductsPlugin(),
+        () => CartPlugin(),
+        () => CheckoutPlugin(),
+      ],
+    );
+    // navigate to main screen when done
+  }
 }
 ```
 
@@ -351,58 +382,49 @@ Plugins can be configured in `environment.json` under the `plugins` key. Each pl
 
 ### Accessing Plugin Configuration
 
+Use `getSetting<T>()` (which reads from the scoped `ConfigManager` via `appContext`):
+
 ```dart
 class ProductsPlugin extends FeaturePlugin {
   @override
   Future<void> initialize() async {
-    final registry = PluginRegistry();
-    final config = registry.getPluginConfig('products');
-
-    // Access settings
-    final cacheTTL = config.getSetting<int>('cache.productsTTL') ?? 300;
-    final perPage = config.getSetting<int>('perPage') ?? 20;
-
-    print('Products plugin active: ${config.active}');
-    print('Cache TTL: $cacheTTL seconds');
+    // getSetting reads from appContext.configManager automatically
+    final cacheTTL = getSetting<int>('cache.productsTTL'); // falls back to getDefaultSettings()
+    final perPage = getSetting<int>('perPage');
   }
 }
 ```
 
 ## Plugin Lifecycle
 
-### 1. Registration Phase
+### 1. Registration Phase — `PluginRegistry.register(plugin, appContext:)`
 
-```dart
-await pluginRegistry.registerPlugin(() => MyPlugin());
-```
+Triggered by `MooseBootstrapper.run(plugins: [...])` for each factory in the list.
 
-- Plugin factory function is called
-- Plugin instance is created
-- **Configuration check**: PluginRegistry checks `plugins:{pluginName}` in environment.json
+- Plugin factory `() => MyPlugin()` is called — plugin instance is created
+- **Configuration check**: PluginRegistry checks `plugins:{pluginName}` in environment.json via `appContext.configManager`
 - If `active: false`, registration is skipped (plugin won't be registered or initialized)
 - If `active: true` or no configuration exists, registration continues:
-  - `onRegister()` is called immediately
+  - `plugin.appContext = appContext` — injects the scoped context
+  - `plugin.onRegister()` is called immediately (sync)
   - Plugin is added to the registry
 
 **Important**: If no plugin configuration exists in environment.json, the plugin is considered active by default.
 
-### 2. Initialization Phase
+### 2. Initialization Phase — `PluginRegistry.initializeAll()`
 
-```dart
-// Happens automatically after registration
-```
+Triggered automatically by `MooseBootstrapper.run()` after all plugins are registered.
 
-- `initialize()` is called on each active plugin
-- Async resources are set up
-- Sections are registered with WidgetRegistry
-- Routes are collected
+- `initialize()` is called on each active plugin (async, in registration order)
+- Async resources are set up (network connections, caches, services)
+- Routes are collected via `getRoutes()`
 
 ### 3. Runtime Phase
 
-- Plugins respond to hooks
-- Custom actions are executed
+- Plugins respond to hooks via `hookRegistry`
+- Custom actions are executed via `actionRegistry`
 - Routes are available for navigation
-- Sections are built from configuration
+- Sections are built from configuration via `widgetRegistry`
 
 ## Registration Patterns
 
@@ -450,11 +472,8 @@ class HomePlugin extends FeaturePlugin {
   String get version => '1.0.0';
 
   @override
-  void onRegister() {}
-
-  @override
-  Future<void> initialize() async {
-    // Register multiple sections
+  void onRegister() {
+    // Register sections in onRegister() (sync, before initialize())
     widgetRegistry.register(
       'home.hero_section',
       (context, {data, onEvent}) => HeroSection(
@@ -468,6 +487,11 @@ class HomePlugin extends FeaturePlugin {
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
+  }
+
+  @override
+  Future<void> initialize() async {
+    // Async setup only (no widget registration here)
   }
 
   @override
@@ -537,7 +561,7 @@ class CartPlugin extends FeaturePlugin {
 
 ### Pattern 4: Plugin with Custom Actions
 
-Plugin that handles user interactions:
+Plugin that handles user interactions (uses `actionRegistry` convenience getter, not `ActionRegistry()` singleton):
 
 ```dart
 class SharePlugin extends FeaturePlugin {
@@ -549,7 +573,7 @@ class SharePlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    // Register custom action handlers
+    // Register custom action handlers via injected actionRegistry
     actionRegistry.registerCustomHandler('share_product', (context, params) {
       final productId = params?['productId'] as String?;
       final productName = params?['productName'] as String?;
@@ -583,18 +607,22 @@ class SharePlugin extends FeaturePlugin {
 
 ### Plugin Configuration
 
-**Always provide sensible defaults:**
+**Always provide sensible defaults via `getDefaultSettings()`:**
 
 ```dart
 class ProductsPlugin extends FeaturePlugin {
   @override
-  Future<void> initialize() async {
-    final registry = PluginRegistry();
-    final config = registry.getPluginConfig('products');
+  Map<String, dynamic> getDefaultSettings() => {
+    'cache': {'productsTTL': 300, 'categoriesTTL': 600},
+    'perPage': 20,
+    'enableReviews': false,
+  };
 
-    // Provide fallback values
-    final cacheTTL = config.getSetting<int>('cache.productsTTL') ?? 300;
-    final perPage = config.getSetting<int>('perPage') ?? 20;
+  @override
+  void onRegister() {
+    // getSetting reads merged config (defaults + environment.json overrides)
+    final cacheTTL = getSetting<int>('cache.productsTTL'); // → 300 if not overridden
+    final perPage = getSetting<int>('perPage'); // → 20 if not overridden
   }
 }
 ```
@@ -603,11 +631,9 @@ class ProductsPlugin extends FeaturePlugin {
 
 ```dart
 @override
-Future<void> initialize() async {
-  final config = PluginRegistry().getPluginConfig('products');
-
-  // Only enable feature if configured
-  if (config.getSetting<bool>('enableReviews') == true) {
+void onRegister() {
+  // Only register section if feature is enabled in config
+  if (getSetting<bool>('enableReviews')) {
     widgetRegistry.register('product.reviews_section', ...);
   }
 }
@@ -820,13 +846,15 @@ void main() {
 ```dart
 void main() {
   testWidgets('ProductsPlugin registers sections', (tester) async {
+    // Use a scoped MooseAppContext — no singletons
+    final appContext = MooseAppContext();
     final plugin = ProductsPlugin();
-    final widgetRegistry = WidgetRegistry();
 
-    await plugin.initialize();
+    // Inject context and call onRegister() (mirrors MooseBootstrapper behavior)
+    appContext.pluginRegistry.register(plugin, appContext: appContext);
 
     expect(
-      widgetRegistry.isRegistered('products.featured_section'),
+      appContext.widgetRegistry.isRegistered('products.featured_section'),
       isTrue,
     );
   });
@@ -1091,10 +1119,18 @@ Plugins with exemplary documentation:
 
 ---
 
-**Last Updated:** 2025-11-10
-**Version:** 2.3.0
+**Last Updated:** 2026-02-22
+**Version:** 3.0.0
 
 ## Changelog
+
+### Version 3.0.0 (2026-02-22)
+- Replaced `PluginRegistry.registerPlugin()` + `initialize()` with `MooseBootstrapper.run(plugins: [...])` pattern
+- `FeaturePlugin.getSetting<T>()` now reads from scoped `appContext.configManager` (not `ConfigManager()` singleton)
+- Plugin registration uses `PluginRegistry.register(plugin, appContext:)` + `initializeAll()` (split lifecycle)
+- `PluginRegistry.getPluginConfig()` usage replaced by `getSetting<T>()` + `getDefaultSettings()`
+- Integration tests updated to use `MooseAppContext` instead of `WidgetRegistry()` singleton
+- Widget/addon registration moved to `onRegister()` (sync); `initialize()` reserved for async I/O
 
 ### Version 2.3.0 (2025-11-10)
 - Documented `configSchema`, `getDefaultSettings()`, and `getSetting()` on `FeaturePlugin`

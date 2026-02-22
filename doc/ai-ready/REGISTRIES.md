@@ -14,7 +14,7 @@
 
 ## Overview
 
-The application uses four singleton registry systems to provide extensibility, modularity, and loose coupling between components:
+The application uses four registry systems to provide extensibility, modularity, and loose coupling between components. All registries are instance-based (no singletons) and owned by `MooseAppContext`. Access them in plugins via convenience getters (`hookRegistry`, `widgetRegistry`, etc.) or in widgets via `MooseScope`/`context.moose`.
 
 | Registry | Purpose | Use When |
 |----------|---------|----------|
@@ -39,9 +39,7 @@ lib/src/events/hook_registry.dart
 
 ```dart
 class HookRegistry {
-  // Singleton instance
-  factory HookRegistry() => _instance;
-  static HookRegistry get instance => _instance;
+  HookRegistry(); // Each instance is independent
 
   /// Register a hook callback
   /// @param hookName - Name of the hook point
@@ -146,8 +144,8 @@ class CartPlugin extends FeaturePlugin {
 
 **Trigger Cart Hooks:**
 ```dart
-// From any widget or component
-final hookRegistry = HookRegistry();
+// From a widget: access via MooseScope
+final hookRegistry = context.moose.hookRegistry;
 
 // Add item to cart without direct dependency on CartPlugin
 hookRegistry.execute('cart:add_to_cart', {
@@ -247,9 +245,7 @@ lib/src/widgets/widget_registry.dart
 
 ```dart
 class WidgetRegistry {
-  // Singleton instance
-  factory WidgetRegistry() => _instance;
-  static WidgetRegistry get instance => _instance;
+  WidgetRegistry(); // Each instance is independent
 
   /// Register a section builder
   /// @param name - Unique identifier for the section
@@ -382,7 +378,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: ListView(
-        children: WidgetRegistry().buildSectionGroup(
+        children: context.moose.widgetRegistry.buildSectionGroup(
           context,
           pluginName: 'home',
           groupName: 'main',
@@ -485,9 +481,7 @@ class Addon {
 }
 
 class AddonRegistry {
-  // Singleton instance
-  factory AddonRegistry() => _instance;
-  static AddonRegistry get instance => _instance;
+  AddonRegistry(); // Each instance is independent
 
   /// Register an addon builder for a named slot.
   /// @param name     - Slot identifier (e.g., 'product.card:badge')
@@ -572,7 +566,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badges = AddonRegistry().build(
+    final badges = context.moose.addonRegistry.build(
       'product.card:badge',
       context,
       data: {'product': product},
@@ -610,7 +604,7 @@ addonRegistry.register(
 );
 
 // Render all - returns [LoyaltyPointsWidget, GiftMessageWidget]
-final extras = AddonRegistry().build('checkout:summary_extras', context);
+final extras = context.moose.addonRegistry.build('checkout:summary_extras', context);
 ```
 
 #### Example 3: Conditional Rendering with Null
@@ -674,9 +668,7 @@ lib/src/actions/action_registry.dart
 
 ```dart
 class ActionRegistry {
-  // Singleton instance
-  factory ActionRegistry() => _instance;
-  static ActionRegistry get instance => _instance;
+  ActionRegistry(); // Each instance is independent
 
   /// Register a custom action handler
   /// @param actionId - Unique identifier for the action
@@ -772,7 +764,7 @@ final collection = Collection(
 // Handle tap in widget
 GestureDetector(
   onTap: () {
-    ActionRegistry().handleInteraction(context, collection.action);
+    context.moose.actionRegistry.handleInteraction(context, collection.action);
   },
   child: CollectionCard(collection: collection),
 )
@@ -786,24 +778,24 @@ final action = UserInteraction.openUrl(
   url: 'https://example.com/promo',
 );
 
-ActionRegistry().handleInteraction(context, action);
+context.moose.actionRegistry.handleInteraction(context, action);
 ```
 
 #### Example 3: Custom Action Handlers
 
-**Register Custom Handler:**
+**Register Custom Handler (in plugin — use `actionRegistry` convenience getter):**
 ```dart
 class CameraPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    // Register camera action
-    ActionRegistry().registerCustomHandler('open_camera', (context, params) {
+    // Register camera action via injected actionRegistry
+    actionRegistry.registerCustomHandler('open_camera', (context, params) {
       final mode = params?['mode'] ?? 'photo';
       Navigator.pushNamed(context, '/camera', arguments: {'mode': mode});
     });
 
     // Register share action
-    ActionRegistry().registerCustomHandler('share', (context, params) async {
+    actionRegistry.registerCustomHandler('share', (context, params) async {
       final content = params?['content'] ?? '';
       await Share.share(content);
     });
@@ -821,7 +813,7 @@ final action = UserInteraction.custom(
 
 // Execute action
 GestureDetector(
-  onTap: () => ActionRegistry().handleInteraction(context, action),
+  onTap: () => context.moose.actionRegistry.handleInteraction(context, action),
   child: CameraButton(),
 )
 ```
@@ -871,29 +863,31 @@ final staticCollection = Collection(
 
 ### Available Custom Action Examples
 
+Register these inside a plugin's `onRegister()` via the `actionRegistry` convenience getter:
+
 ```dart
 // Payment action
-ActionRegistry().registerCustomHandler('process_payment', (context, params) {
+actionRegistry.registerCustomHandler('process_payment', (context, params) {
   final amount = params?['amount'] as double?;
   final paymentMethod = params?['method'] as String?;
   // Process payment...
 });
 
 // Analytics action
-ActionRegistry().registerCustomHandler('track_event', (context, params) {
+actionRegistry.registerCustomHandler('track_event', (context, params) {
   final eventName = params?['event'] as String?;
   final properties = params?['properties'] as Map<String, dynamic>?;
   analytics.logEvent(eventName, properties);
 });
 
 // Deep link action
-ActionRegistry().registerCustomHandler('deep_link', (context, params) {
+actionRegistry.registerCustomHandler('deep_link', (context, params) {
   final url = params?['url'] as String?;
   DeepLinkHandler.handle(url);
 });
 
 // Modal action
-ActionRegistry().registerCustomHandler('show_modal', (context, params) {
+actionRegistry.registerCustomHandler('show_modal', (context, params) {
   final modalType = params?['type'] as String?;
   showModalBottomSheet(
     context: context,
@@ -961,7 +955,7 @@ class MyPlugin extends FeaturePlugin {
     hookRegistry.register('my_plugin:data_transform', _transformData);
 
     // Register custom actions (mid-level)
-    ActionRegistry().registerCustomHandler('my_action', _handleAction);
+    actionRegistry.registerCustomHandler('my_action', _handleAction);
   }
 
   @override
@@ -1052,9 +1046,9 @@ test('widget builds correctly', () {
   expect(widget, isA<Text>());
 });
 
-// Test action handling
+// Test action handling — create an independent ActionRegistry instance
 test('action executes custom handler', () {
-  final actionRegistry = ActionRegistry();
+  final actionRegistry = ActionRegistry(); // independent instance, not a singleton
   var executed = false;
 
   actionRegistry.registerCustomHandler('test_action', (context, params) {
@@ -1101,25 +1095,25 @@ bool exists = widgetRegistry.isRegistered('widget_name');
 
 ### AddonRegistry
 ```dart
-// Register
+// Register (in plugin onRegister())
 addonRegistry.register('slot.name:zone', builder, priority: 10);
 
-// Build all addons for a slot
-List<Widget> addons = AddonRegistry().build('slot.name:zone', context, data: {...});
+// Build all addons for a slot (in widget — via MooseScope)
+List<Widget> addons = context.moose.addonRegistry.build('slot.name:zone', context, data: {...});
 
 // Check
-bool exists = AddonRegistry().hasAddon('slot.name:zone');
-int count = AddonRegistry().getAddonCount('slot.name:zone');
+bool exists = context.moose.addonRegistry.hasAddon('slot.name:zone');
+int count = context.moose.addonRegistry.getAddonCount('slot.name:zone');
 ```
 
 ### ActionRegistry
 ```dart
-// Register
-ActionRegistry().registerCustomHandler('action_id', handler);
+// Register (in plugin onRegister())
+actionRegistry.registerCustomHandler('action_id', handler);
 
-// Handle
-ActionRegistry().handleInteraction(context, interaction);
+// Handle (in widget — via MooseScope)
+context.moose.actionRegistry.handleInteraction(context, interaction);
 
 // Check
-bool exists = ActionRegistry().hasCustomHandler('action_id');
+bool exists = context.moose.actionRegistry.hasCustomHandler('action_id');
 ```

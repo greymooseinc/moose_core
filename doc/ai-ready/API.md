@@ -11,6 +11,7 @@ The moose_core package is organized into focused modules:
 import 'package:moose_core/moose_core.dart';
 
 // Or import specific modules
+import 'package:moose_core/app.dart';            // MooseAppContext, MooseScope, MooseBootstrapper
 import 'package:moose_core/entities.dart';       // Domain entities
 import 'package:moose_core/repositories.dart';   // Repository interfaces
 import 'package:moose_core/plugin.dart';         // Plugin system
@@ -24,10 +25,11 @@ import 'package:moose_core/services.dart';       // Utilities & helpers
 
 | Module | Exports |
 |--------|---------|
+| **app.dart** | MooseAppContext, MooseScope, MooseBootstrapper, BootstrapReport, MooseContextExtension |
 | **entities.dart** | Product, Cart, Order, Category, ProductTag, Collection, Post, PromoBanner, ProductReview, SearchResult, PaginatedResult, etc. |
 | **repositories.dart** | ProductsRepository, CartRepository, ReviewRepository, SearchRepository, PostRepository, BannerRepository, PushNotificationRepository |
 | **plugin.dart** | FeaturePlugin, PluginRegistry |
-| **widgets.dart** | FeatureSection, WidgetRegistry, AddonRegistry |
+| **widgets.dart** | FeatureSection, WidgetRegistry, AddonRegistry, UnknownSectionWidget |
 | **adapters.dart** | BackendAdapter, AdapterRegistry |
 | **cache.dart** | CacheManager, MemoryCache, PersistentCache |
 | **services.dart** | ActionRegistry, HookRegistry, EventBus, ApiClient, ConfigManager, AppLogger, ColorHelper, TextStyleHelper, VariationSelectorService |
@@ -71,13 +73,16 @@ abstract class FeaturePlugin {
   /// Return routes provided by this plugin
   Map<String, WidgetBuilder>? getRoutes();
 
-  // Built-in registry accessors (all singletons):
-  // HookRegistry hookRegistry
-  // AddonRegistry addonRegistry
-  // WidgetRegistry widgetRegistry
-  // AdapterRegistry adapterRegistry
-  // ActionRegistry actionRegistry
-  // EventBus eventBus
+  // Injected by PluginRegistry.register() before onRegister() is called:
+  // late MooseAppContext appContext
+
+  // Convenience getters (delegate to appContext — NOT singletons):
+  // HookRegistry get hookRegistry => appContext.hookRegistry
+  // AddonRegistry get addonRegistry => appContext.addonRegistry
+  // WidgetRegistry get widgetRegistry => appContext.widgetRegistry
+  // AdapterRegistry get adapterRegistry => appContext.adapterRegistry
+  // ActionRegistry get actionRegistry => appContext.actionRegistry
+  // EventBus get eventBus => appContext.eventBus
 }
 ```
 
@@ -117,8 +122,9 @@ abstract class FeatureSection extends StatelessWidget {
 
   const FeatureSection({super.key, this.settings});
 
-  /// Convenient getter for accessing the AdapterRegistry instance
-  AdapterRegistry get adapters => AdapterRegistry();
+  /// Access the scoped AdapterRegistry from the widget tree
+  AdapterRegistry adaptersOf(BuildContext context) =>
+      MooseScope.adapterRegistryOf(context);
 
   /// Define default settings for this section
   Map<String, dynamic> getDefaultSettings();
@@ -223,8 +229,10 @@ Base class for all repository interfaces.
 
 ```dart
 abstract class CoreRepository {
-  final HookRegistry hookRegistry = HookRegistry();
-  final EventBus eventBus = EventBus();
+  final HookRegistry hookRegistry;
+  final EventBus eventBus;
+
+  CoreRepository({required this.hookRegistry, required this.eventBus});
 
   /// Initialize the repository
   ///
@@ -241,11 +249,14 @@ abstract class CoreRepository {
 **Example:**
 ```dart
 abstract class ProductsRepository extends CoreRepository {
+  ProductsRepository({required super.hookRegistry, required super.eventBus});
   Future<List<Product>> getProducts(ProductFilters? filters);
   Future<Product> getProductById(String id);
 }
 
 class WooProductsRepository extends CoreRepository implements ProductsRepository {
+  WooProductsRepository({required super.hookRegistry, required super.eventBus});
+
   @override
   void initialize() {
     // Called automatically - setup listeners, state, etc.
@@ -328,6 +339,109 @@ class RestBannerRepository extends BannerRepository {
 }
 ```
 
+## App Context Classes
+
+### MooseAppContext
+
+Central container that owns all registries. Create one per app.
+
+```dart
+class MooseAppContext {
+  final PluginRegistry pluginRegistry;
+  final WidgetRegistry widgetRegistry;
+  final HookRegistry hookRegistry;
+  final AddonRegistry addonRegistry;
+  final ActionRegistry actionRegistry;
+  final AdapterRegistry adapterRegistry;
+  final ConfigManager configManager;
+  final EventBus eventBus;
+  final AppLogger logger;
+
+  /// All fields are final; pass custom instances to override (useful for testing).
+  MooseAppContext({
+    PluginRegistry? pluginRegistry,
+    WidgetRegistry? widgetRegistry,
+    // ...
+  });
+}
+```
+
+**Example:**
+```dart
+final ctx = MooseAppContext();
+// Use a mock registry in tests:
+final testCtx = MooseAppContext(hookRegistry: MockHookRegistry());
+```
+
+### MooseScope
+
+`InheritedWidget` that provides `MooseAppContext` to the widget tree.
+
+```dart
+class MooseScope extends InheritedWidget {
+  final MooseAppContext appContext;
+
+  const MooseScope({required this.appContext, required super.child, super.key});
+
+  /// Get MooseAppContext from any descendant widget.
+  static MooseAppContext of(BuildContext context);
+
+  // Static convenience accessors:
+  static PluginRegistry pluginRegistryOf(BuildContext ctx);
+  static WidgetRegistry widgetRegistryOf(BuildContext ctx);
+  static HookRegistry hookRegistryOf(BuildContext ctx);
+  static AddonRegistry addonRegistryOf(BuildContext ctx);
+  static ActionRegistry actionRegistryOf(BuildContext ctx);
+  static AdapterRegistry adapterRegistryOf(BuildContext ctx);
+  static ConfigManager configManagerOf(BuildContext ctx);
+  static EventBus eventBusOf(BuildContext ctx);
+}
+
+// Extension for ergonomic access:
+extension MooseContextExtension on BuildContext {
+  MooseAppContext get moose => MooseScope.of(this);
+}
+```
+
+**Example:**
+```dart
+// In any widget descendant of MooseScope:
+final registry = context.moose.widgetRegistry;
+// or:
+final registry = MooseScope.widgetRegistryOf(context);
+```
+
+### MooseBootstrapper
+
+Orchestrates config, adapter, and plugin initialization.
+
+```dart
+class MooseBootstrapper {
+  final MooseAppContext appContext;
+  MooseBootstrapper({required this.appContext});
+
+  Future<BootstrapReport> run({
+    required Map<String, dynamic> config,
+    List<BackendAdapter> adapters = const [],
+    List<FeaturePlugin Function()> plugins = const [],
+  });
+}
+
+class BootstrapReport {
+  final Duration totalTime;
+  final Map<String, Duration> pluginTimings;
+  final Map<String, Object> failures;
+  bool get succeeded; // true if failures is empty
+}
+```
+
+**Bootstrap order:**
+1. `appContext.configManager.initialize(config)`
+2. `AppNavigator.setEventBus(appContext.eventBus)`
+3. Register each adapter via `appContext.adapterRegistry.registerAdapter()`
+4. Register each plugin via `appContext.pluginRegistry.register(plugin, appContext:)`
+5. `appContext.pluginRegistry.initializeAll()`
+
 ## Registry Classes
 
 ### PluginRegistry
@@ -336,8 +450,11 @@ Manages plugin registration and initialization.
 
 ```dart
 class PluginRegistry {
-  /// Register a plugin using a factory function
-  Future<void> registerPlugin(FeaturePlugin Function() factory);
+  /// Register a plugin synchronously: inject appContext, call onRegister()
+  void register(FeaturePlugin plugin, {required MooseAppContext appContext});
+
+  /// Initialize all registered plugins asynchronously (calls initialize() on each)
+  Future<void> initializeAll({Map<String, Duration>? timings});
 
   /// Get a registered plugin by name
   FeaturePlugin? getPlugin(String name);
@@ -346,17 +463,32 @@ class PluginRegistry {
   bool hasPlugin(String name);
 
   /// Get all registered plugins
-  List<FeaturePlugin> getAllPlugins();
+  List<FeaturePlugin> getRegisteredPlugins();
 
   /// Get all routes from all plugins
   Map<String, WidgetBuilder> getAllRoutes();
+
+  /// Plugin count
+  int get pluginCount;
+
+  /// Clear all plugins (for testing)
+  void clearAll();
 }
 ```
 
-**Example:**
+**Example — use `MooseBootstrapper` (preferred):**
 ```dart
-final pluginRegistry = PluginRegistry();
-await pluginRegistry.registerPlugin(() => ProductsPlugin());
+final report = await MooseBootstrapper(appContext: ctx).run(
+  config: myConfig,
+  plugins: [() => ProductsPlugin(), () => CartPlugin()],
+);
+```
+
+**Example — direct use (for testing):**
+```dart
+final ctx = MooseAppContext();
+ctx.pluginRegistry.register(ProductsPlugin(), appContext: ctx);
+await ctx.pluginRegistry.initializeAll();
 ```
 
 ### AdapterRegistry
@@ -757,35 +889,56 @@ class RepositoryTypeMismatchException implements Exception {
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load configuration
-  final config = await loadConfiguration();
-
-  // Initialize cache
   await CacheManager.initPersistentCache();
 
-  // Initialize configuration
-  ConfigManager().initialize(config);
+  final ctx = MooseAppContext(); // owns all registries
 
-  // Setup registries
-  final adapterRegistry = AdapterRegistry();
-  final pluginRegistry = PluginRegistry();
+  runApp(
+    MooseScope(
+      appContext: ctx,            // provides ctx to the widget tree
+      child: MaterialApp(
+        home: _BootstrapScreen(appContext: ctx),
+      ),
+    ),
+  );
+}
 
-  // Register adapter
-  await adapterRegistry.registerAdapter(() async {
-    final adapter = WooCommerceAdapter();
-    await adapter.initialize(config['woocommerce']);
-    return adapter;
-  });
+class _BootstrapScreen extends StatefulWidget {
+  final MooseAppContext appContext;
+  const _BootstrapScreen({required this.appContext});
+  @override State<_BootstrapScreen> createState() => _BootstrapScreenState();
+}
 
-  // Register plugins
-  await pluginRegistry.registerPlugin(() => ProductsPlugin());
-  await pluginRegistry.registerPlugin(() => CartPlugin());
+class _BootstrapScreenState extends State<_BootstrapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
 
-  runApp(MyApp(
-    pluginRegistry: pluginRegistry,
-    adapterRegistry: adapterRegistry,
-  ));
+  Future<void> _bootstrap() async {
+    final config = await loadConfiguration();
+
+    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+      config: config,
+      adapters: [WooCommerceAdapter()],
+      plugins: [() => ProductsPlugin(), () => CartPlugin()],
+    );
+
+    if (mounted && report.succeeded) {
+      Navigator.pushReplacement(context, MaterialPageRoute(
+        builder: (_) => MooseScope(
+          appContext: widget.appContext,
+          child: const MainScreen(),
+        ),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    body: Center(child: CircularProgressIndicator()),
+  );
 }
 ```
 
@@ -800,9 +953,10 @@ void main() async {
 
 ---
 
-**Last Updated:** 2025-11-12
-**Version:** 1.2.0
+**Last Updated:** 2026-02-22
+**Version:** 2.0.0
 
 ### Changelog
+- **2.0.0 (2026-02-22)** - Added `app.dart` module; added `MooseAppContext`, `MooseScope`, `MooseBootstrapper` API docs. Fixed `FeaturePlugin` registry getter comment (not singletons). Fixed `FeatureSection.adapters` → `adaptersOf(context)`. Fixed `CoreRepository` to show constructor params. Fixed `PluginRegistry` API (`register`/`initializeAll` split). Fixed "Complete App Setup" example to use `MooseBootstrapper`. Added `UnknownSectionWidget` to widgets module.
 - **1.2.0 (2025-11-12)** - Added `BannerRepository` + `PromoBanner` coverage and refreshed module exports and repository samples.
 - **1.1.0 (2025-11-10)** - Updated AdapterRegistry API docs to cover repository-level routing, auto-initialization, and adapter accessors.

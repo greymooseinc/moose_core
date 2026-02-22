@@ -244,8 +244,9 @@ abstract class FeatureSection extends StatelessWidget {
 
   const FeatureSection({super.key, this.settings});
 
-  /// Convenient getter for accessing the AdapterRegistry instance
-  AdapterRegistry get adapters => AdapterRegistry();
+  /// Access AdapterRegistry from the widget tree (replaces old singleton getter)
+  AdapterRegistry adaptersOf(BuildContext context) =>
+      MooseScope.adapterRegistryOf(context);
 
   Map<String, dynamic> getDefaultSettings();
 
@@ -257,7 +258,7 @@ abstract class FeatureSection extends StatelessWidget {
 ```
 
 **Key Features:**
-- **`adapters` getter**: Direct access to `AdapterRegistry` instance
+- **`adaptersOf(context)`**: Access `AdapterRegistry` from the widget tree via `MooseScope`
 - **`getSetting<T>()`**: Type-safe configuration value retrieval
 - **`getDefaultSettings()`**: Define all configurable values with defaults
 
@@ -288,8 +289,8 @@ class FeaturedProductsSection extends FeatureSection {
 
   @override
   Widget build(BuildContext context) {
-    // Use adapters getter from FeatureSection base class
-    final repository = adapters.getRepository<ProductsRepository>();
+    // Access AdapterRegistry from the widget tree via MooseScope
+    final repository = adaptersOf(context).getRepository<ProductsRepository>();
 
     return BlocProvider(
       create: (context) => ProductsBloc(repository)
@@ -395,13 +396,31 @@ class FeaturedProductsSection extends FeatureSection {
 
 ## Plugin System
 
+### App Bootstrap
+
+Plugins and adapters are wired up through `MooseBootstrapper`:
+
+```dart
+final ctx = MooseAppContext();
+// MooseScope makes ctx available to the widget tree
+runApp(MooseScope(appContext: ctx, child: MaterialApp(...)));
+
+// In initState / main:
+final report = await MooseBootstrapper(appContext: ctx).run(
+  config: await loadConfiguration(),
+  adapters: [WooCommerceAdapter()],
+  plugins: [() => ProductsPlugin(), () => CartPlugin()],
+);
+```
+
 ### Plugin Lifecycle
 
-1. **Registration**: Plugin registered via `PluginRegistry`
-2. **onRegister()**: Called immediately - register hooks, actions
-3. **initialize()**: Called after registration - setup resources, register sections
-4. **Route Setup**: `getRoutes()` called - navigation configured
-5. **Runtime**: Sections built from configuration
+1. **`MooseBootstrapper.run()`**: Initializes config, wires `AppNavigator`, registers adapters
+2. **`PluginRegistry.register(plugin, appContext:)`**: Injects `appContext` into plugin, calls `onRegister()`
+3. **`onRegister()`**: Sync — register hooks, widgets, addon slots, custom actions
+4. **`PluginRegistry.initializeAll()`**: Calls `initialize()` on each registered plugin
+5. **`initialize()`**: Async — connect services, warm caches, perform I/O
+6. **Runtime**: Sections built from configuration via `WidgetRegistry`
 
 ### Example Plugin Implementation
 
@@ -415,7 +434,7 @@ class MyFeaturePlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    // Register hooks (executed immediately)
+    // Register hooks (sync — called before initialize())
     hookRegistry.register('my_feature:data_loaded', (data) {
       // Transform data
       return data;
@@ -425,19 +444,19 @@ class MyFeaturePlugin extends FeaturePlugin {
     actionRegistry.registerCustomHandler('my_action', (context, params) {
       // Handle action
     });
-  }
 
-  @override
-  Future<void> initialize() async {
-    // Register sections
+    // Register sections (also valid here; initialize() is for async work)
     widgetRegistry.register(
       'my_feature.section',
       (context, {data, onEvent}) => MyFeatureSection(
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
+  }
 
-    // Initialize resources
+  @override
+  Future<void> initialize() async {
+    // Async work: connect to services, warm caches, etc.
     await _initializeResources();
   }
 
@@ -450,21 +469,51 @@ class MyFeaturePlugin extends FeaturePlugin {
 }
 ```
 
+> **Note:** Plugins receive `appContext` injected by `PluginRegistry.register()` before `onRegister()` is called. Use the convenience getters (`hookRegistry`, `widgetRegistry`, `addonRegistry`, `actionRegistry`, `eventBus`) which delegate to `appContext`.
+
+## App Context & Dependency Injection
+
+### MooseAppContext
+
+`MooseAppContext` is the single owner of all registries. Create one instance per app, pass it to `MooseScope` and `MooseBootstrapper`:
+
+```dart
+final ctx = MooseAppContext(
+  // Override any registry with a custom/mock instance:
+  // hookRegistry: MyTestHookRegistry(),
+);
+// All registries are created and cross-wired automatically.
+```
+
+### MooseScope
+
+`MooseScope` is an `InheritedWidget` that provides `MooseAppContext` to the widget tree:
+
+```dart
+MooseScope(
+  appContext: ctx,
+  child: MaterialApp(...),
+)
+
+// Access from any descendant widget:
+final registry = context.moose.widgetRegistry;
+// or via static helpers:
+final registry = MooseScope.widgetRegistryOf(context);
+```
+
 ## Configuration System
 
 ### Structure
 
-Configuration is loaded from JSON and accessed via `ConfigManager`:
+Configuration is loaded from JSON and applied by `MooseBootstrapper`. Access it via the scoped `ConfigManager` from `appContext` or `MooseScope`:
 
 ```dart
-// Get configuration value
-final value = ConfigManager().get('plugins:products:perPage');
+// Preferred: read through MooseScope in widgets/sections
+final cm = MooseScope.configManagerOf(context);
+final value = cm.get('plugins:products:perPage', defaultValue: 10);
 
-// Get with default
-final value = ConfigManager().get('plugins:products:perPage', defaultValue: 10);
-
-// Get nested object
-final cache = ConfigManager().get('plugins:products:settings:cache');
+// In a plugin (appContext is injected before onRegister()):
+final value = appContext.configManager.get('plugins:$name:settings:perPage');
 ```
 
 ### Access in FeatureSection
@@ -657,5 +706,9 @@ class WooCommerceAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+**Last Updated:** 2026-02-22
+**Version:** 2.0.0
+
+**Changelog:**
+- **v2.0.0 (2026-02-22)**: Removed all singletons. Introduced `MooseAppContext`, `MooseScope`, `MooseBootstrapper`. `FeatureSection.adapters` getter replaced by `adaptersOf(context)`. Plugin lifecycle now split into sync `register()`/`onRegister()` and async `initializeAll()`/`initialize()`. `ConfigManager` is now instance-scoped, not a global singleton.
+- **v1.0.0 (2025-11-03)**: Initial version

@@ -1,5 +1,5 @@
 {
-  "blueprintVersion": "2025.02",
+  "blueprintVersion": "2026.02",
   "metadata": {
     "project": "moose_extensions",
     "purpose": "Flutter e-commerce application composed of FeaturePlugins powered by moose_core.",
@@ -68,11 +68,13 @@
     "steps": [
       "Create folder lib/plugins/{plugin_name}/ with subfolders logic/, presentation/, data/ if needed.",
       "Add {plugin_name}_plugin.dart extending FeaturePlugin; implement name, version, onRegister, initialize, getRoutes.",
-      "Register FeatureSections inside initialize() via widgetRegistry.register().",
+      "Register FeatureSections and addon/action handlers inside onRegister() (sync). Reserve initialize() for async I/O only.",
       "Each section extends FeatureSection, overrides getDefaultSettings(), uses getSetting<T>().",
+      "To access AdapterRegistry inside a FeatureSection's build(), call adaptersOf(context).getRepository<T>() — never use AdapterRegistry() singleton.",
       "All business logic lives in Bloc classes under logic/bloc/** (events, states, blocs).",
       "Expose configuration knobs through assets/config/environment.json and document schema.",
-      "Optionally register addon builders inside onRegister() via addonRegistry.register('slot.name:zone', builder, priority: N) to inject supplementary widgets (badges, overlays) into slots exposed by other sections."
+      "Optionally register addon builders inside onRegister() via addonRegistry.register('slot.name:zone', builder, priority: N) to inject supplementary widgets (badges, overlays) into slots exposed by other sections.",
+      "Bootstrap the app with MooseBootstrapper(appContext: ctx).run(config:, adapters:, plugins:) and wrap the widget tree with MooseScope(appContext: ctx, child: ...)."
     ],
     "checklist": {
       "must": [
@@ -81,14 +83,19 @@
         "Use repository interfaces from moose_core; never call http directly.",
         "Provide getDefaultSettings() for every FeatureSection.",
         "All numeric UI settings stored as double.",
-        "Add docs to ai-ready/docs/PLUGIN_SYSTEM.md when introducing new hooks."
+        "Add docs to ai-ready/docs/PLUGIN_SYSTEM.md when introducing new hooks.",
+        "All concrete CoreRepository subclasses must declare forwarding constructor: ClassName({required super.hookRegistry, required super.eventBus}).",
+        "Wrap the widget tree with MooseScope(appContext: ctx) so that context.moose and MooseScope.of() work in all descendant widgets."
       ],
       "mustNot": [
         "Do not mutate configuration maps in place; copy before editing.",
         "Do not access adapters directly from widgets; go through repositories.",
-        "Do not create global singletons besides provided registries.",
+        "Do not use singleton constructors for any registry (WidgetRegistry(), HookRegistry(), AddonRegistry(), ActionRegistry(), EventBus(), etc.); all registries are now owned by MooseAppContext.",
+        "Do not call AdapterRegistry() — use context.moose.adapterRegistry or adaptersOf(context) in FeatureSection.build().",
         "Do not throw exceptions from AddonRegistry builders; return null to skip rendering gracefully.",
-        "Do not use AddonRegistry to own a full screen area; use WidgetRegistry for that."
+        "Do not use AddonRegistry to own a full screen area; use WidgetRegistry for that.",
+        "Do not call ConfigManager() directly — use appContext.configManager or MooseScope.configManagerOf(context).",
+        "Do not register sections inside initialize() — use onRegister() for all synchronous registration."
       ]
     }
   },
@@ -115,20 +122,25 @@
     "testPattern": "test/** Matches plugin-specific blocs/widgets."
   },
   "templates": {
-    "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override void onRegister() {} @override Future<void> initialize() async { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } }",
-    "featureSection": "class {SectionWidget} extends FeatureSection { const {SectionWidget}({super.key, super.settings}); @override Map<String, dynamic> getDefaultSettings() => {'title': 'Section Title'}; @override Widget build(BuildContext context) { final title = getSetting<String>('title'); return Text(title); } }",
+    "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override Map<String, dynamic> getDefaultSettings() => {}; @override void onRegister() { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } @override Future<void> initialize() async { /* async I/O only */ } @override Map<String, WidgetBuilder>? getRoutes() => null; }",
+    "featureSection": "class {SectionWidget} extends FeatureSection { const {SectionWidget}({super.key, super.settings}); @override Map<String, dynamic> getDefaultSettings() => {'title': 'Section Title'}; @override Widget build(BuildContext context) { final title = getSetting<String>('title'); final repo = adaptersOf(context).getRepository<{RepositoryType}>(); return Text(title); } }",
     "addonRegistration": "@override void onRegister() { addonRegistry.register('{component}.{widget}:{slot}', (context, {data, onEvent}) { final item = data?['{dataKey}'] as {Type}?; if (item == null || !{condition}) return null; return {AddonWidget}(); }, priority: 10); }",
-    "addonSlotRender": "final addons = AddonRegistry().build('{component}.{widget}:{slot}', context, data: {'{dataKey}': item}); if (addons.isNotEmpty) Column(children: addons)",
+    "addonSlotRender": "final addons = context.moose.addonRegistry.build('{component}.{widget}:{slot}', context, data: {'{dataKey}': item}); if (addons.isNotEmpty) Column(children: addons)",
+    "appBootstrap": "void main() async { WidgetsFlutterBinding.ensureInitialized(); await CacheManager.initPersistentCache(); final ctx = MooseAppContext(); runApp(MooseScope(appContext: ctx, child: MaterialApp(home: _BootstrapScreen(appContext: ctx)))); }",
     "bloc": "class {Feature}Event extends Equatable { const {Feature}Event(); @override List<Object?> get props => []; } class {Feature}State extends Equatable { const {Feature}State(); @override List<Object?> get props => []; } class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> { {Feature}Bloc() : super(const {Feature}State()) { on<{Feature}Event>(_onEvent); } Future<void> _onEvent({Feature}Event event, Emitter<{Feature}State> emit) async {} }"
   },
   "apiSurface": {
     "coreClasses": [
-      "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart)",
-      "FeatureSection (moose_core/lib/src/widgets/feature_section.dart)",
-      "WidgetRegistry (moose_core/lib/src/widgets/widget_registry.dart) — registers full FeatureSections by name; used in initialize()",
-      "AddonRegistry (moose_core/lib/src/widgets/addon_registry.dart) — registers slot-based supplementary widgets; used in onRegister(); builders may return null to opt out; multiple builders per slot rendered in descending priority order",
+      "MooseAppContext (moose_core/lib/src/app/moose_app_context.dart) — owns all registries; create one per app",
+      "MooseScope (moose_core/lib/src/app/moose_scope.dart) — InheritedWidget providing MooseAppContext to widget tree; access via context.moose or MooseScope.of(context)",
+      "MooseBootstrapper (moose_core/lib/src/app/moose_bootstrapper.dart) — orchestrates config, adapter, and plugin initialization; returns BootstrapReport",
+      "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart) — receives injected appContext; convenience getters delegate to appContext (not singletons)",
+      "FeatureSection (moose_core/lib/src/widgets/feature_section.dart) — use adaptersOf(context) to access AdapterRegistry; NOT adapters getter (removed)",
+      "WidgetRegistry (moose_core/lib/src/widgets/widget_registry.dart) — registers full FeatureSections by name; register in onRegister()",
+      "AddonRegistry (moose_core/lib/src/widgets/addon_registry.dart) — slot-based supplementary widgets; register in onRegister(); builders may return null; multiple builders per slot in descending priority order",
       "HookRegistry (moose_core/lib/src/events/hook_registry.dart) — synchronous data-transformation hooks",
       "ActionRegistry (moose_core/lib/src/actions/action_registry.dart) — handles UserInteraction (navigate, openUrl, custom)",
+      "CoreRepository (moose_core/lib/src/repositories/repository.dart) — requires hookRegistry + eventBus constructor params; all subclasses must forward them",
       "Repository interfaces (moose_core/lib/repositories.dart)"
     ],
     "configurationKeys": [
@@ -160,12 +172,12 @@
   "examples": {
     "addSection": [
       "1. Create lib/plugins/blog/presentation/sections/latest_posts_section.dart extending FeatureSection.",
-      "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.initialize().",
+      "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.onRegister() (sync — not initialize()).",
       "3. Update assets/config/environment.json -> plugins.home.sections.main[]."
     ],
     "addAddon": [
       "1. Decide the slot name using the convention '{component}.{widget}:{slot}' (e.g., 'product.card:badge').",
-      "2. In the plugin that owns the UI widget, call AddonRegistry().build('product.card:badge', context, data: {'product': product}) and render the returned list.",
+      "2. In the plugin that owns the UI widget, call context.moose.addonRegistry.build('product.card:badge', context, data: {'product': product}) and render the returned list.",
       "3. In any plugin that wants to inject content, register inside onRegister(): addonRegistry.register('product.card:badge', (context, {data, onEvent}) { ... return null or Widget; }, priority: 10).",
       "4. Return null from the builder when the addon should not appear (e.g., product is not on sale).",
       "5. Higher priority value = rendered first. Default priority is 1."
