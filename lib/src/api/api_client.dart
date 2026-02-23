@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../events/hook_registry.dart';
+
 /// Advanced API client with comprehensive features
 ///
 /// Features:
@@ -9,10 +11,17 @@ import 'package:dio/dio.dart';
 /// - File uploads/downloads
 /// - Retry logic
 /// - Request/response interceptors
+/// - Hook-based request header transformation via `api:request_headers`
+///
+/// Hook contract for `api:request_headers`:
+/// - Input: `Map<String, dynamic>` merged request headers
+/// - Output: `Map<String, dynamic>` transformed headers
 class ApiClient {
   final Dio _dio;
+  final HookRegistry? _hookRegistry;
 
-  ApiClient(this._dio);
+  ApiClient(this._dio, {HookRegistry? hookRegistry})
+      : _hookRegistry = hookRegistry;
 
   /// GET request with optional headers and cancellation
   Future<Response> get(
@@ -275,14 +284,32 @@ class ApiClient {
 
   /// Merge custom headers with options
   Options _mergeOptions(Options? options, Map<String, dynamic>? headers) {
-    if (headers == null || headers.isEmpty) {
-      return options ?? Options();
-    }
+    final existingHeaders = _asStringDynamicMap(options?.headers);
+    final mergedHeaders = <String, dynamic>{
+      ...existingHeaders,
+      ...?headers,
+    };
+    final transformedHeaders = _applyHeaderHooks(mergedHeaders);
 
-    final existingHeaders = options?.headers ?? {};
-    return (options ?? Options()).copyWith(
-      headers: {...existingHeaders, ...headers},
+    return (options ?? Options()).copyWith(headers: transformedHeaders);
+  }
+
+  Map<String, dynamic> _applyHeaderHooks(Map<String, dynamic> headers) {
+    if (_hookRegistry == null) return headers;
+    return _hookRegistry!.execute<Map<String, dynamic>>(
+      'api:request_headers',
+      headers,
     );
+  }
+
+  Map<String, dynamic> _asStringDynamicMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map(
+        (key, mapValue) => MapEntry(key.toString(), mapValue),
+      );
+    }
+    return <String, dynamic>{};
   }
 
   Exception _handleError(DioException e) {
