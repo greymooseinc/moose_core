@@ -118,6 +118,8 @@ class MooseBootstrapper {
       '(${timings.length} plugins, ${failures.length} failures)',
     );
 
+    appContext.logger.debug('Plugin timings: $timings');
+
     return BootstrapReport(
       totalTime: sw.elapsed,
       pluginTimings: timings,
