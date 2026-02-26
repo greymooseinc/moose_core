@@ -1,23 +1,19 @@
-// Central registry for managing backend adapters and their repository implementations
-//
-// This class implements the Singleton pattern to ensure only one registry
-// exists throughout the application lifecycle.
+// Central registry for managing backend adapters and their repository implementations.
 //
 // Features:
 // - Register multiple backend adapters using factory functions
 // - Repository-level registration (last registered wins)
+// - True lazy repository instantiation — repos created only on first request
 // - Type-safe repository retrieval
 // - Support for multiple adapters contributing different repositories
 //
 // Usage:
 // ```dart
-// // Register adapters with factory functions
-// AdapterRegistry().registerAdapter(() => WooCommerceAdapter());
-// AdapterRegistry().registerAdapter(() => FCMNotificationAdapter());
+// // Wired automatically by MooseAppContext / MooseBootstrapper:
+// await appContext.adapterRegistry.registerAdapter(() => WooCommerceAdapter());
 //
-// // Get repository (automatically uses correct adapter)
-// final productsRepo = AdapterRegistry().getRepository<ProductsRepository>();
-// final notificationRepo = AdapterRegistry().getRepository<PushNotificationRepository>();
+// // Get repository (created lazily on first call)
+// final productsRepo = appContext.adapterRegistry.getRepository<ProductsRepository>();
 // ```
 // =============================================================================
 
@@ -27,55 +23,31 @@ import 'package:moose_core/services.dart';
 import 'backend_adapter.dart';
 
 
-/// Singleton registry for managing backend adapters and repository implementations.
+/// Instance-based registry for managing backend adapters and repository implementations.
 ///
-/// The AdapterRegistry provides centralized management of repository implementations
-/// from multiple adapters. Unlike the previous version that managed "active adapters",
-/// this version works at the **repository level** - each adapter registers the
-/// repositories it provides, and the last registration wins.
+/// [AdapterRegistry] is owned by [MooseAppContext] — each context gets its own
+/// independent registry, ensuring full isolation between app instances and tests.
 ///
-/// ## Key Features:
-/// - **Singleton Pattern**: Only one registry instance exists
-/// - **Factory-Based Registration**: Adapters registered via factory functions (lazy initialization)
-/// - **Repository-Level Management**: No "active adapter" concept - repositories are registered directly
-/// - **Last Registration Wins**: If multiple adapters provide the same repository, last one wins
-/// - **Type Safety**: Generic methods for type-safe repository retrieval
-/// - **Mixed Adapters**: Can use WooCommerce for products, FCM for notifications, etc.
+/// ## Key Design:
+/// - **No singleton** — every `AdapterRegistry()` call produces a fresh instance.
+/// - **Lazy repositories** — repository factories are stored by type; instances
+///   are created on the first [getRepository] call and cached afterwards.
+/// - **Last registration wins** — if multiple adapters register the same
+///   repository type, the last one takes precedence.
+/// - **Scoped dependencies** — [ConfigManager], [HookRegistry], and [EventBus]
+///   are injected by [MooseAppContext] before any adapter is registered.
 ///
-/// ## Example Usage:
+/// ## Example:
 /// ```dart
-/// // 1. Register adapters (initialization happens at registration time)
-/// final registry = AdapterRegistry();
+/// final ctx = MooseAppContext();
+/// await MooseBootstrapper(appContext: ctx).run(
+///   config: {...},
+///   adapters: [WooCommerceAdapter(), FCMAdapter()],
+/// );
 ///
-/// await registry.registerAdapter(() async {
-///   final adapter = WooCommerceAdapter();
-///   await adapter.initialize(config['woocommerce']);
-///   return adapter;
-/// });
-///
-/// await registry.registerAdapter(() async {
-///   final adapter = FCMNotificationAdapter();
-///   await adapter.initialize(config['fcm']);
-///   return adapter;
-/// });
-///
-/// // 2. Get repositories from anywhere in the app
-/// final productsRepo = AdapterRegistry().getRepository<ProductsRepository>();
-/// final notificationRepo = AdapterRegistry().getRepository<PushNotificationRepository>();
+/// // Repos are created lazily on first use:
+/// final productsRepo = ctx.adapterRegistry.getRepository<ProductsRepository>();
 /// ```
-///
-/// ## How It Works:
-/// 1. Adapters are registered via factory functions
-/// 2. Each adapter is instantiated and initialized immediately when registered
-/// 3. Repositories are extracted and cached during registration
-/// 4. If two adapters provide the same repository type, the last one wins
-/// 5. Repositories are retrieved by type, no need to know which adapter provides them
-///
-/// ## Architecture:
-/// - Plugins depend on repository interfaces (e.g., ProductsRepository)
-/// - Adapters implement these interfaces for specific platforms
-/// - Registry manages repository lifecycle and provides access
-/// - No coupling between plugins and specific adapters
 class AdapterRegistry {
   AdapterRegistry();
 
@@ -89,16 +61,22 @@ class AdapterRegistry {
   /// Value: Initialized BackendAdapter instance
   final Map<String, BackendAdapter> _adapters = {};
 
-  /// Repository implementations registry
+  /// Lazy repository factory registry
   ///
   /// Key: Repository type (e.g., ProductsRepository)
-  /// Value: Repository instance from an adapter
+  /// Value: Zero-argument factory that delegates to the owning adapter's
+  ///        internal cache — the adapter only creates the repo on first call.
   ///
   /// Note: If multiple adapters provide the same repository type,
-  /// the last registered adapter wins (overwrites previous).
-  final Map<Type, CoreRepository> _repositories = {};
+  /// the last registered adapter wins (overwrites previous factory).
+  final Map<Type, CoreRepository Function()> _factories = {};
 
-  /// Flag to track if adapters have been initialized
+  /// Resolved repository instance cache
+  ///
+  /// Populated on first [getRepository] call for a given type.
+  final Map<Type, CoreRepository> _instances = {};
+
+  /// Flag to track if at least one adapter has been registered.
   bool _initialized = false;
 
   /// Logger instance for the registry
@@ -127,48 +105,38 @@ class AdapterRegistry {
     _eventBus = eventBus;
   }
 
-  /// Registers and initializes a backend adapter.
+  /// Registers and optionally initializes a backend adapter.
   ///
-  /// The adapter is created and initialized immediately when this method is called.
-  /// All repositories from the adapter are extracted and registered.
+  /// The adapter is created from [factory] and its scoped dependencies are
+  /// injected. If [autoInitialize] is true (the default), the adapter's
+  /// configuration is loaded from the scoped [ConfigManager] and
+  /// `initializeFromConfig()` is called.
+  ///
+  /// Repository factories are registered lazily — **no repository instances
+  /// are created during this call**. Repos are only created on the first
+  /// [getRepository] call.
   ///
   /// **Parameters:**
-  /// - [factory]: Function that creates the adapter (can be sync or async)
-  /// - [autoInitialize]: If true, automatically calls `initializeFromConfig()` (default: true)
+  /// - [factory]: Function that creates the adapter (sync or async).
+  /// - [autoInitialize]: When true, calls `initializeFromConfig()` automatically
+  ///   using the scoped [ConfigManager]. Requires [setDependencies] to have
+  ///   been called first. Defaults to `true`.
   ///
-  /// **Behavior:**
-  /// - Calls the factory function to create the adapter
-  /// - If autoInitialize is true, calls `initializeFromConfig()` automatically
-  /// - Extracts all repository implementations from the adapter
-  /// - Registers repositories (last registered wins for duplicate types)
-  /// - Caches the adapter instance
+  /// **Throws:**
+  /// - [Exception]: If adapter creation or initialization fails.
   ///
-  /// **Example (Auto-initialize):**
+  /// **Example (auto-initialize — typical usage):**
   /// ```dart
-  /// // Simplest approach - automatic config loading
-  /// await AdapterRegistry().registerAdapter(
-  ///   () => ShopifyAdapter(),
-  ///   autoInitialize: true,
-  /// );
-  ///
-  /// await AdapterRegistry().registerAdapter(
-  ///   () => JudgemeAdapter(),
-  ///   autoInitialize: true,
-  /// );
+  /// await registry.registerAdapter(() => ShopifyAdapter());
   /// ```
   ///
-  /// **Example (Manual initialization):**
+  /// **Example (manual initialization):**
   /// ```dart
-  /// // Manual config passing
-  /// await AdapterRegistry().registerAdapter(() async {
+  /// await registry.registerAdapter(() async {
   ///   final adapter = WooCommerceAdapter();
-  ///   await adapter.initialize({
-  ///     'baseUrl': 'https://mystore.com',
-  ///     'consumerKey': 'ck_xxx',
-  ///     'consumerSecret': 'cs_xxx',
-  ///   });
+  ///   await adapter.initialize({'baseUrl': '...', 'consumerKey': '...'});
   ///   return adapter;
-  /// });
+  /// }, autoInitialize: false);
   /// ```
   Future<void> registerAdapter(
     dynamic Function() factory, {
@@ -195,28 +163,42 @@ class AdapterRegistry {
       if (_hookRegistry != null) adapter.hookRegistry = _hookRegistry!;
       if (_eventBus != null) adapter.eventBus = _eventBus!;
 
-      // Auto-initialize if requested
+      // Auto-initialize if requested — requires scoped ConfigManager.
       if (autoInitialize) {
-        await adapter.initializeFromConfig(configManager: _configManager);
+        if (_configManager == null) {
+          throw StateError(
+            'Cannot auto-initialize adapter "${adapter.name}": '
+            'ConfigManager has not been injected. '
+            'Call setDependencies() before registering adapters, or use '
+            'autoInitialize: false and initialize the adapter manually.',
+          );
+        }
+        await adapter.initializeFromConfig(configManager: _configManager!);
       }
 
       final adapterName = adapter.name;
 
-      // Register adapter defaults in ConfigManager
-      final defaults = adapter.getDefaultSettings();
-      if (defaults.isNotEmpty) {
-        (_configManager ?? ConfigManager()).registerAdapterDefaults(adapterName, defaults);
-        _logger.debug('Registered defaults for adapter: $adapterName');
+      // Register adapter defaults in ConfigManager (scoped — no global fallback).
+      if (_configManager != null) {
+        final defaults = adapter.getDefaultSettings();
+        if (defaults.isNotEmpty) {
+          _configManager!.registerAdapterDefaults(adapterName, defaults);
+          _logger.debug('Registered defaults for adapter: $adapterName');
+        }
       }
 
-      // Cache the adapter instance
+      // Cache the adapter instance.
       _adapters[adapterName] = adapter;
 
-      // Extract and register all repositories from this adapter
-      _extractRepositoriesFromAdapter(adapter);
+      // Register lazy factories for each repository type the adapter provides.
+      // No repository instances are created here.
+      _registerLazyFactories(adapter);
 
       _initialized = true;
-      _logger.debug('Registered adapter: $adapterName (${adapter.version}) with ${adapter.registeredRepositoryTypes.length} repositories');
+      _logger.debug(
+        'Registered adapter: $adapterName (${adapter.version}) '
+        'with ${adapter.registeredRepositoryTypes.length} repository types',
+      );
     } catch (e) {
       _logger.error('Failed to register adapter', e);
       rethrow;
@@ -225,139 +207,88 @@ class AdapterRegistry {
 
   /// Retrieves a repository by type.
   ///
-  /// This is the primary method for getting repository implementations.
-  /// The registry automatically returns the correct repository instance
-  /// regardless of which adapter provides it.
+  /// The repository is created from its factory on the **first call** for that
+  /// type and cached for all subsequent calls. No repository is created until
+  /// this method is invoked.
   ///
   /// **Type Parameters:**
-  /// - [T]: The repository type (must extend [CoreRepository])
+  /// - [T]: The repository type (must extend [CoreRepository]).
   ///
   /// **Returns:**
-  /// - [T]: The repository instance
+  /// - [T]: The repository instance.
   ///
   /// **Throws:**
-  /// - [RepositoryNotRegisteredException]: If no adapter provides this repository type
-  /// - [StateError]: If registry not initialized (call initializeAllAdapters first)
+  /// - [StateError]: If no adapters have been registered yet.
+  /// - [RepositoryNotRegisteredException]: If no adapter provides this type.
   ///
   /// **Example:**
   /// ```dart
-  /// // In BLoC or screen
-  /// class ProductsBloc {
-  ///   final ProductsRepository repository;
-  ///
-  ///   ProductsBloc() : repository = AdapterRegistry().getRepository<ProductsRepository>();
-  /// }
-  ///
-  /// // In notification plugin
-  /// class NotificationsPlugin {
-  ///   late final PushNotificationRepository notificationRepo;
-  ///
-  ///   @override
-  ///   Future<void> initialize() async {
-  ///     notificationRepo = AdapterRegistry().getRepository<PushNotificationRepository>();
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// **Common Usage:**
-  /// ```dart
-  /// // Get any repository
-  /// final products = AdapterRegistry().getRepository<ProductsRepository>();
-  /// final cart = AdapterRegistry().getRepository<CartRepository>();
-  /// final notifications = AdapterRegistry().getRepository<PushNotificationRepository>();
+  /// final products = appContext.adapterRegistry.getRepository<ProductsRepository>();
   /// ```
   T getRepository<T extends CoreRepository>() {
     if (!_initialized) {
       throw StateError(
-        'AdapterRegistry not initialized. Call initializeAllAdapters() first.',
+        'AdapterRegistry not initialized. '
+        'Register at least one adapter before requesting repositories.',
       );
     }
 
-    if (!_repositories.containsKey(T)) {
+    // Return cached instance if available.
+    if (_instances.containsKey(T)) {
+      return _instances[T] as T;
+    }
+
+    if (!_factories.containsKey(T)) {
       throw RepositoryNotRegisteredException(
         'No adapter provides repository type: $T\n'
-        'Available repositories: ${_repositories.keys.join(", ")}\n'
+        'Available repositories: ${_factories.keys.join(", ")}\n'
         'Did you forget to register an adapter that provides $T?',
       );
     }
 
-    return _repositories[T] as T;
+    // Create and cache the repository instance (lazy instantiation).
+    final instance = _factories[T]!() as T;
+    _instances[T] = instance;
+    _logger.debug('Created repository: $T (first request)');
+    return instance;
   }
 
   /// Checks if a repository type is available.
   ///
-  /// **Type Parameters:**
-  /// - [T]: The repository type to check
-  ///
-  /// **Returns:**
-  /// - [bool]: true if a repository of this type is registered, false otherwise
+  /// Returns `true` if a factory for [T] has been registered, regardless of
+  /// whether an instance has been created yet.
   ///
   /// **Example:**
   /// ```dart
-  /// if (AdapterRegistry().hasRepository<PushNotificationRepository>()) {
-  ///   final notificationRepo = AdapterRegistry().getRepository<PushNotificationRepository>();
-  ///   await notificationRepo.requestPermission();
-  /// } else {
-  ///   print('Push notifications not available');
+  /// if (registry.hasRepository<PushNotificationRepository>()) {
+  ///   final repo = registry.getRepository<PushNotificationRepository>();
   /// }
   /// ```
   bool hasRepository<T extends CoreRepository>() {
-    return _repositories.containsKey(T);
+    return _factories.containsKey(T);
   }
 
   /// Returns list of all available repository types.
   ///
   /// **Returns:**
-  /// - [List<Type>]: List of repository types that can be retrieved
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final availableRepos = AdapterRegistry().getAvailableRepositories();
-  /// print('Available repositories: $availableRepos');
-  /// // Output: Available repositories: [ProductsRepository, CartRepository, PushNotificationRepository]
-  /// ```
+  /// - [List<Type>]: Repository types that can be retrieved via [getRepository].
   List<Type> getAvailableRepositories() {
-    return _repositories.keys.toList();
+    return _factories.keys.toList();
   }
 
-  /// Returns list of all initialized adapter names.
-  ///
-  /// **Returns:**
-  /// - [List<String>]: Names of all initialized adapters
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final adapters = AdapterRegistry().getInitializedAdapters();
-  /// print('Initialized adapters: $adapters');
-  /// // Output: Initialized adapters: [woocommerce, fcm_notifications]
-  /// ```
+  /// Returns list of all registered adapter names.
   List<String> getInitializedAdapters() {
     return _adapters.keys.toList();
   }
 
-  /// Gets a specific adapter by name (advanced usage).
+  /// Gets a specific adapter instance by name (advanced usage).
   ///
-  /// Most code should use [getRepository] instead. This method is for
-  /// advanced scenarios where you need adapter-specific functionality.
-  ///
-  /// **Type Parameters:**
-  /// - [T]: The adapter type (must extend [BackendAdapter])
-  ///
-  /// **Parameters:**
-  /// - [name]: The name of the adapter
-  ///
-  /// **Returns:**
-  /// - [T]: The adapter instance
+  /// Most code should use [getRepository] instead. This is for scenarios where
+  /// adapter-specific functionality is needed beyond repository access.
   ///
   /// **Throws:**
-  /// - [Exception]: If adapter not found or not initialized
-  ///
-  /// **Example:**
-  /// ```dart
-  /// // Get WooCommerce-specific adapter for custom operations
-  /// final wooAdapter = AdapterRegistry().getAdapter<WooCommerceAdapter>('woocommerce');
-  /// await wooAdapter.customWooCommerceOperation();
-  /// ```
+  /// - [StateError]: If no adapters have been registered yet.
+  /// - [Exception]: If the named adapter is not found.
   T getAdapter<T extends BackendAdapter>(String name) {
     if (!_initialized) {
       throw StateError('AdapterRegistry not initialized');
@@ -373,78 +304,48 @@ class AdapterRegistry {
     return _adapters[name] as T;
   }
 
-  /// Checks if adapter registry has been initialized.
-  ///
-  /// **Returns:**
-  /// - [bool]: true if initialized, false otherwise
+  /// Whether at least one adapter has been registered.
   bool get isInitialized => _initialized;
 
-  /// Returns the total number of registered repositories.
-  ///
-  /// **Returns:**
-  /// - [int]: Count of available repositories
-  int get repositoryCount => _repositories.length;
+  /// Total number of registered repository types (not instances created).
+  int get repositoryCount => _factories.length;
 
-  /// Returns the total number of initialized adapters.
-  ///
-  /// **Returns:**
-  /// - [int]: Count of initialized adapters
+  /// Total number of registered adapters.
   int get adapterCount => _adapters.length;
 
   // =========================================================================
   // PRIVATE HELPER METHODS
   // =========================================================================
 
-  /// Extracts all repository implementations from an adapter.
+  /// Registers a lazy factory in [_factories] for each repository type the
+  /// adapter declares, without instantiating any repository.
   ///
-  /// This method iterates through all registered repository types in the adapter
-  /// and adds them to the registry. If a repository type was already registered
-  /// by a previous adapter, it will be overwritten (last one wins).
-  void _extractRepositoriesFromAdapter(BackendAdapter adapter) {
-    // Get all repository types registered in this adapter
-    final repositoryTypes = adapter.registeredRepositoryTypes;
-
-    for (final repoType in repositoryTypes) {
-      try {
-        // Get repository instance from adapter
-        // We use a helper to invoke getRepository<T> with runtime type
-        final repository = _getRepositoryFromAdapter(adapter, repoType);
-
-        // Register or overwrite in global registry
-        if (_repositories.containsKey(repoType)) {
-          _logger.warning('Overwriting ${repoType.toString()} (previously registered)');
-        }
-
-        _repositories[repoType] = repository;
-        _logger.debug('Registered ${repoType.toString()}');
-      } catch (e) {
-        _logger.warning('Failed to extract ${repoType.toString()}: $e');
+  /// The factory closure captures [adapter] and delegates to
+  /// [BackendAdapter.getRepositoryByType], which handles its own lazy
+  /// instantiation and per-adapter caching.
+  void _registerLazyFactories(BackendAdapter adapter) {
+    for (final repoType in adapter.registeredRepositoryTypes) {
+      if (_factories.containsKey(repoType)) {
+        _logger.warning(
+          'Overwriting factory for ${repoType.toString()} '
+          '(previously registered by another adapter)',
+        );
+        // Remove any previously resolved instance so the new factory is used.
+        _instances.remove(repoType);
       }
+
+      _factories[repoType] = () => adapter.getRepositoryByType(repoType);
+      _logger.debug('Registered lazy factory for ${repoType.toString()}');
     }
   }
 
-  /// Helper method to get repository from adapter using runtime type.
+  /// Clears all adapters, factories, and instances (for testing).
   ///
-  /// Uses the adapter's getRepositoryByType() method which handles the
-  /// runtime type retrieval and caching.
-  CoreRepository _getRepositoryFromAdapter(BackendAdapter adapter, Type repoType) {
-    return adapter.getRepositoryByType(repoType);
-  }
-
-  /// Clears all adapters and repositories (for testing).
-  ///
-  /// **Warning:** Use with caution - this will remove all adapters and repositories.
-  ///
-  /// **Example:**
-  /// ```dart
-  /// // For testing
-  /// setUp(() {
-  ///   AdapterRegistry().clearAll();
-  /// });
-  /// ```
+  /// **Warning:** Use only in tests — removes all state.
   void clearAll() {
     _adapters.clear();
-    _repositories.clear();
+    _factories.clear();
+    _instances.clear();
     _initialized = false;
   }
 }

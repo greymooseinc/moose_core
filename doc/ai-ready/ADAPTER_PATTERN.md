@@ -95,27 +95,27 @@ abstract class BackendAdapter {
   /// Initialize the adapter with configuration (already validated)
   Future<void> initialize(Map<String, dynamic> config);
 
-  /// Convenience helper that loads, validates, and applies config automatically
-  Future<void> initializeFromConfig();
+  /// Loads, validates, and applies config from the scoped ConfigManager.
+  /// [configManager] is required — no global fallback exists.
+  Future<void> initializeFromConfig({required ConfigManager configManager});
 }
 ```
 
 #### Configuration Schema & Defaults
 
-- Override `configSchema` with a JSON Schema definition. When you call `initializeFromConfig()`, the framework automatically validates `environment.json.adapters.{adapterName}` against this schema before your adapter boots.
-- Override `getDefaultSettings()` with a full tree of sensible defaults. `ConfigManager` registers these values so missing keys in `environment.json` fall back to your code-defined settings.
-- Access merged settings via the scoped ConfigManager: `appContext.configManager.get('adapters:$name:some:nested:key')` (or through `MooseScope.configManagerOf(context)` in widgets).
+- Override `configSchema` with a JSON Schema definition. The framework automatically validates `environment.json.adapters.{adapterName}` against this schema before your adapter boots.
+- Override `getDefaultSettings()` with sensible defaults. `ConfigManager` registers these so missing keys in `environment.json` fall back to your code-defined values.
+- Access merged settings via the scoped `ConfigManager`: `appContext.configManager.get('adapters:$name:some:key')`.
 
 #### `initializeFromConfig()` Shortcut
 
-Call `await adapter.initializeFromConfig()` in `main.dart` (or tests) to:
+`MooseBootstrapper` calls this automatically (passing the scoped `ConfigManager`) when `autoInitialize: true`. It:
 
-1. Read `environment.json.adapters.{adapterName}`
-2. Merge it with `getDefaultSettings()`
-3. Validate the result against `configSchema`
-4. Invoke your adapter's `initialize()` with the validated map
+1. Reads `environment.json.adapters.{adapterName}`
+2. Validates the map against `configSchema`
+3. Calls your adapter's `initialize()` with the validated map
 
-This removes boilerplate and guarantees consistent validation across adapters.
+The `configManager` parameter is **required** — there is no global fallback.
 
 ### CoreRepository Base Class
 
@@ -997,26 +997,9 @@ class CustomApiAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2026-02-22
-**Version:** 3.0.0
+**Last Updated:** 2026-02-26
+**Version:** 4.0.0
 
 **Changelog:**
-- **v3.0.0 (2026-02-22)**: `CoreRepository` now requires `hookRegistry`/`eventBus` constructor params. All concrete repo subclasses need forwarding constructors. `AdapterRegistry()` singleton removed — use `MooseBootstrapper` or `appContext.adapterRegistry`. `ConfigManager().get()` → `appContext.configManager.get()`. MockProductsRepository updated with constructor.
-- **v2.2.0 (2025-11-12)**:
-  - Added Repository Catalog overview with interface/entity mapping
-  - Provided banner repository registration sample and placement guidance
-  - Documented `PromoBanner` usage for adapters
-- **v2.1.0 (2025-11-10)**:
-  - Documented `configSchema`, `getDefaultSettings()`, and `initializeFromConfig()`
-  - Updated AdapterRegistry usage to highlight repository-level ownership (no "active adapter")
-  - Refreshed Shopify adapter example with schema + defaults
-  - Added guidance on configuration validation workflow
-- **v2.0.0 (2025-11-05)**:
-  - Added `CoreRepository.initialize()` method documentation
-  - Added automatic initialization flow in adapter
-  - Added `HookRegistry` and `EventBus` access in repositories
-  - Added cache management methods (`clearRepositoryCache`, `isRepositoryCached`)
-  - Added `getRepositoryByType()` and `registeredRepositoryTypes` documentation
-  - Updated best practices with initialize() examples
-  - Updated testing examples with initialization verification
-- **v1.0.0 (2025-11-03)**: Initial version
+- **v4.0.0 (2026-02-26)**: `initializeFromConfig()` now requires `configManager:` (named, required) — no global fallback. `AdapterRegistry` registers lazy factories only; no repo instances created during adapter registration. `MooseAppContext.getRepository<T>()` convenience shortcut added.
+- **v3.0.0 (2026-02-22)**: `CoreRepository` requires `hookRegistry`/`eventBus` constructor params. `AdapterRegistry()` singleton removed — use `MooseBootstrapper` or `appContext.adapterRegistry`.

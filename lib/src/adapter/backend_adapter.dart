@@ -636,8 +636,16 @@ abstract class BackendAdapter {
   /// This method reads the adapter's configuration from the `adapters` section
   /// of the config using the adapter's name as the key.
   ///
+  /// A scoped [ConfigManager] **must** be provided — there is no global fallback.
+  /// [AdapterRegistry] passes the app-scoped instance automatically when
+  /// `autoInitialize: true` (the default).
+  ///
+  /// **Parameters:**
+  /// - [configManager]: The scoped [ConfigManager] that holds the app configuration.
+  ///
   /// **Throws:**
-  /// - [Exception]: If configuration not found or ConfigManager not initialized
+  /// - [ArgumentError]: If [configManager] is null.
+  /// - [Exception]: If configuration is not found or validation fails.
   ///
   /// **Example:**
   /// ```dart
@@ -645,39 +653,36 @@ abstract class BackendAdapter {
   /// // {
   /// //   "adapters": {
   /// //     "shopify": { "storeUrl": "...", "token": "..." },
-  /// //     "judgeme": { "publicApiKey": "...", "shopDomain": "..." }
   /// //   }
   /// // }
   ///
-  /// // Usage:
-  /// final adapter = ShopifyAdapter();
-  /// await adapter.initializeFromConfig();
-  /// // Automatically loads config['adapters']['shopify']
+  /// // Called automatically by AdapterRegistry when autoInitialize: true:
+  /// await adapter.initializeFromConfig(configManager: appContext.configManager);
   /// ```
-  Future<void> initializeFromConfig({ConfigManager? configManager}) async {
+  Future<void> initializeFromConfig({required ConfigManager configManager}) async {
     try {
-      final cm = configManager ?? _getConfigManager();
-
-      // Get the adapters configuration
-      final adaptersConfig = cm.get('adapters') as Map<String, dynamic>?;
-
-      if (adaptersConfig == null) {
+      // Get the adapters configuration — use a safe cast to handle maps whose
+      // generic parameters may be inferred as dynamic at runtime.
+      final rawAdapters = configManager.get('adapters');
+      if (rawAdapters == null) {
         throw Exception(
           'No adapters configuration found in environment.json.\n'
           'Expected "adapters" key at root level.'
         );
       }
+      final adaptersConfig = Map<String, dynamic>.from(rawAdapters as Map);
 
       // Get this adapter's specific configuration using its name
-      final adapterConfig = adaptersConfig[name] as Map<String, dynamic>?;
+      final rawAdapterConfig = adaptersConfig[name];
 
-      if (adapterConfig == null) {
+      if (rawAdapterConfig == null) {
         throw Exception(
           'No configuration found for adapter "$name".\n'
           'Expected "adapters.$name" in environment.json.\n'
           'Available adapters: ${adaptersConfig.keys.join(", ")}'
         );
       }
+      final adapterConfig = Map<String, dynamic>.from(rawAdapterConfig as Map);
 
       // Validate configuration against schema
       validateConfig(adapterConfig);
@@ -687,11 +692,6 @@ abstract class BackendAdapter {
     } catch (e) {
       throw Exception('Failed to initialize adapter "$name" from config: $e');
     }
-  }
-
-  /// Get ConfigManager instance (helper method)
-  ConfigManager _getConfigManager() {
-    return ConfigManager();
   }
 }
 

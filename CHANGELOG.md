@@ -5,6 +5,34 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-26
+
+### Breaking Changes
+
+- **`BackendAdapter.initializeFromConfig()`**: `configManager` parameter is now named
+  and **required** — `({required ConfigManager configManager})`. No global fallback exists.
+  `MooseBootstrapper` passes the scoped instance automatically; callers that invoked
+  `initializeFromConfig()` directly (without the parameter) must now pass the scoped
+  `ConfigManager` explicitly.
+
+### Changed
+
+- **`AdapterRegistry`**: Repository registration is now fully **lazy**. Calling
+  `registerAdapter()` stores factory closures but creates **no** repository instances.
+  Instances are created on the first `getRepository<T>()` call and cached thereafter.
+  This eliminates all eager repository construction during app startup.
+- **`AdapterRegistry`**: Removed the `ConfigManager()` fallback in `registerAdapter()`.
+  Adapter defaults are only registered when a scoped `ConfigManager` has been injected
+  via `setDependencies()`. Calling `registerAdapter(autoInitialize: true)` without a
+  prior `setDependencies()` call now throws a clear `StateError`.
+
+### Added
+
+- **`MooseAppContext.getRepository<T>()`**: Convenience shortcut that delegates to
+  `adapterRegistry.getRepository<T>()`. Simplifies access from plugins and tests.
+- **`test/app/moose_app_context_test.dart`**: New test file covering context isolation,
+  scoped dependency wiring, lazy repository access, and constructor injection.
+
 ## [1.0.0] - 2026-02-22
 
 ### Breaking Changes

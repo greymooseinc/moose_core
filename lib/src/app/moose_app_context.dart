@@ -4,6 +4,7 @@ import '../config/config_manager.dart';
 import '../events/event_bus.dart';
 import '../events/hook_registry.dart';
 import '../plugin/plugin_registry.dart';
+import '../repositories/repository.dart';
 import '../utils/logger.dart';
 import '../widgets/addon_registry.dart';
 import '../widgets/widget_registry.dart';
@@ -66,5 +67,17 @@ class MooseAppContext {
       hookRegistry: this.hookRegistry,
       eventBus: this.eventBus,
     );
+  }
+
+  /// Convenience shortcut for `adapterRegistry.getRepository<T>()`.
+  ///
+  /// Retrieves a repository by type. The instance is created lazily on the
+  /// first call and cached for subsequent calls.
+  ///
+  /// ```dart
+  /// final products = appContext.getRepository<ProductsRepository>();
+  /// ```
+  T getRepository<T extends CoreRepository>() {
+    return adapterRegistry.getRepository<T>();
   }
 }

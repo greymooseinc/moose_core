@@ -20,29 +20,29 @@ The moose_core package implements a **multi-layered, plugin-based architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Presentation Layer                       │
-│              (Screens, Sections, Widgets)                    │
-│                     - UI Rendering Only                      │
-│                     - NO Business Logic                      │
+│                     Presentation Layer                      │
+│              (Screens, Sections, Widgets)                   │
+│                     - UI Rendering Only                     │
+│                     - NO Business Logic                     │
 └──────────────────────┬──────────────────────────────────────┘
                        │ Events/States
 ┌──────────────────────▼──────────────────────────────────────┐
-│                  Business Logic Layer (BLoC)                 │
-│                  (Events, States, BLoCs)                     │
-│                - State Management                            │
-│                - Business Logic Orchestration                │
+│                  Business Logic Layer (BLoC)                │
+│                  (Events, States, BLoCs)                    │
+│                - State Management                           │
+│                - Business Logic Orchestration               │
 └──────────────────────┬──────────────────────────────────────┘
                        │ Repository Calls
 ┌──────────────────────▼──────────────────────────────────────┐
-│                    Repository Layer                          │
-│              (Abstract Interfaces)                           │
-│            - Define Data Operations                          │
-│            - Platform Agnostic                               │
+│                    Repository Layer                         │
+│              (Abstract Interfaces)                          │
+│            - Define Data Operations                         │
+│            - Platform Agnostic                              │
 └──────────────────────┬──────────────────────────────────────┘
                        │ Implementation
 ┌──────────────────────▼──────────────────────────────────────┐
-│                     Adapter Layer                            │
-│         (Backend-Specific Implementation)                    │
+│                     Adapter Layer                           │
+│         (Backend-Specific Implementation)                   │
 │         - DTO ↔ Entity Conversion                           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -706,9 +706,10 @@ class WooCommerceAdapter extends BackendAdapter {
 
 ---
 
-**Last Updated:** 2026-02-22
-**Version:** 2.0.0
+**Last Updated:** 2026-02-26
+**Version:** 2.1.0
 
 **Changelog:**
-- **v2.0.0 (2026-02-22)**: Removed all singletons. Introduced `MooseAppContext`, `MooseScope`, `MooseBootstrapper`. `FeatureSection.adapters` getter replaced by `adaptersOf(context)`. Plugin lifecycle now split into sync `register()`/`onRegister()` and async `initializeAll()`/`initialize()`. `ConfigManager` is now instance-scoped, not a global singleton.
+- **v2.1.0 (2026-02-26)**: `initializeFromConfig()` requires `configManager:` (no global fallback). `AdapterRegistry` now stores lazy factories — no repo instances created at startup. `MooseAppContext.getRepository<T>()` shortcut added.
+- **v2.0.0 (2026-02-22)**: Removed all singletons. Introduced `MooseAppContext`, `MooseScope`, `MooseBootstrapper`. `FeatureSection.adapters` getter replaced by `adaptersOf(context)`. Plugin lifecycle split into sync `onRegister()` and async `initialize()`.
 - **v1.0.0 (2025-11-03)**: Initial version

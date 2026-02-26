@@ -8,6 +8,14 @@ class MockRepository extends CoreRepository {
   MockRepository()
       : super(hookRegistry: HookRegistry(), eventBus: EventBus());
 
+  bool _created = false;
+
+  MockRepository.tracked() : super(hookRegistry: HookRegistry(), eventBus: EventBus()) {
+    _created = true;
+  }
+
+  bool get wasCreated => _created;
+
   @override
   void initialize() {}
 }
@@ -23,6 +31,8 @@ class AnotherMockRepository extends CoreRepository {
 
 /// Test adapter that provides MockRepository
 class TestAdapter1 extends BackendAdapter {
+  int initializeCallCount = 0;
+
   @override
   String get name => 'test1';
 
@@ -37,6 +47,7 @@ class TestAdapter1 extends BackendAdapter {
 
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
+    initializeCallCount++;
     registerRepositoryFactory<MockRepository>(() => MockRepository());
   }
 }
@@ -86,22 +97,48 @@ class OverridingAdapter extends BackendAdapter {
 
 void main() {
   group('AdapterRegistry', () {
-    setUp(() {
-      // Clear registry before each test
-      AdapterRegistry().clearAll();
-    });
-
-    tearDown(() {
-      // Clean up after each test
-      AdapterRegistry().clearAll();
-    });
-
     group('Instance Isolation', () {
       test('each AdapterRegistry() creates an independent instance', () {
         final registry1 = AdapterRegistry();
         final registry2 = AdapterRegistry();
 
         expect(identical(registry1, registry2), isFalse);
+      });
+
+      test('two registries do not share state', () async {
+        final registry1 = AdapterRegistry();
+        final registry2 = AdapterRegistry();
+
+        await registry1.registerAdapter(
+          () async {
+            final adapter = TestAdapter1();
+            await adapter.initialize({});
+            return adapter;
+          },
+          autoInitialize: false,
+        );
+
+        // registry2 has not had any adapters registered
+        expect(registry1.adapterCount, 1);
+        expect(registry2.adapterCount, 0);
+        expect(registry2.isInitialized, false);
+      });
+
+      test('repositories from one registry are not visible in another', () async {
+        final registry1 = AdapterRegistry();
+        final registry2 = AdapterRegistry();
+
+        await registry1.registerAdapter(
+          () async {
+            final adapter = TestAdapter1();
+            await adapter.initialize({});
+            return adapter;
+          },
+          autoInitialize: false,
+        );
+
+        expect(registry1.hasRepository<MockRepository>(), true);
+        expect(registry2.hasRepository<MockRepository>(), false);
       });
     });
 
@@ -172,6 +209,79 @@ void main() {
         expect(registry.adapterCount, 2);
         expect(registry.getInitializedAdapters(), contains('test1'));
         expect(registry.getInitializedAdapters(), contains('test2'));
+      });
+    });
+
+    group('Lazy Repository Instantiation', () {
+      test('no repository instance is created during registration', () async {
+        // We verify this by registering with autoInitialize: false and
+        // checking that hasRepository returns true (factory registered) but
+        // getRepository has not been called, so the instance count before
+        // calling getRepository is zero (tracked via factory call count).
+        int factoryCallCount = 0;
+        final registry = AdapterRegistry();
+
+        // Build adapter manually so we control the factory
+        final adapter = TestAdapter1();
+        await adapter.initialize({});
+        // Replace the factory with a tracked one
+        adapter.registerRepositoryFactory<MockRepository>(() {
+          factoryCallCount++;
+          return MockRepository();
+        });
+
+        await registry.registerAdapter(
+          () => adapter,
+          autoInitialize: false,
+        );
+
+        // Factory must NOT have been called during registration
+        expect(factoryCallCount, 0);
+        expect(registry.hasRepository<MockRepository>(), true);
+      });
+
+      test('repository factory is called on first getRepository', () async {
+        int factoryCallCount = 0;
+        final registry = AdapterRegistry();
+
+        final adapter = TestAdapter1();
+        await adapter.initialize({});
+        adapter.registerRepositoryFactory<MockRepository>(() {
+          factoryCallCount++;
+          return MockRepository();
+        });
+
+        await registry.registerAdapter(() => adapter, autoInitialize: false);
+
+        expect(factoryCallCount, 0);
+
+        registry.getRepository<MockRepository>();
+
+        expect(factoryCallCount, 1);
+      });
+
+      test('repository is cached after first getRepository call', () async {
+        int factoryCallCount = 0;
+        final registry = AdapterRegistry();
+
+        final adapter = TestAdapter1();
+        await adapter.initialize({});
+        adapter.registerRepositoryFactory<MockRepository>(() {
+          factoryCallCount++;
+          return MockRepository();
+        });
+
+        await registry.registerAdapter(() => adapter, autoInitialize: false);
+
+        final repo1 = registry.getRepository<MockRepository>();
+        final repo2 = registry.getRepository<MockRepository>();
+        final repo3 = registry.getRepository<MockRepository>();
+
+        // Factory called exactly once
+        expect(factoryCallCount, 1);
+        // Same instance returned every time
+        expect(identical(repo1, repo2), true);
+        expect(identical(repo2, repo3), true);
       });
     });
 
@@ -279,6 +389,38 @@ void main() {
         // Both adapters provide MockRepository, last one should win
         final repo = registry.getRepository<MockRepository>();
         expect(repo, isA<MockRepository>());
+      });
+
+      test('overriding an existing type clears the previously cached instance',
+          () async {
+        final registry = AdapterRegistry();
+
+        await registry.registerAdapter(
+          () async {
+            final a = TestAdapter1();
+            await a.initialize({});
+            return a;
+          },
+          autoInitialize: false,
+        );
+
+        // Resolve repo from first adapter — this caches the instance.
+        final repo1 = registry.getRepository<MockRepository>();
+
+        // Register an overriding adapter for the same type.
+        await registry.registerAdapter(
+          () async {
+            final a = OverridingAdapter();
+            await a.initialize({});
+            return a;
+          },
+          autoInitialize: false,
+        );
+
+        // The new getRepository call must use the new factory, not the
+        // previously cached instance.
+        final repo2 = registry.getRepository<MockRepository>();
+        expect(identical(repo1, repo2), isFalse);
       });
     });
 
@@ -499,10 +641,9 @@ void main() {
     });
 
     group('Error Handling', () {
-      test('should handle adapter initialization failures', () async {
+      test('should throw StateError when not initialized', () async {
         final registry = AdapterRegistry();
 
-        // This will fail if we try to access repositories before initialization
         expect(
           () => registry.getRepository<MockRepository>(),
           throwsA(isA<StateError>()),
@@ -522,6 +663,43 @@ void main() {
             contains('AdapterRegistry not initialized'),
           );
         }
+      });
+
+      test('autoInitialize without scoped ConfigManager throws StateError',
+          () async {
+        final registry = AdapterRegistry();
+        // Do NOT call setDependencies — no ConfigManager injected.
+
+        expect(
+          () async => await registry.registerAdapter(
+            () => TestAdapter1(),
+            autoInitialize: true,
+          ),
+          throwsA(isA<StateError>()),
+        );
+      });
+
+      test('autoInitialize with scoped ConfigManager loads adapter config',
+          () async {
+        final registry = AdapterRegistry();
+        final configManager = ConfigManager();
+        configManager.initialize({
+          'adapters': {
+            'test1': {},
+          },
+        });
+        registry.setDependencies(
+          configManager: configManager,
+          hookRegistry: HookRegistry(),
+          eventBus: EventBus(),
+        );
+
+        // TestAdapter1 has an empty configSchema (no required fields),
+        // so this should succeed.
+        await registry.registerAdapter(() => TestAdapter1());
+
+        expect(registry.isInitialized, true);
+        expect(registry.hasRepository<MockRepository>(), true);
       });
     });
   });
