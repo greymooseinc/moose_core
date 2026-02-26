@@ -357,8 +357,6 @@ The package is organized into focused modules for better maintainability and sel
 | **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
 | **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
 
-See [Migration Guide](doc/MIGRATION_MODULAR_STRUCTURE.md) for details on using modular imports.
-
 ## Documentation
 
 - [Architecture Guide](doc/ai-ready/ARCHITECTURE.md) - Complete architectural patterns
