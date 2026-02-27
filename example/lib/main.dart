@@ -135,7 +135,7 @@ class DemoPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Async setup: warm cache, connect to services, etc.
   }
 

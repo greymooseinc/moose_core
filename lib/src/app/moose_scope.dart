@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../actions/action_registry.dart';
@@ -10,8 +12,10 @@ import '../plugin/plugin_registry.dart';
 import '../widgets/addon_registry.dart';
 import '../widgets/widget_registry.dart';
 import 'moose_app_context.dart';
+import 'moose_lifecycle_observer.dart';
 
-/// InheritedWidget that provides a [MooseAppContext] to the widget tree.
+/// Provides a [MooseAppContext] to the widget tree and manages plugin lifecycle
+/// observer wiring for that context.
 ///
 /// Place [MooseScope] at the root of your app (wrapping [MaterialApp]) so all
 /// descendant widgets can access registries and caches via `context.moose` or
@@ -26,21 +30,24 @@ import 'moose_app_context.dart';
 ///   ),
 /// );
 /// ```
-class MooseScope extends InheritedWidget {
+class MooseScope extends StatefulWidget {
   final MooseAppContext appContext;
 
   const MooseScope({
     super.key,
     required this.appContext,
-    required super.child,
+    required this.child,
   });
+
+  final Widget child;
 
   /// Returns the nearest [MooseAppContext] from the widget tree.
   ///
   /// Throws a descriptive [AssertionError] in debug mode if no [MooseScope]
   /// ancestor is found.
   static MooseAppContext of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<MooseScope>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<_MooseScopeInherited>();
     assert(
       scope != null,
       'MooseScope.of() called with a context that does not contain a MooseScope.\n'
@@ -62,8 +69,7 @@ class MooseScope extends InheritedWidget {
   static WidgetRegistry widgetRegistryOf(BuildContext ctx) =>
       of(ctx).widgetRegistry;
 
-  static HookRegistry hookRegistryOf(BuildContext ctx) =>
-      of(ctx).hookRegistry;
+  static HookRegistry hookRegistryOf(BuildContext ctx) => of(ctx).hookRegistry;
 
   static AddonRegistry addonRegistryOf(BuildContext ctx) =>
       of(ctx).addonRegistry;
@@ -82,7 +88,57 @@ class MooseScope extends InheritedWidget {
   static CacheManager cacheOf(BuildContext ctx) => of(ctx).cache;
 
   @override
-  bool updateShouldNotify(MooseScope oldWidget) =>
+  State<MooseScope> createState() => _MooseScopeState();
+}
+
+class _MooseScopeState extends State<MooseScope> {
+  MooseLifecycleObserver? _lifecycleObserver;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleObserver = MooseLifecycleObserver(appContext: widget.appContext)
+      ..attach();
+  }
+
+  @override
+  void didUpdateWidget(covariant MooseScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.appContext, widget.appContext)) return;
+
+    _lifecycleObserver?.detach();
+    unawaited(oldWidget.appContext.pluginRegistry.stopAll());
+
+    _lifecycleObserver = MooseLifecycleObserver(appContext: widget.appContext)
+      ..attach();
+  }
+
+  @override
+  void dispose() {
+    _lifecycleObserver?.detach();
+    unawaited(widget.appContext.pluginRegistry.stopAll());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _MooseScopeInherited(
+      appContext: widget.appContext,
+      child: widget.child,
+    );
+  }
+}
+
+class _MooseScopeInherited extends InheritedWidget {
+  final MooseAppContext appContext;
+
+  const _MooseScopeInherited({
+    required this.appContext,
+    required super.child,
+  });
+
+  @override
+  bool updateShouldNotify(_MooseScopeInherited oldWidget) =>
       !identical(oldWidget.appContext, appContext);
 }
 

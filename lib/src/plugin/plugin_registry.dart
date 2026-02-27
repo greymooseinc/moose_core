@@ -12,7 +12,8 @@ import 'feature_plugin.dart';
 ///
 /// ## Lifecycle:
 /// 1. [register] — sync: inject [MooseAppContext], call [FeaturePlugin.onRegister]
-/// 2. [initializeAll] — async: call [FeaturePlugin.initialize] on every active plugin
+/// 2. [initAll] — async: call [FeaturePlugin.onInit] on every active plugin
+/// 3. [startAll] — async: call [FeaturePlugin.onStart] on every active plugin
 class PluginRegistry {
   PluginRegistry();
 
@@ -37,7 +38,8 @@ class PluginRegistry {
       _logger.info('Registered defaults for plugin: ${plugin.name}');
     }
 
-    final pluginConfigData = appContext.configManager.get('plugins:${plugin.name}');
+    final pluginConfigData =
+        appContext.configManager.get('plugins:${plugin.name}');
     final pluginConfig = pluginConfigData is Map<String, dynamic>
         ? PluginConfig.fromJson(plugin.name, pluginConfigData)
         : PluginConfig(name: plugin.name, active: true);
@@ -61,13 +63,43 @@ class PluginRegistry {
   ///
   /// Optionally collects per-plugin timing into [timings] (populated by
   /// [MooseBootstrapper] for the [BootstrapReport]).
-  Future<void> initializeAll({Map<String, Duration>? timings}) async {
+  Future<void> initAll({Map<String, Duration>? timings}) async {
     for (final plugin in _plugins.values) {
       final sw = Stopwatch()..start();
-      await plugin.initialize();
+      await plugin.onInit();
       sw.stop();
       timings?[plugin.name] = sw.elapsed;
-      _logger.success('Initialized plugin: ${plugin.name}');
+      _logger.success('Initialized plugin: ${plugin.name} (onInit)');
+    }
+  }
+
+  /// Asynchronously starts every registered plugin in registration order.
+  Future<void> startAll({Map<String, Duration>? timings}) async {
+    for (final plugin in _plugins.values) {
+      final sw = Stopwatch()..start();
+      await plugin.onStart();
+      sw.stop();
+      timings?[plugin.name] = sw.elapsed;
+      _logger.success('Started plugin: ${plugin.name} (onStart)');
+    }
+  }
+
+  /// Asynchronously stops every registered plugin in reverse registration order.
+  Future<void> stopAll({Map<String, Duration>? timings}) async {
+    final pluginsInReverse = _plugins.values.toList().reversed;
+    for (final plugin in pluginsInReverse) {
+      final sw = Stopwatch()..start();
+      await plugin.onStop();
+      sw.stop();
+      timings?[plugin.name] = sw.elapsed;
+      _logger.success('Stopped plugin: ${plugin.name} (onStop)');
+    }
+  }
+
+  /// Forwards app lifecycle changes to every registered plugin.
+  Future<void> notifyAppLifecycle(AppLifecycleState state) async {
+    for (final plugin in _plugins.values) {
+      await plugin.onAppLifecycle(state);
     }
   }
 

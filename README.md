@@ -102,7 +102,7 @@ class ProductsPlugin extends FeaturePlugin {
     );
   }
 
-  @override Future<void> initialize() async {}
+  @override Future<void> onInit() async {}
 
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
@@ -175,7 +175,7 @@ class MyPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Async initialization (called after all plugins are registered)
   }
 

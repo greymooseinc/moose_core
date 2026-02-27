@@ -17,7 +17,10 @@ import '../app/moose_app_context.dart';
 /// 1. **Creation**: Plugin instance is created via factory function
 /// 2. **Configuration Check**: PluginRegistry checks if plugin is active in environment.json
 /// 3. **Registration**: If active, onRegister() is called for setup
-/// 4. **Initialization**: initialize() is called for async setup (API connections, etc.)
+/// 4. **Initialization**: onInit() is called for async setup (API connections, etc.)
+/// 5. **Start**: onStart() is called once all plugins finished initialization
+/// 6. **Runtime**: onAppLifecycle() is called for app foreground/background changes
+/// 7. **Stop**: onStop() is called during app teardown
 ///
 /// ## Configuration:
 /// Plugins can be configured in environment.json under the `plugins` key:
@@ -62,7 +65,7 @@ import '../app/moose_app_context.dart';
 ///   }
 ///
 ///   @override
-///   Future<void> initialize() async {
+///   Future<void> onInit() async {
 ///     // Async initialization (API setup, cache warming, etc.)
 ///     await loadInitialData();
 ///   }
@@ -152,8 +155,21 @@ abstract class FeaturePlugin {
   /// Called when plugin is registered
   void onRegister();
 
-  /// Called when plugin needs to be initialized
-  Future<void> initialize();
+  /// Called when plugin needs to be initialized.
+  Future<void> onInit();
+
+  /// Called after all plugins have finished [onInit].
+  ///
+  /// Use this for work that depends on other plugins already being initialized.
+  Future<void> onStart() async {}
+
+  /// Called when the app lifecycle changes.
+  Future<void> onAppLifecycle(AppLifecycleState state) async {}
+
+  /// Called during app teardown.
+  ///
+  /// Use this to release subscriptions/resources owned by the plugin.
+  Future<void> onStop() async {}
 
   /// Optional: Plugin can provide routes
   Map<String, WidgetBuilder>? getRoutes();

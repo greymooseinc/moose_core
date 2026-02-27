@@ -5,6 +5,25 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-27
+
+### Breaking Changes
+
+- **`FeaturePlugin.initialize()` renamed to `FeaturePlugin.onInit()`**: Plugin
+  implementations must now override `onInit()` instead of `initialize()`.
+- **`PluginRegistry.initializeAll()` renamed to `PluginRegistry.initAll()`**.
+
+### Added
+
+- **Plugin lifecycle hooks on `FeaturePlugin`**:
+  - `onStart()` — called after all plugins complete `onInit()`
+  - `onStop()` — called during teardown
+  - `onAppLifecycle(AppLifecycleState)` — receives app foreground/background transitions
+- **`PluginRegistry.startAll()`** and **`PluginRegistry.stopAll()`** lifecycle orchestration APIs.
+- **`PluginRegistry.notifyAppLifecycle()`** for dispatching Flutter lifecycle changes to plugins.
+- **`MooseLifecycleObserver`** (`package:moose_core/app.dart`) to forward
+  `WidgetsBindingObserver` lifecycle events into plugin lifecycle callbacks.
+
 ## [1.1.0] - 2026-02-26
 
 ### Breaking Changes

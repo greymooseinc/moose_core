@@ -60,7 +60,7 @@ Every major feature area is encapsulated in a self-contained plugin.
 abstract class FeaturePlugin {
   String get name;
   String get version;
-  Future<void> initialize();
+  Future<void> onInit();
   Map<String, WidgetBuilder>? getRoutes();
   void onRegister();
 }
@@ -76,7 +76,7 @@ class ProductsPlugin extends FeaturePlugin {
   String get version => '1.0.0';
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Register sections with WidgetRegistry
     widgetRegistry.register(
       'product.featured_section',
@@ -418,8 +418,8 @@ final report = await MooseBootstrapper(appContext: ctx).run(
 1. **`MooseBootstrapper.run()`**: Initializes config, wires `AppNavigator`, registers adapters
 2. **`PluginRegistry.register(plugin, appContext:)`**: Injects `appContext` into plugin, calls `onRegister()`
 3. **`onRegister()`**: Sync — register hooks, widgets, addon slots, custom actions
-4. **`PluginRegistry.initializeAll()`**: Calls `initialize()` on each registered plugin
-5. **`initialize()`**: Async — connect services, warm caches, perform I/O
+4. **`PluginRegistry.initAll()`**: Calls `onInit()` on each registered plugin
+5. **`onInit()`**: Async — connect services, warm caches, perform I/O
 6. **Runtime**: Sections built from configuration via `WidgetRegistry`
 
 ### Example Plugin Implementation
@@ -455,7 +455,7 @@ class MyFeaturePlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Async work: connect to services, warm caches, etc.
     await _initializeResources();
   }
@@ -711,5 +711,6 @@ class WooCommerceAdapter extends BackendAdapter {
 
 **Changelog:**
 - **v2.1.0 (2026-02-26)**: `initializeFromConfig()` requires `configManager:` (no global fallback). `AdapterRegistry` now stores lazy factories — no repo instances created at startup. `MooseAppContext.getRepository<T>()` shortcut added.
-- **v2.0.0 (2026-02-22)**: Removed all singletons. Introduced `MooseAppContext`, `MooseScope`, `MooseBootstrapper`. `FeatureSection.adapters` getter replaced by `adaptersOf(context)`. Plugin lifecycle split into sync `onRegister()` and async `initialize()`.
+- **v2.0.0 (2026-02-22)**: Removed all singletons. Introduced `MooseAppContext`, `MooseScope`, `MooseBootstrapper`. `FeatureSection.adapters` getter replaced by `adaptersOf(context)`. Plugin lifecycle split into sync `onRegister()` and async `onInit()`.
 - **v1.0.0 (2025-11-03)**: Initial version
+

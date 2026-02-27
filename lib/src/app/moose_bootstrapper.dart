@@ -10,6 +10,7 @@ class BootstrapReport {
 
   /// Per-plugin initialization timings (plugin name → elapsed time).
   final Map<String, Duration> pluginTimings;
+  final Map<String, Duration> pluginStartTimings;
 
   /// Failures that occurred (key = `"adapter:<name>"` or `"plugin:<name>"`).
   final Map<String, Object> failures;
@@ -20,13 +21,14 @@ class BootstrapReport {
   const BootstrapReport({
     required this.totalTime,
     required this.pluginTimings,
+    required this.pluginStartTimings,
     required this.failures,
   });
 
   @override
-  String toString() =>
-      'BootstrapReport(${succeeded ? "OK" : "FAILED"}, '
+  String toString() => 'BootstrapReport(${succeeded ? "OK" : "FAILED"}, '
       '${pluginTimings.length} plugins, '
+      '${pluginStartTimings.length} plugin starts, '
       '${failures.length} failures, '
       'took ${totalTime.inMilliseconds}ms)';
 }
@@ -57,7 +59,8 @@ class BootstrapReport {
 /// 3. Wire [AppNavigator] to the scoped [EventBus].
 /// 4. Register each adapter via [AdapterRegistry].
 /// 5. Register each plugin via [PluginRegistry] (sync, injects [MooseAppContext]).
-/// 6. Initialize all registered plugins via [PluginRegistry.initializeAll] (async).
+/// 6. Initialize all registered plugins via [PluginRegistry.initAll] (async).
+/// 7. Start all registered plugins via [PluginRegistry.startAll] (async).
 class MooseBootstrapper {
   final MooseAppContext appContext;
 
@@ -70,6 +73,7 @@ class MooseBootstrapper {
   }) async {
     final sw = Stopwatch()..start();
     final timings = <String, Duration>{};
+    final startTimings = <String, Duration>{};
     final failures = <String, Object>{};
 
     // Step 1: Initialize configuration.
@@ -110,23 +114,33 @@ class MooseBootstrapper {
 
     // Step 6: Initialize all registered plugins (async).
     try {
-      await appContext.pluginRegistry.initializeAll(timings: timings);
+      await appContext.pluginRegistry.initAll(timings: timings);
     } catch (e) {
-      failures['plugin:initializeAll'] = e;
-      appContext.logger.error('Plugin initialization phase failed', e);
+      failures['plugin:initAll'] = e;
+      appContext.logger.error('Plugin init phase failed', e);
+    }
+
+    // Step 7: Start all registered plugins (async).
+    try {
+      await appContext.pluginRegistry.startAll(timings: startTimings);
+    } catch (e) {
+      failures['plugin:startAll'] = e;
+      appContext.logger.error('Plugin start phase failed', e);
     }
 
     sw.stop();
     appContext.logger.info(
       'Bootstrap complete in ${sw.elapsed.inMilliseconds}ms '
-      '(${timings.length} plugins, ${failures.length} failures)',
+      '(${timings.length} plugins inited, ${startTimings.length} plugins started, ${failures.length} failures)',
     );
 
     appContext.logger.debug('Plugin timings: $timings');
+    appContext.logger.debug('Plugin start timings: $startTimings');
 
     return BootstrapReport(
       totalTime: sw.elapsed,
       pluginTimings: timings,
+      pluginStartTimings: startTimings,
       failures: failures,
     );
   }

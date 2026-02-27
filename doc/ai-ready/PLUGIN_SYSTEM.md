@@ -49,7 +49,7 @@ abstract class FeaturePlugin {
   void onRegister();
 
   /// Called during app initialization
-  Future<void> initialize();
+  Future<void> onInit();
 
   /// Return routes provided by this plugin
   Map<String, WidgetBuilder>? getRoutes();
@@ -250,7 +250,7 @@ class ProductsPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Register sections
     widgetRegistry.register(
       'products.featured_section',
@@ -389,7 +389,7 @@ Use `getSetting<T>()` (which reads from the scoped `ConfigManager` via `appConte
 ```dart
 class ProductsPlugin extends FeaturePlugin {
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // getSetting reads from appContext.configManager automatically
     final cacheTTL = getSetting<int>('cache.productsTTL'); // falls back to getDefaultSettings()
     final perPage = getSetting<int>('perPage');
@@ -413,11 +413,11 @@ Triggered by `MooseBootstrapper.run(plugins: [...])` for each factory in the lis
 
 **Important**: If no plugin configuration exists in environment.json, the plugin is considered active by default.
 
-### 2. Initialization Phase — `PluginRegistry.initializeAll()`
+### 2. Initialization Phase — `PluginRegistry.initAll()`
 
 Triggered automatically by `MooseBootstrapper.run()` after all plugins are registered.
 
-- `initialize()` is called on each active plugin (async, in registration order)
+- `onInit()` is called on each active plugin (async, in registration order)
 - Async resources are set up (network connections, caches, services)
 - Routes are collected via `getRoutes()`
 
@@ -448,7 +448,7 @@ class BasicPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // No async setup needed
   }
 
@@ -492,7 +492,7 @@ class HomePlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Async setup only (no widget registration here)
   }
 
@@ -547,7 +547,7 @@ class CartPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     final repository = adapterRegistry.getRepository<CartRepository>();
     _cartBloc = CartBloc(repository);
   }
@@ -598,7 +598,7 @@ class SharePlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {}
+  Future<void> onInit() async {}
 
   @override
   Map<String, WidgetBuilder>? getRoutes() => null;
@@ -686,7 +686,7 @@ Plugins can be disabled in environment.json without removing their configuration
 When a plugin is inactive:
 - ✅ Registration is skipped (saves resources)
 - ✅ `onRegister()` is never called
-- ✅ `initialize()` is never called
+- ✅ `onInit()` is never called
 - ✅ Routes are not added to the app
 - ✅ Sections are not registered
 - ❌ Plugin cannot be retrieved with `getPlugin()`
@@ -755,7 +755,7 @@ class NotificationsPlugin extends FeaturePlugin {
   StreamSubscription? _subscription;
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     final repo = adapterRegistry.getRepository<NotificationRepository>();
     _subscription = repo.onNotificationReceived.listen((notification) {
       // Handle notification
@@ -774,7 +774,7 @@ Handle errors gracefully:
 
 ```dart
 @override
-Future<void> initialize() async {
+Future<void> onInit() async {
   try {
     await _initializeResources();
   } catch (e) {
@@ -877,7 +877,7 @@ class AnalyticsPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Don't initialize analytics until first use
   }
 }
@@ -888,7 +888,7 @@ class AnalyticsPlugin extends FeaturePlugin {
 ```dart
 class PremiumPlugin extends FeaturePlugin {
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     final isPremium = await checkPremiumStatus();
 
     if (isPremium) {
@@ -908,7 +908,7 @@ class EcommercePlugin extends FeaturePlugin {
   late final CheckoutPlugin _checkoutPlugin;
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     _productsPlugin = ProductsPlugin();
     _cartPlugin = CartPlugin();
     _checkoutPlugin = CheckoutPlugin();
@@ -1127,12 +1127,12 @@ Plugins with exemplary documentation:
 ## Changelog
 
 ### Version 3.0.0 (2026-02-22)
-- Replaced `PluginRegistry.registerPlugin()` + `initialize()` with `MooseBootstrapper.run(plugins: [...])` pattern
+- Replaced `PluginRegistry.registerPlugin()` + `onInit()` with `MooseBootstrapper.run(plugins: [...])` pattern
 - `FeaturePlugin.getSetting<T>()` now reads from scoped `appContext.configManager` (not `ConfigManager()` singleton)
-- Plugin registration uses `PluginRegistry.register(plugin, appContext:)` + `initializeAll()` (split lifecycle)
+- Plugin registration uses `PluginRegistry.register(plugin, appContext:)` + `initAll()` (split lifecycle)
 - `PluginRegistry.getPluginConfig()` usage replaced by `getSetting<T>()` + `getDefaultSettings()`
 - Integration tests updated to use `MooseAppContext` instead of `WidgetRegistry()` singleton
-- Widget/addon registration moved to `onRegister()` (sync); `initialize()` reserved for async I/O
+- Widget/addon registration moved to `onRegister()` (sync); `onInit()` reserved for async I/O
 
 ### Version 2.3.0 (2025-11-10)
 - Documented `configSchema`, `getDefaultSettings()`, and `getSetting()` on `FeaturePlugin`
@@ -1163,3 +1163,4 @@ Plugins with exemplary documentation:
 - Documented plugin configuration best practices
 - Updated section configuration to support `active` flag
 - Moved cache configuration from root level to `settings` section
+

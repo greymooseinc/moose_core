@@ -68,7 +68,16 @@ abstract class FeaturePlugin {
 
   /// Called during app initialization
   /// Use this for async setup, registering sections, and routes
-  Future<void> initialize();
+  Future<void> onInit();
+
+  /// Optional: called after all plugins complete onInit()
+  Future<void> onStart();
+
+  /// Optional: called when app lifecycle changes
+  Future<void> onAppLifecycle(AppLifecycleState state);
+
+  /// Optional: called during teardown
+  Future<void> onStop();
 
   /// Return routes provided by this plugin
   Map<String, WidgetBuilder>? getRoutes();
@@ -101,7 +110,7 @@ class ProductsPlugin extends FeaturePlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> onInit() async {
     // Register sections and routes
   }
 
@@ -430,6 +439,7 @@ class MooseBootstrapper {
 class BootstrapReport {
   final Duration totalTime;
   final Map<String, Duration> pluginTimings;
+  final Map<String, Duration> pluginStartTimings;
   final Map<String, Object> failures;
   bool get succeeded; // true if failures is empty
 }
@@ -440,7 +450,8 @@ class BootstrapReport {
 2. `AppNavigator.setEventBus(appContext.eventBus)`
 3. Register each adapter via `appContext.adapterRegistry.registerAdapter()`
 4. Register each plugin via `appContext.pluginRegistry.register(plugin, appContext:)`
-5. `appContext.pluginRegistry.initializeAll()`
+5. `appContext.pluginRegistry.initAll()`
+6. `appContext.pluginRegistry.startAll()`
 
 ## Registry Classes
 
@@ -453,8 +464,14 @@ class PluginRegistry {
   /// Register a plugin synchronously: inject appContext, call onRegister()
   void register(FeaturePlugin plugin, {required MooseAppContext appContext});
 
-  /// Initialize all registered plugins asynchronously (calls initialize() on each)
-  Future<void> initializeAll({Map<String, Duration>? timings});
+  /// Initialize all registered plugins asynchronously (calls onInit() on each)
+  Future<void> initAll({Map<String, Duration>? timings});
+
+  /// Start all registered plugins asynchronously (calls onStart() on each)
+  Future<void> startAll({Map<String, Duration>? timings});
+
+  /// Stop all registered plugins asynchronously (calls onStop() in reverse order)
+  Future<void> stopAll({Map<String, Duration>? timings});
 
   /// Get a registered plugin by name
   FeaturePlugin? getPlugin(String name);
@@ -489,6 +506,7 @@ final report = await MooseBootstrapper(appContext: ctx).run(
 final ctx = MooseAppContext();
 ctx.pluginRegistry.register(ProductsPlugin(), appContext: ctx);
 await ctx.pluginRegistry.initializeAll();
+await ctx.pluginRegistry.startAll();
 ```
 
 ### AdapterRegistry
