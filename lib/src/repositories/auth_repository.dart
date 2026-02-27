@@ -45,7 +45,6 @@ import 'repository.dart';
 /// }
 /// ```
 abstract class AuthRepository extends CoreRepository {
-  AuthRepository({required super.hookRegistry, required super.eventBus});
 
   // ============================================================================
   // AUTHENTICATION METHODS

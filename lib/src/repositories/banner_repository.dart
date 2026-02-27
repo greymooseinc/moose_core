@@ -4,7 +4,6 @@ import 'repository.dart';
 /// Repository responsible for retrieving promotional banners and reporting
 /// engagement metrics (views/clicks) back to the backend.
 abstract class BannerRepository extends CoreRepository {
-  BannerRepository({required super.hookRegistry, required super.eventBus});
 
   /// Load banners for a placement (e.g. `home_hero`, `cart_footer`).
   ///

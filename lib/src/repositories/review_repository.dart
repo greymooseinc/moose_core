@@ -21,7 +21,6 @@ import 'repository.dart';
 /// - Adapter implementations handle backend-specific logic
 /// - The 'entityType' and 'entityId' pattern allows reviews for any entity type
 abstract class ReviewRepository extends CoreRepository {
-  ReviewRepository({required super.hookRegistry, required super.eventBus});
 
   /// Load paginated reviews for a specific entity
   ///

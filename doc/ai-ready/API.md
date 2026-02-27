@@ -528,7 +528,13 @@ class AdapterRegistry {
 
 **Example:**
 ```dart
-final adapterRegistry = AdapterRegistry();
+final appContext = MooseAppContext();
+appContext.configManager.initialize({
+  'adapters': {
+    'shopify': {'storeUrl': 'https://mystore.com', 'token': 'shpat_xxx'},
+  },
+});
+final adapterRegistry = appContext.adapterRegistry;
 
 // Simplest path: let the registry load + validate config via initializeFromConfig()
 await adapterRegistry.registerAdapter(
@@ -545,7 +551,7 @@ await adapterRegistry.registerAdapter(() async {
     'consumerSecret': 'cs_xxx',
   });
   return adapter;
-});
+}, autoInitialize: false);
 
 final repo = adapterRegistry.getRepository<ProductsRepository>();
 ```
@@ -889,7 +895,6 @@ class RepositoryTypeMismatchException implements Exception {
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheManager.initPersistentCache();
 
   final ctx = MooseAppContext(); // owns all registries
 

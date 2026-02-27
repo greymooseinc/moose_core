@@ -1,17 +1,9 @@
-import 'package:moose_core/services.dart';
-
 /// Base class for all repository implementations
 ///
-/// Provides common functionality and lifecycle management for repositories.
+/// Provides lifecycle management for repositories. Concrete subclasses
+/// declare their own dependencies (e.g. `EventBus`, `HookRegistry`,
+/// `CacheManager`) as local fields — only what each repo actually needs.
 abstract class CoreRepository {
-  final HookRegistry hookRegistry;
-  final EventBus eventBus;
-
-  CoreRepository({
-    required this.hookRegistry,
-    required this.eventBus,
-  });
-
   /// Initialize the repository
   ///
   /// This method is called after the repository is instantiated but before
@@ -30,7 +22,7 @@ abstract class CoreRepository {
   ///
   /// **Example:**
   /// ```dart
-  /// class WooProductsRepository extends CoreRepository implements ProductsRepository {
+  /// class WooProductsRepository extends ProductsRepository {
   ///   @override
   ///   void initialize() {
   ///     // Setup listeners

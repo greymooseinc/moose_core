@@ -708,17 +708,15 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final config = await loadConfiguration();
+  final appContext = MooseAppContext();
+  appContext.configManager.initialize(config);
 
-  final adapterRegistry = AdapterRegistry();
+  final adapterRegistry = appContext.adapterRegistry;
 
   // Register Firebase adapter
-  await adapterRegistry.registerAdapter(() async {
-    final adapter = FirebaseBackendAdapter();
-    await adapter.initialize(config['firebase']);
-    return adapter;
-  });
+  await adapterRegistry.registerAdapter(() => FirebaseBackendAdapter());
 
-  runApp(MyApp(adapterRegistry: adapterRegistry));
+  runApp(MyApp(appContext: appContext));
 }
 ```
 

@@ -5,7 +5,6 @@ import 'repository.dart';
 /// Abstract repository for search functionality
 /// Can be implemented for different platforms (WooCommerce, Shopify, etc.)
 abstract class SearchRepository extends CoreRepository {
-  SearchRepository({required super.hookRegistry, required super.eventBus});
 
   /// Search for items matching the query
   Future<List<SearchResult>> search({

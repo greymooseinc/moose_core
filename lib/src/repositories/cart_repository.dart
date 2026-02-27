@@ -3,7 +3,6 @@ import 'package:moose_core/entities.dart';
 import 'repository.dart';
 
 abstract class CartRepository extends CoreRepository {
-  CartRepository({required super.hookRegistry, required super.eventBus});
 
   Future<Cart> getCart({String? cartId, String? customerId});
 

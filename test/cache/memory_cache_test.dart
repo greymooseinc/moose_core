@@ -7,9 +7,6 @@ void main() {
 
     setUp(() {
       cache = MemoryCache();
-      cache.clear();
-      cache.resetStats();
-      // Reset to default config for each test
       cache.configure(
         maxSize: 1000,
         evictionPolicy: EvictionPolicy.lru,
@@ -17,19 +14,48 @@ void main() {
     });
 
     tearDown(() {
-      cache.clear();
-      cache.resetStats();
+      cache.dispose();
     });
 
     // =========================================================================
-    // Singleton
+    // Instance isolation — no singleton
     // =========================================================================
 
-    group('Singleton Pattern', () {
-      test('should return the same instance', () {
+    group('Instance isolation', () {
+      test('two MemoryCache instances are independent objects', () {
         final a = MemoryCache();
         final b = MemoryCache();
-        expect(identical(a, b), isTrue);
+        expect(identical(a, b), isFalse);
+        a.dispose();
+        b.dispose();
+      });
+
+      test('writes to one instance are not visible in another', () {
+        final a = MemoryCache();
+        final b = MemoryCache();
+
+        a.set('key', 'from_a');
+
+        expect(a.get<String>('key'), equals('from_a'));
+        expect(b.get<String>('key'), isNull);
+
+        a.dispose();
+        b.dispose();
+      });
+
+      test('clearing one instance does not affect another', () {
+        final a = MemoryCache();
+        final b = MemoryCache();
+
+        a.set('x', 1);
+        b.set('x', 2);
+        a.clear();
+
+        expect(a.get<int>('x'), isNull);
+        expect(b.get<int>('x'), equals(2));
+
+        a.dispose();
+        b.dispose();
       });
     });
 

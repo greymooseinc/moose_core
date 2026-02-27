@@ -119,13 +119,11 @@ Examples:
 The `PluginRegistry` automatically registers your defaults during plugin registration:
 
 ```dart
-Future<void> registerPlugin(FeaturePlugin Function() factory) async {
-  final plugin = factory();
-
+void register(FeaturePlugin plugin, {required MooseAppContext appContext}) {
   // Automatically registers defaults
   final defaults = plugin.getDefaultSettings();
   if (defaults.isNotEmpty) {
-    _configManager.registerPluginDefaults(plugin.name, defaults);
+    appContext.configManager.registerPluginDefaults(plugin.name, defaults);
   }
 
   // ... rest of registration
@@ -172,9 +170,9 @@ class MyBackendAdapter extends BackendAdapter {
     _baseUrl = config['baseUrl'] as String;
     _timeout = config['timeout'] as int? ?? 30;
 
-    // Alternatively, access via ConfigManager (same values):
-    // _baseUrl = ConfigManager().get('adapters:my_backend:baseUrl');
-    // _timeout = ConfigManager().get('adapters:my_backend:timeout');
+    // Alternatively, access via scoped configManager (same values):
+    // _baseUrl = configManager.get('adapters:my_backend:baseUrl');
+    // _timeout = configManager.get('adapters:my_backend:timeout');
   }
 }
 ```
@@ -319,16 +317,16 @@ Map<String, dynamic> getDefaultSettings() => {};
 
 ```dart
 // ✅ GOOD - Correct plugin path
-ConfigManager().get('plugins:my_plugin:settings:cache:ttl')
+configManager.get('plugins:my_plugin:settings:cache:ttl')
 
 // ❌ BAD - Missing 'settings' segment
-ConfigManager().get('plugins:my_plugin:cache:ttl')
+configManager.get('plugins:my_plugin:cache:ttl')
 
 // ✅ GOOD - Correct adapter path
-ConfigManager().get('adapters:shopify:apiVersion')
+configManager.get('adapters:shopify:apiVersion')
 
 // ❌ BAD - Incorrect path format
-ConfigManager().get('adapters:shopify:settings:apiVersion')
+configManager.get('adapters:shopify:settings:apiVersion')
 ```
 
 ### 4. Choose Sensible Defaults
@@ -553,7 +551,7 @@ class ShopifyAdapter extends BackendAdapter {
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
     final apiVersion = config['apiVersion'] as String? ??
-        ConfigManager().get('adapters:shopify:apiVersion');
+        configManager.get('adapters:shopify:apiVersion');
 
     // Use apiVersion...
   }
@@ -565,7 +563,7 @@ class ShopifyAdapter extends BackendAdapter {
 When creating or modifying plugins:
 1. Add `configSchema` getter with JSON Schema definition
 2. Add `getDefaultSettings()` method with sensible defaults
-3. Access config using `ConfigManager().get('plugins:{name}:settings:{path}')`
+3. Access config using `getSetting<T>()` or `configManager.get('plugins:{name}:settings:{path}')`
 4. Defaults are auto-registered - no manual registration needed
 5. Document configuration in plugin class comments
 
@@ -574,6 +572,6 @@ When creating or modifying adapters:
 2. Add `getDefaultSettings()` method with sensible defaults
 3. Implement `initialize(Map<String, dynamic> config)` - config is pre-validated and merged with defaults
 4. Defaults are auto-registered by AdapterRegistry - no manual registration needed
-5. Use `ConfigManager().get('adapters:{name}:{key}')` as an alternative way to access config
+5. Use `configManager.get('adapters:{name}:{key}')` as an alternative way to access config
 
 The system handles the rest automatically!

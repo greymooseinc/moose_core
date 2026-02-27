@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../actions/action_registry.dart';
 import '../adapter/adapter_registry.dart';
+import '../cache/cache_manager.dart';
 import '../config/config_manager.dart';
 import '../events/event_bus.dart';
 import '../events/hook_registry.dart';
@@ -13,8 +14,8 @@ import 'moose_app_context.dart';
 /// InheritedWidget that provides a [MooseAppContext] to the widget tree.
 ///
 /// Place [MooseScope] at the root of your app (wrapping [MaterialApp]) so all
-/// descendant widgets can access registries via `context.moose` or the static
-/// accessors on this class.
+/// descendant widgets can access registries and caches via `context.moose` or
+/// the static accessors on this class.
 ///
 /// ```dart
 /// final ctx = MooseAppContext();
@@ -77,6 +78,8 @@ class MooseScope extends InheritedWidget {
       of(ctx).configManager;
 
   static EventBus eventBusOf(BuildContext ctx) => of(ctx).eventBus;
+
+  static CacheManager cacheOf(BuildContext ctx) => of(ctx).cache;
 
   @override
   bool updateShouldNotify(MooseScope oldWidget) =>

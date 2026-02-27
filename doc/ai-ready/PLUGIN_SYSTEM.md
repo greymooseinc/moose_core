@@ -36,6 +36,9 @@ abstract class FeaturePlugin {
   /// Semantic version of the plugin
   String get version;
 
+  /// Injected by PluginRegistry before onRegister()
+  late MooseAppContext appContext;
+
   /// JSON Schema describing this plugin's configuration surface
   Map<String, dynamic> get configSchema => {'type': 'object'};
 
@@ -66,7 +69,7 @@ abstract class FeaturePlugin {
 
 - Override `configSchema` with a JSON Schema definition so tools (and CI) can validate `environment.json`.
 - Override `getDefaultSettings()` with a full tree of sensible defaults. The registry automatically registers these via `ConfigManager.registerPluginDefaults`, so any missing keys fall back to your code-defined values.
-- Use `getSetting<T>('cache:ttl')` (or direct `ConfigManager().get(...)`) to read settings. The helper merges environment overrides with defaults transparently.
+- Use `getSetting<T>('cache:ttl')` (or `configManager.get(...)`) to read settings. The helper merges environment overrides with defaults transparently.
 - See [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) for end-to-end examples.
 
 #### Distributing Plugin Settings to Internal Layers
@@ -292,7 +295,6 @@ Plugins are registered and initialized through `MooseBootstrapper`, not `PluginR
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheManager.initPersistentCache();
 
   final ctx = MooseAppContext();
 

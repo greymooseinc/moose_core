@@ -1,91 +1,85 @@
 import 'memory_cache.dart';
 import 'persistent_cache.dart';
 
-/// Central cache manager providing access to both memory and persistent caches
+/// Scoped cache manager that owns independent [MemoryCache] and [PersistentCache]
+/// instances for a single [MooseAppContext].
 ///
-/// This class provides a unified interface to access different cache implementations:
-/// - MemoryCache: Fast in-memory storage for temporary runtime data
-/// - PersistentCache: Persistent storage using SharedPreferences for data that survives app restarts
+/// [CacheManager] is created and owned by [MooseAppContext]. There is no global
+/// or static state — each context has its own isolated cache. Two
+/// [MooseAppContext] instances never share cache data.
 ///
-/// Usage:
+/// Access via the widget tree:
 /// ```dart
-/// // For temporary runtime data (cleared on app restart)
-/// CacheManager.memoryCacheInstance().set('temp_token', 'abc123');
-/// final token = CacheManager.memoryCacheInstance().get<String>('temp_token');
+/// // From a widget
+/// final cache = context.moose.cache;
+/// cache.memory.set('temp_token', 'abc123');
+/// final token = cache.memory.get<String>('temp_token');
 ///
-/// // For persistent data (survives app restarts)
-/// await CacheManager.persistentCacheInstance().set('user_id', '12345');
-/// final userId = await CacheManager.persistentCacheInstance().getString('user_id');
+/// // Persistent (survives app restarts)
+/// await cache.persistent.set('user_id', '12345');
+/// final userId = await cache.persistent.getString('user_id');
 /// ```
 ///
-/// When to use each cache:
-/// - Use MemoryCache for: API response caching, computed values, session state, temporary UI state
-/// - Use PersistentCache for: User preferences, settings, authentication tokens, search history, favorites
+/// Or directly on [MooseAppContext]:
+/// ```dart
+/// appContext.cache.memory.set('key', value);
+/// appContext.cache.persistent.setString('pref', 'value');
+/// ```
+///
+/// Initialise the persistent layer during bootstrap (done automatically by
+/// [MooseBootstrapper]):
+/// ```dart
+/// await appContext.cache.initPersistent();
+/// ```
 class CacheManager {
-  // Private constructor to prevent instantiation
-  CacheManager._();
+  /// In-memory cache for fast, session-scoped storage.
+  ///
+  /// Use for API response caching, computed values, session state, and
+  /// temporary UI state. Data is lost when the app process ends.
+  final MemoryCache memory;
 
-  /// Get the singleton instance of MemoryCache
+  /// Persistent cache backed by SharedPreferences.
   ///
-  /// Use this for fast in-memory caching of temporary data that doesn't need
-  /// to persist between app sessions.
+  /// Use for user preferences, settings, authentication tokens, search
+  /// history, and favourites. Data survives app restarts.
+  final PersistentCache persistent;
+
+  CacheManager({
+    MemoryCache? memory,
+    PersistentCache? persistent,
+  })  : memory = memory ?? MemoryCache(),
+        persistent = persistent ?? PersistentCache();
+
+  /// Initialise the persistent cache layer.
   ///
-  /// Example:
-  /// ```dart
-  /// CacheManager.memoryCacheInstance().set('api_response', data, ttl: Duration(minutes: 5));
-  /// final cachedData = CacheManager.memoryCacheInstance().get('api_response');
-  /// ```
-  static MemoryCache memoryCacheInstance() {
-    return MemoryCache();
+  /// Called automatically by [MooseBootstrapper]. Must complete before any
+  /// [persistent] operations are attempted.
+  Future<void> initPersistent() async {
+    await persistent.init();
   }
 
-  /// Get the singleton instance of PersistentCache
+  /// Clear both memory and persistent caches.
   ///
-  /// Use this for data that needs to persist between app sessions.
-  ///
-  /// IMPORTANT: Make sure to call `await CacheManager.initPersistentCache()`
-  /// during app initialization before using this cache.
-  ///
-  /// Example:
-  /// ```dart
-  /// await CacheManager.persistentCacheInstance().setString('username', 'john_doe');
-  /// final username = await CacheManager.persistentCacheInstance().getString('username');
-  /// ```
-  static PersistentCache persistentCacheInstance() {
-    return PersistentCache();
+  /// Use with caution — this removes all cached data for this context.
+  Future<void> clearAll() async {
+    memory.clear();
+    await persistent.clear();
   }
 
-  /// Initialize the persistent cache
-  ///
-  /// Call this during app initialization (e.g., in main()) before using PersistentCache.
-  ///
-  /// Example:
-  /// ```dart
-  /// void main() async {
-  ///   WidgetsFlutterBinding.ensureInitialized();
-  ///   await CacheManager.initPersistentCache();
-  ///   runApp(MyApp());
-  /// }
-  /// ```
-  static Future<void> initPersistentCache() async {
-    await PersistentCache().init();
+  /// Clear only the in-memory cache.
+  void clearMemory() {
+    memory.clear();
   }
 
-  /// Clear all caches (both memory and persistent)
+  /// Clear only the persistent cache.
+  Future<bool> clearPersistent() async {
+    return await persistent.clear();
+  }
+
+  /// Dispose the memory cache and stop its cleanup timer.
   ///
-  /// Use with caution as this will remove all cached data.
-  static Future<void> clearAll() async {
-    memoryCacheInstance().clear();
-    await persistentCacheInstance().clear();
-  }
-
-  /// Clear only the memory cache
-  static void clearMemoryCache() {
-    memoryCacheInstance().clear();
-  }
-
-  /// Clear only the persistent cache
-  static Future<bool> clearPersistentCache() async {
-    return await persistentCacheInstance().clear();
+  /// Call when the owning [MooseAppContext] is being torn down.
+  void dispose() {
+    memory.dispose();
   }
 }

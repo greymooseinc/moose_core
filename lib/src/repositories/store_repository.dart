@@ -6,7 +6,6 @@ import 'repository.dart';
 /// Provides access to store-wide settings, legal information,
 /// physical locations, and other store-related data.
 abstract class StoreRepository extends CoreRepository {
-  StoreRepository({required super.hookRegistry, required super.eventBus});
 
   // ==================== Store Information ====================
 

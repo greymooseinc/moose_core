@@ -1,25 +1,19 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persistent cache using SharedPreferences for data that survives app restarts
+/// Persistent cache using SharedPreferences for data that survives app restarts.
+///
+/// Each [PersistentCache] instance is independent — there is no shared global
+/// state. Instances are owned and scoped by [MooseAppContext] and accessed via
+/// `appContext.cache.persistent`.
 ///
 /// Provides persistent key-value storage backed by SharedPreferences.
 /// Data stored here persists between app sessions and device reboots.
 ///
-/// Ideal for user preferences, settings, search history, and other data
-/// that needs to be preserved across app launches.
-///
 /// Note: For temporary runtime data that doesn't need persistence,
-/// use MemoryCache instead for better performance.
+/// use [MemoryCache] instead for better performance.
 class PersistentCache {
-  // Private constructor for singleton
-  PersistentCache._internal();
-
-  // Singleton instance
-  static final PersistentCache _instance = PersistentCache._internal();
-
-  // Factory constructor returns the same instance
-  factory PersistentCache() => _instance;
+  PersistentCache();
 
   // SharedPreferences instance (lazy loaded)
   SharedPreferences? _prefs;

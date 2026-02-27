@@ -1,16 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
+import 'package:moose_core/app.dart';
 import 'package:moose_core/repositories.dart';
-import 'package:moose_core/services.dart';
 
 /// Mock repository for testing
 class MockRepository extends CoreRepository {
-  MockRepository()
-      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+  MockRepository();
 
   bool _created = false;
 
-  MockRepository.tracked() : super(hookRegistry: HookRegistry(), eventBus: EventBus()) {
+  MockRepository.tracked() {
     _created = true;
   }
 
@@ -22,8 +21,7 @@ class MockRepository extends CoreRepository {
 
 /// Another mock for testing
 class AnotherMockRepository extends CoreRepository {
-  AnotherMockRepository()
-      : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+  AnotherMockRepository();
 
   @override
   void initialize() {}
@@ -682,16 +680,14 @@ void main() {
       test('autoInitialize with scoped ConfigManager loads adapter config',
           () async {
         final registry = AdapterRegistry();
-        final configManager = ConfigManager();
-        configManager.initialize({
+        final appContext = MooseAppContext();
+        appContext.configManager.initialize({
           'adapters': {
             'test1': {},
           },
         });
         registry.setDependencies(
-          configManager: configManager,
-          hookRegistry: HookRegistry(),
-          eventBus: EventBus(),
+          appContext: appContext,
         );
 
         // TestAdapter1 has an empty configSchema (no required fields),

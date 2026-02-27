@@ -35,25 +35,39 @@ import 'package:moose_core/services.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize registries
-  final adapterRegistry = AdapterRegistry();
-  final pluginRegistry = PluginRegistry();
+  final appContext = MooseAppContext();
 
-  // Register your adapter
-  await adapterRegistry.registerAdapter(() async {
-    final adapter = WooCommerceAdapter();
-    await adapter.initialize(config);
-    return adapter;
-  });
-
-  // Register your plugins
-  await pluginRegistry.registerPlugin(() => ProductsPlugin());
-  await pluginRegistry.registerPlugin(() => CartPlugin());
-
-  runApp(MyApp(
-    pluginRegistry: pluginRegistry,
-    adapterRegistry: adapterRegistry,
+  runApp(MooseScope(
+    appContext: appContext,
+    child: AppBootstrap(appContext: appContext),
   ));
+}
+
+class AppBootstrap extends StatefulWidget {
+  final MooseAppContext appContext;
+  const AppBootstrap({super.key, required this.appContext});
+
+  @override
+  State<AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends State<AppBootstrap> {
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await MooseBootstrapper(appContext: widget.appContext).run(
+      config: await loadConfiguration(),
+      adapters: [WooCommerceAdapter()],
+      plugins: [() => ProductsPlugin(), () => CartPlugin()],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 ```
 

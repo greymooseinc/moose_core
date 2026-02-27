@@ -20,6 +20,7 @@
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
 
+import '../app/moose_app_context.dart';
 import 'backend_adapter.dart';
 
 
@@ -82,10 +83,8 @@ class AdapterRegistry {
   /// Logger instance for the registry
   final _logger = AppLogger('AdapterRegistry');
 
-  // Scoped dependencies set by MooseAppContext after construction.
-  ConfigManager? _configManager;
-  HookRegistry? _hookRegistry;
-  EventBus? _eventBus;
+  // Scoped context set by MooseAppContext after construction.
+  MooseAppContext? _appContext;
 
   // =========================================================================
   // PUBLIC METHODS
@@ -96,13 +95,9 @@ class AdapterRegistry {
   /// Called automatically by [MooseAppContext] immediately after construction.
   /// These are forwarded to each [BackendAdapter] before it is initialized.
   void setDependencies({
-    required ConfigManager configManager,
-    required HookRegistry hookRegistry,
-    required EventBus eventBus,
+    required MooseAppContext appContext,
   }) {
-    _configManager = configManager;
-    _hookRegistry = hookRegistry;
-    _eventBus = eventBus;
+    _appContext = appContext;
   }
 
   /// Registers and optionally initializes a backend adapter.
@@ -158,31 +153,29 @@ class AdapterRegistry {
         );
       }
 
-      // Inject scoped dependencies before initialization so the adapter and the
-      // repositories it creates can use the app-scoped hook/event instances.
-      if (_hookRegistry != null) adapter.hookRegistry = _hookRegistry!;
-      if (_eventBus != null) adapter.eventBus = _eventBus!;
+      // Inject scoped app context before initialization.
+      if (_appContext != null) adapter.appContext = _appContext!;
 
       // Auto-initialize if requested — requires scoped ConfigManager.
       if (autoInitialize) {
-        if (_configManager == null) {
+        if (_appContext == null) {
           throw StateError(
             'Cannot auto-initialize adapter "${adapter.name}": '
-            'ConfigManager has not been injected. '
+            'MooseAppContext has not been injected. '
             'Call setDependencies() before registering adapters, or use '
             'autoInitialize: false and initialize the adapter manually.',
           );
         }
-        await adapter.initializeFromConfig(configManager: _configManager!);
+        await adapter.initializeFromConfig(configManager: _appContext!.configManager);
       }
 
       final adapterName = adapter.name;
 
       // Register adapter defaults in ConfigManager (scoped — no global fallback).
-      if (_configManager != null) {
+      if (_appContext != null) {
         final defaults = adapter.getDefaultSettings();
         if (defaults.isNotEmpty) {
-          _configManager!.registerAdapterDefaults(adapterName, defaults);
+          _appContext!.configManager.registerAdapterDefaults(adapterName, defaults);
           _logger.debug('Registered defaults for adapter: $adapterName');
         }
       }

@@ -1,6 +1,9 @@
+import 'package:moose_core/cache.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
 import 'package:json_schema/json_schema.dart';
+
+import '../app/moose_app_context.dart';
 
 /// BackendAdapter - Abstract base class for backend implementations
 ///
@@ -119,14 +122,20 @@ abstract class BackendAdapter {
   /// ```
   Map<String, dynamic> getDefaultSettings() => {};
 
-  /// Scoped [HookRegistry] injected by [AdapterRegistry] before initialization.
-  ///
-  /// Concrete adapters can pass this to repository factories so repositories
-  /// use the same scoped instance rather than a global singleton.
-  late HookRegistry hookRegistry;
+  /// Injected by [AdapterRegistry.registerAdapter] before initialization.
+  /// All shared services should be accessed through this scoped context.
+  late MooseAppContext appContext;
 
-  /// Scoped [EventBus] injected by [AdapterRegistry] before initialization.
-  late EventBus eventBus;
+  // Convenience getters — delegate to the injected appContext.
+  HookRegistry get hookRegistry => appContext.hookRegistry;
+  ActionRegistry get actionRegistry => appContext.actionRegistry;
+  ConfigManager get configManager => appContext.configManager;
+  EventBus get eventBus => appContext.eventBus;
+  AppLogger get logger => appContext.logger;
+  CacheManager get cache => appContext.cache;
+
+  // Backward-compatible alias for existing adapters that still use cacheManager.
+  CacheManager get cacheManager => cache;
 
   /// Repository factories storage
   final Map<Type, Object> _factories = {};

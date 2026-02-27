@@ -1,22 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/app.dart';
+import 'package:moose_core/cache.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
-
 // ---------------------------------------------------------------------------
 // Test doubles
 // ---------------------------------------------------------------------------
 
 class MockRepo extends CoreRepository {
-  MockRepo() : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+  MockRepo();
 
   @override
   void initialize() {}
 }
 
 class AnotherMockRepo extends CoreRepository {
-  AnotherMockRepo() : super(hookRegistry: HookRegistry(), eventBus: EventBus());
+  AnotherMockRepo();
 
   @override
   void initialize() {}
@@ -112,6 +112,45 @@ void main() {
 
         expect(ctx1.configManager.get('key'), 'value1');
         expect(ctx2.configManager.get('key'), 'value2');
+      });
+
+      test('two contexts own independent CacheManager instances', () {
+        final ctx1 = MooseAppContext();
+        final ctx2 = MooseAppContext();
+
+        expect(identical(ctx1.cache, ctx2.cache), isFalse);
+        expect(identical(ctx1.cache.memory, ctx2.cache.memory), isFalse);
+        expect(identical(ctx1.cache.persistent, ctx2.cache.persistent), isFalse);
+      });
+
+      test('memory cache writes in one context are not visible in another', () {
+        final ctx1 = MooseAppContext();
+        final ctx2 = MooseAppContext();
+
+        ctx1.cache.memory.set('token', 'abc');
+
+        expect(ctx1.cache.memory.get<String>('token'), equals('abc'));
+        expect(ctx2.cache.memory.get<String>('token'), isNull);
+      });
+
+      test('clearing cache in one context does not affect another', () {
+        final ctx1 = MooseAppContext();
+        final ctx2 = MooseAppContext();
+
+        ctx1.cache.memory.set('data', 1);
+        ctx2.cache.memory.set('data', 2);
+
+        ctx1.cache.clearMemory();
+
+        expect(ctx1.cache.memory.get<int>('data'), isNull);
+        expect(ctx2.cache.memory.get<int>('data'), equals(2));
+      });
+
+      test('accepts injected CacheManager for testing', () {
+        final customCache = CacheManager();
+        final ctx = MooseAppContext(cache: customCache);
+
+        expect(identical(ctx.cache, customCache), isTrue);
       });
     });
 

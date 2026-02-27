@@ -91,7 +91,11 @@ enum EvictionPolicy {
   fifo,
 }
 
-/// In-memory cache with memory management and leak prevention
+/// In-memory cache with memory management and leak prevention.
+///
+/// Each [MemoryCache] instance is independent — there is no shared global state.
+/// Instances are owned and scoped by [MooseAppContext] and accessed via
+/// `appContext.cache.memory`.
 ///
 /// Features:
 /// - **Max size limits** - Prevents unbounded memory growth
@@ -118,13 +122,9 @@ enum EvictionPolicy {
 /// print(cache.stats);
 /// ```
 class MemoryCache {
-  // Singleton pattern
-  MemoryCache._internal() {
+  MemoryCache() {
     _startCleanupTimer();
   }
-
-  static final MemoryCache _instance = MemoryCache._internal();
-  factory MemoryCache() => _instance;
 
   // Configuration
   int _maxSize = 1000; // Default: max 1000 entries

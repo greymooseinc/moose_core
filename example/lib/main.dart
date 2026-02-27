@@ -3,7 +3,6 @@ import 'package:moose_core/moose_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheManager.initPersistentCache();
   runApp(const AppRoot());
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moose_core/adapters.dart';
+import 'package:moose_core/cache.dart';
 import 'package:moose_core/entities.dart';
 import 'package:moose_core/services.dart';
 import 'package:moose_core/widgets.dart';
@@ -39,13 +40,6 @@ import '../app/moose_app_context.dart';
 /// }
 /// ```
 ///
-/// ## Available Registries:
-/// - **hookRegistry**: Register lifecycle hooks that other plugins can trigger
-/// - **addonRegistry**: Register addons that extend functionality
-/// - **widgetRegistry**: Register UI components/sections
-/// - **adapterRegistry**: Register backend adapters (WooCommerce, Shopify, etc.)
-/// - **actionRegistry**: Register custom actions for user interactions
-/// - **eventBus**: Publish/subscribe to events across plugins
 ///
 /// ## Example Implementation:
 /// ```dart
@@ -96,7 +90,10 @@ abstract class FeaturePlugin {
   WidgetRegistry get widgetRegistry => appContext.widgetRegistry;
   AdapterRegistry get adapterRegistry => appContext.adapterRegistry;
   ActionRegistry get actionRegistry => appContext.actionRegistry;
+  ConfigManager get configManager => appContext.configManager;
   EventBus get eventBus => appContext.eventBus;
+  AppLogger get logger => appContext.logger;
+  CacheManager get cache => appContext.cache;
 
   /// JSON Schema for plugin configuration validation.
   ///

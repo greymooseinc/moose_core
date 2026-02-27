@@ -1,5 +1,6 @@
 import '../actions/action_registry.dart';
 import '../adapter/adapter_registry.dart';
+import '../cache/cache_manager.dart';
 import '../config/config_manager.dart';
 import '../events/event_bus.dart';
 import '../events/hook_registry.dart';
@@ -9,7 +10,8 @@ import '../utils/logger.dart';
 import '../widgets/addon_registry.dart';
 import '../widgets/widget_registry.dart';
 
-/// App-scoped container holding all registries and managers for a moose_core instance.
+/// App-scoped container holding all registries, managers, and caches for a
+/// moose_core instance.
 ///
 /// Create one [MooseAppContext] per app (or per isolated test), then pass it to
 /// [MooseScope] so widgets can access it via `context.moose`.
@@ -19,14 +21,24 @@ import '../widgets/widget_registry.dart';
 /// runApp(MooseScope(appContext: ctx, child: MyApp()));
 /// ```
 ///
-/// All optional constructor parameters allow injection of custom or mock instances
-/// for testing:
+/// All optional constructor parameters allow injection of custom or mock
+/// instances for testing:
 ///
 /// ```dart
 /// final ctx = MooseAppContext(
 ///   hookRegistry: MockHookRegistry(),
 ///   configManager: MockConfigManager(),
 /// );
+/// ```
+///
+/// ### Cache access
+///
+/// ```dart
+/// // In-memory (session-scoped)
+/// ctx.cache.memory.set('key', value);
+///
+/// // Persistent (survives restarts)
+/// await ctx.cache.persistent.setString('pref', 'value');
 /// ```
 class MooseAppContext {
   final PluginRegistry pluginRegistry;
@@ -39,6 +51,10 @@ class MooseAppContext {
   final EventBus eventBus;
   final AppLogger logger;
 
+  /// Scoped cache manager owning independent [MemoryCache] and [PersistentCache]
+  /// instances. Never shared across [MooseAppContext] instances.
+  final CacheManager cache;
+
   MooseAppContext({
     PluginRegistry? pluginRegistry,
     WidgetRegistry? widgetRegistry,
@@ -49,6 +65,7 @@ class MooseAppContext {
     ConfigManager? configManager,
     EventBus? eventBus,
     AppLogger? logger,
+    CacheManager? cache,
   })  : configManager = configManager ?? ConfigManager(),
         hookRegistry = hookRegistry ?? HookRegistry(),
         addonRegistry = addonRegistry ?? AddonRegistry(),
@@ -57,15 +74,14 @@ class MooseAppContext {
         eventBus = eventBus ?? EventBus(),
         logger = logger ?? AppLogger('MooseApp'),
         pluginRegistry = pluginRegistry ?? PluginRegistry(),
-        widgetRegistry = widgetRegistry ?? WidgetRegistry() {
+        widgetRegistry = widgetRegistry ?? WidgetRegistry(),
+        cache = cache ?? CacheManager() {
     // Wire WidgetRegistry to the scoped ConfigManager (post-construction to avoid
     // circular initializer-list dependency).
     this.widgetRegistry.setConfigManager(this.configManager);
     // Wire AdapterRegistry to scoped dependencies.
     this.adapterRegistry.setDependencies(
-      configManager: this.configManager,
-      hookRegistry: this.hookRegistry,
-      eventBus: this.eventBus,
+      appContext: this,
     );
   }
 

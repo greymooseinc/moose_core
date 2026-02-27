@@ -154,7 +154,7 @@ abstract class CoreRepository {
 - **Automatic Initialization**: `initialize()` is called automatically by the adapter
 - **HookRegistry Access**: Injected via constructor; available as `hookRegistry` field
 - **EventBus Access**: Injected via constructor; available as `eventBus` field
-- **Injected by AdapterRegistry**: `AdapterRegistry.setDependencies()` provides the scoped `HookRegistry` and `EventBus` before any adapter is registered. Factories close over adapter's own fields.
+- **Scoped app context injection**: `AdapterRegistry` injects `appContext` before adapter initialization. Adapters then use convenience getters (`hookRegistry`, `eventBus`, `cache`, `configManager`, etc.) from that context.
 
 ## Creating a Custom Adapter
 
@@ -362,7 +362,6 @@ class WooCommerceAdapter extends BackendAdapter {
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheManager.initPersistentCache();
 
   final ctx = MooseAppContext();
 
@@ -381,7 +380,7 @@ final report = await MooseBootstrapper(appContext: ctx).run(
 );
 ```
 
-> **Note:** `MooseBootstrapper` calls `appContext.adapterRegistry.registerAdapter(() => adapter)` internally after calling `setDependencies()` so adapters receive the scoped `HookRegistry`/`EventBus`. For manual registration outside a bootstrapper, call `appContext.adapterRegistry.registerAdapter(factory)` directly.
+> **Note:** `MooseBootstrapper` calls `appContext.adapterRegistry.registerAdapter(() => adapter)` after wiring the registry to the scoped `MooseAppContext`, so adapters receive `appContext` before `initializeFromConfig()`. For manual registration outside a bootstrapper, call `appContext.adapterRegistry.registerAdapter(factory)` directly.
 
 ## Repository Factory Pattern
 

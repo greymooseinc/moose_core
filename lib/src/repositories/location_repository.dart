@@ -8,7 +8,6 @@ import 'repository.dart';
 /// Handles address autocomplete, postal code lookup, geolocation,
 /// and customer address management.
 abstract class LocationRepository extends CoreRepository {
-  LocationRepository({required super.hookRegistry, required super.eventBus});
 
   // ==================== Address Autocomplete ====================
 

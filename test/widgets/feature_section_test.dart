@@ -178,6 +178,10 @@ void main() {
 
         expect(captured, isNotNull);
         expect(identical(captured, appContext.adapterRegistry), isTrue);
+
+        // Dispose the scoped cache to stop the MemoryCache cleanup timer before
+        // the widget tree is torn down.
+        appContext.cache.dispose();
       });
     });
 

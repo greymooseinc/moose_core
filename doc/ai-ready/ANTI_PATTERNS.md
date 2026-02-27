@@ -664,6 +664,34 @@ Future<void> _onLoadProducts(...) async {
 }
 ```
 
+### ❌ ANTI-PATTERN 16: Global / Static Cache Access
+
+**Why it's wrong:**
+- Two `MooseAppContext` instances share state — isolation breaks
+- Tests leak state between runs
+- Prevents proper DI and testability
+
+**Wrong:**
+```dart
+// ❌ Static facade (removed in v1.2)
+CacheManager.memoryCacheInstance().set('key', value);
+CacheManager.persistentCacheInstance().getString('pref');
+
+// ❌ Direct singleton construction
+final cache = MemoryCache();   // shares global state
+final cache = PersistentCache(); // shares global state
+```
+
+**Correct:**
+```dart
+// ✅ Always access through MooseAppContext
+appContext.cache.memory.set('key', value);
+await appContext.cache.persistent.getString('pref');
+
+// ✅ In widgets
+context.moose.cache.memory.set('key', value);
+```
+
 ## Quick Reference Checklist
 
 Before committing code, check:
@@ -689,6 +717,12 @@ Before committing code, check:
 - [ ] ✅ Immutable Events and States (final, const)
 - [ ] ✅ Error handling in BLoCs
 - [ ] ✅ Emit initial state in constructor
+
+**Cache:**
+- [ ] ✅ All cache access via `appContext.cache` or `context.moose.cache`
+- [ ] ✅ No `CacheManager.memoryCacheInstance()` / `persistentCacheInstance()` (removed)
+- [ ] ✅ No direct `MemoryCache()` / `PersistentCache()` construction outside tests
+- [ ] ✅ Dispose `appContext.cache` when tearing down a context in tests
 
 **Plugin:**
 - [ ] ✅ Extend FeaturePlugin

@@ -53,10 +53,11 @@ class BootstrapReport {
 ///
 /// The bootstrap sequence:
 /// 1. Initialize [ConfigManager] with the provided config map.
-/// 2. Wire [AppNavigator] to the scoped [EventBus].
-/// 3. Register each adapter via [AdapterRegistry].
-/// 4. Register each plugin via [PluginRegistry] (sync, injects [MooseAppContext]).
-/// 5. Initialize all registered plugins via [PluginRegistry.initializeAll] (async).
+/// 2. Initialize the scoped [CacheManager] persistent layer.
+/// 3. Wire [AppNavigator] to the scoped [EventBus].
+/// 4. Register each adapter via [AdapterRegistry].
+/// 5. Register each plugin via [PluginRegistry] (sync, injects [MooseAppContext]).
+/// 6. Initialize all registered plugins via [PluginRegistry.initializeAll] (async).
 class MooseBootstrapper {
   final MooseAppContext appContext;
 
@@ -74,11 +75,14 @@ class MooseBootstrapper {
     // Step 1: Initialize configuration.
     appContext.configManager.initialize(config);
 
-    // Step 2: Wire AppNavigator to the scoped EventBus so that navigation
+    // Step 2: Initialize the scoped persistent cache layer.
+    await appContext.cache.initPersistent();
+
+    // Step 3: Wire AppNavigator to the scoped EventBus so that navigation
     //         events flow through this context's bus (not a global singleton).
     AppNavigator.setEventBus(appContext.eventBus);
 
-    // Step 3: Register and initialize adapters.
+    // Step 4: Register and initialize adapters.
     for (final adapter in adapters) {
       try {
         await appContext.adapterRegistry.registerAdapter(() => adapter);
@@ -91,7 +95,7 @@ class MooseBootstrapper {
       }
     }
 
-    // Step 4: Register plugins (sync — injects appContext, calls onRegister).
+    // Step 5: Register plugins (sync — injects appContext, calls onRegister).
     for (final factory in plugins) {
       FeaturePlugin? plugin;
       try {
@@ -104,7 +108,7 @@ class MooseBootstrapper {
       }
     }
 
-    // Step 5: Initialize all registered plugins (async).
+    // Step 6: Initialize all registered plugins (async).
     try {
       await appContext.pluginRegistry.initializeAll(timings: timings);
     } catch (e) {
