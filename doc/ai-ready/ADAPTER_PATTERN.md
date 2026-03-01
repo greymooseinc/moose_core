@@ -4,281 +4,230 @@
 
 ## Table of Contents
 - [Overview](#overview)
-- [BackendAdapter Architecture](#backendadapter-architecture)
-- [Creating a Custom Adapter](#creating-a-custom-adapter)
+- [CoreRepository Base Class](#corerepository-base-class)
+- [BackendAdapter Base Class](#backendadapter-base-class)
+- [Step-by-Step: Creating an Adapter](#step-by-step-creating-an-adapter)
 - [Repository Factory Pattern](#repository-factory-pattern)
-- [Adapter Registry](#adapter-registry)
+- [AdapterRegistry](#adapterregistry)
+- [Accessing Repositories in Widgets and Plugins](#accessing-repositories-in-widgets-and-plugins)
+- [Repository Interface Catalog](#repository-interface-catalog)
+- [Configuration: Schema and Defaults](#configuration-schema-and-defaults)
+- [Convenience Services on BackendAdapter](#convenience-services-on-backendadapter)
 - [Best Practices](#best-practices)
+- [Anti-Patterns](#anti-patterns)
+- [Testing Adapters](#testing-adapters)
+- [Related Documentation](#related-documentation)
+
+---
 
 ## Overview
 
-The Adapter Pattern enables support for multiple e-commerce backends (WooCommerce, Shopify, custom APIs, etc.) without changing business logic. Adapters provide backend-specific implementations of core repository interfaces.
+The Adapter Pattern decouples business logic from backend specifics. Each backend (WooCommerce, Shopify, a custom REST API, etc.) is wrapped in a `BackendAdapter` subclass. The adapter registers lazy factories for each repository type it supports. Plugins and UI sections access repositories through type-safe calls on `AdapterRegistry` — they never depend on any concrete adapter class.
 
-## BackendAdapter Architecture
+**Core objects:**
 
-### BackendAdapter Base Class
+| Class | Role |
+|---|---|
+| `CoreRepository` | Pure lifecycle base for all repository implementations |
+| `BackendAdapter` | Abstract base that owns repository factories and exposes services |
+| `AdapterRegistry` | Registry owned by `MooseAppContext`; resolves repositories by type |
+| `MooseBootstrapper` | Orchestrates startup: wires registries, registers adapters, boots plugins |
 
-```dart
-abstract class BackendAdapter {
-  /// Unique identifier for the adapter
-  String get name;
+---
 
-  /// Semantic version of the adapter
-  String get version;
-
-  /// JSON Schema that describes the adapter's configuration surface
-  Map<String, dynamic> get configSchema;
-
-  /// Default configuration merged with environment.json (registered automatically)
-  Map<String, dynamic> getDefaultSettings() => const {};
-
-  /// Repository factories storage
-  final Map<Type, Object> _factories = {};
-
-  /// Repository cache storage
-  final Map<Type, Object> _cache = {};
-
-  /// Register a synchronous factory for a repository type
-  void registerRepositoryFactory<T extends CoreRepository>(
-    T Function() factory,
-  ) {
-    _factories[T] = factory;
-  }
-
-  /// Register an asynchronous factory for a repository type
-  void registerAsyncRepositoryFactory<T extends CoreRepository>(
-    Future<T> Function() factory,
-  ) {
-    _factories[T] = factory;
-  }
-
-  /// Get repository synchronously (for sync factories)
-  T getRepository<T extends CoreRepository>() {
-    // Check cache first, then instantiate from factory
-  }
-
-  /// Get repository asynchronously (supports both sync and async factories)
-  Future<T> getRepositoryAsync<T extends CoreRepository>() async {
-    // Check cache first, then instantiate from factory
-  }
-
-  /// Check if a factory is registered
-  bool hasRepository<T extends CoreRepository>() {
-    return _factories.containsKey(T);
-  }
-
-  /// Check if a repository is currently cached
-  bool isRepositoryCached<T extends CoreRepository>() {
-    return _cache.containsKey(T);
-  }
-
-  /// Clear the cache for a specific repository type
-  void clearRepositoryCache<T extends CoreRepository>() {
-    _cache.remove(T);
-  }
-
-  /// Clear all cached repository instances
-  void clearAllRepositoryCaches() {
-    _cache.clear();
-  }
-
-  /// Get list of all registered repository types
-  List<Type> get registeredRepositoryTypes {
-    return _factories.keys.toList();
-  }
-
-  /// Get a repository by its runtime type (for AdapterRegistry)
-  CoreRepository getRepositoryByType(Type type) {
-    // Returns cached instance or creates new one
-  }
-
-  /// Initialize the adapter with configuration (already validated)
-  Future<void> initialize(Map<String, dynamic> config);
-
-  /// Loads, validates, and applies config from the scoped ConfigManager.
-  /// [configManager] is required — no global fallback exists.
-  Future<void> initializeFromConfig({required ConfigManager configManager});
-}
-```
-
-#### Configuration Schema & Defaults
-
-- Override `configSchema` with a JSON Schema definition. The framework automatically validates `environment.json.adapters.{adapterName}` against this schema before your adapter boots.
-- Override `getDefaultSettings()` with sensible defaults. `ConfigManager` registers these so missing keys in `environment.json` fall back to your code-defined values.
-- Access merged settings via the scoped `ConfigManager`: `appContext.configManager.get('adapters:$name:some:key')`.
-
-#### `initializeFromConfig()` Shortcut
-
-`MooseBootstrapper` calls this automatically (passing the scoped `ConfigManager`) when `autoInitialize: true`. It:
-
-1. Reads `environment.json.adapters.{adapterName}`
-2. Validates the map against `configSchema`
-3. Calls your adapter's `initialize()` with the validated map
-
-The `configManager` parameter is **required** — there is no global fallback.
-
-### CoreRepository Base Class
-
-All repository interfaces must extend `CoreRepository`:
+## CoreRepository Base Class
 
 ```dart
-/// Base class for all repository implementations
-///
-/// Provides common functionality and lifecycle management for repositories.
 abstract class CoreRepository {
-  final HookRegistry hookRegistry;
-  final EventBus eventBus;
-
-  CoreRepository({required this.hookRegistry, required this.eventBus});
-
-  /// Initialize the repository
-  ///
-  /// This method is called automatically after the repository is instantiated
-  /// but before it's cached. Override this method to perform synchronous
-  /// initialization tasks such as:
-  /// - Setting up listeners
-  /// - Initializing local variables
-  /// - Registering hooks
-  /// - Configuring internal state
-  ///
-  /// **Note:** This method is synchronous. For async initialization (loading
-  /// data, network calls, etc.), trigger those operations here but don't await
-  /// them, or handle them in your repository methods as needed.
-  ///
-  /// The default implementation does nothing.
+  /// Called automatically after instantiation and before caching.
+  /// Override for synchronous setup: listeners, hooks, local state.
+  /// Never make this async — fire async work as fire-and-forget.
   void initialize() {}
 }
 ```
 
-**Key Features:**
-- **Automatic Initialization**: `initialize()` is called automatically by the adapter
-- **HookRegistry Access**: Injected via constructor; available as `hookRegistry` field
-- **EventBus Access**: Injected via constructor; available as `eventBus` field
-- **Scoped app context injection**: `AdapterRegistry` injects `appContext` before adapter initialization. Adapters then use convenience getters (`hookRegistry`, `eventBus`, `cache`, `configManager`, etc.) from that context.
+**Key facts:**
+- No constructor parameters. No injected fields.
+- Concrete repository implementations declare their own dependencies as constructor arguments (e.g. an API client, a `CacheManager`, an `EventBus`). They receive them from the adapter's factory closure.
+- `initialize()` is `void`. Do not override it as `Future<void>`. Fire async work with `_loadCache()` (without `await`) inside `initialize()`.
 
-## Creating a Custom Adapter
+---
 
-### Step 1: Define Repository Interfaces
-
-All concrete repository subclasses must pass `hookRegistry` and `eventBus` up to `CoreRepository`:
+## BackendAdapter Base Class
 
 ```dart
-// In core package
-abstract class ProductsRepository extends CoreRepository {
-  ProductsRepository({required super.hookRegistry, required super.eventBus});
-  Future<List<Product>> getProducts(ProductFilters? filters);
-  Future<Product> getProductById(String id);
-  Future<List<Category>> getCategories();
-}
+abstract class BackendAdapter {
+  /// Unique adapter identifier (e.g., 'woocommerce').
+  String get name;
 
-abstract class CartRepository extends CoreRepository {
-  CartRepository({required super.hookRegistry, required super.eventBus});
-  Future<Cart> getCart();
-  Future<Cart> addToCart(String productId, int quantity);
-  Future<Cart> updateCartItem(String itemId, int quantity);
-  Future<void> clearCart();
+  /// Semantic version string (e.g., '1.0.0').
+  String get version;
+
+  /// JSON Schema that describes the adapter's configuration surface.
+  /// Validated automatically before initialize() is called.
+  Map<String, dynamic> get configSchema;
+
+  /// Default settings merged into ConfigManager at registration time.
+  /// Keys missing from environment.json fall back to these values.
+  Map<String, dynamic> getDefaultSettings() => {};
+
+  // --- Injected by AdapterRegistry before initialization ---
+  // Access these from inside initialize() and repository factories.
+  late MooseAppContext appContext;  // injected — do not set manually
+
+  // Convenience getters (all delegate to appContext):
+  HookRegistry    get hookRegistry   => appContext.hookRegistry;
+  ActionRegistry  get actionRegistry => appContext.actionRegistry;
+  ConfigManager   get configManager  => appContext.configManager;
+  EventBus        get eventBus       => appContext.eventBus;
+  AppLogger       get logger         => appContext.logger;
+  CacheManager    get cache          => appContext.cache;
+  CacheManager    get cacheManager   => appContext.cache; // backward-compat alias
+
+  // --- Factory registration ---
+  void registerRepositoryFactory<T extends CoreRepository>(T Function() factory);
+  void registerAsyncRepositoryFactory<T extends CoreRepository>(Future<T> Function() factory);
+
+  // --- Repository retrieval (used internally by AdapterRegistry) ---
+  T getRepository<T extends CoreRepository>();
+  Future<T> getRepositoryAsync<T extends CoreRepository>();
+  CoreRepository getRepositoryByType(Type type);
+
+  // --- Introspection ---
+  bool hasRepository<T extends CoreRepository>();
+  bool isRepositoryCached<T extends CoreRepository>();
+  List<Type> get registeredRepositoryTypes;
+
+  // --- Cache management ---
+  void clearRepositoryCache<T extends CoreRepository>();
+  void clearAllRepositoryCaches();
+
+  // --- Lifecycle ---
+  Future<void> initialize(Map<String, dynamic> config);
+
+  /// Called automatically by AdapterRegistry (via MooseBootstrapper).
+  /// Reads adapters.<name> from environment.json, validates against configSchema,
+  /// then calls initialize(). The configManager parameter is required — no global fallback.
+  Future<void> initializeFromConfig({required ConfigManager configManager});
+
+  /// Validates config against configSchema. Called automatically inside
+  /// initializeFromConfig(). You can also call it manually in tests.
+  void validateConfig(Map<String, dynamic> config);
 }
 ```
 
-### Step 2: Implement Repository Classes
+### What AdapterRegistry injects and when
+
+Before calling `initializeFromConfig()`, `AdapterRegistry` injects `appContext` into the adapter. This means all convenience getters (`hookRegistry`, `eventBus`, `cache`, `configManager`, `logger`, `actionRegistry`) are available inside `initialize()` and inside factory closures registered during `initialize()`.
+
+---
+
+## Step-by-Step: Creating an Adapter
+
+### Step 1: Implement repository classes
+
+Repository classes extend the moose_core abstract interface and declare their own constructor dependencies. They do **not** pass anything to `super`.
 
 ```dart
-// In your adapter package/directory
 class WooProductsRepository extends ProductsRepository {
-  final WooCommerceApiClient _apiClient;
+  final WooApiClient _client;
+  final CacheManager _cache;
+  final EventBus _eventBus;
+  final HookRegistry _hooks;
 
-  WooProductsRepository(this._apiClient, {required super.hookRegistry, required super.eventBus});
-
-  @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
-    try {
-      final response = await _apiClient.get(
-        '/products',
-        params: _buildQueryParams(filters),
-      );
-
-      return response
-          .map((json) => _convertToProduct(json))
-          .toList();
-    } catch (e) {
-      throw RepositoryException('Failed to load products: $e');
-    }
-  }
-
-  @override
-  Future<Product> getProductById(String id) async {
-    try {
-      final response = await _apiClient.get('/products/$id');
-      return _convertToProduct(response);
-    } catch (e) {
-      throw RepositoryException('Failed to load product: $e');
-    }
-  }
-
-  @override
-  Future<List<Category>> getCategories() async {
-    try {
-      final response = await _apiClient.get('/products/categories');
-      return response
-          .map((json) => _convertToCategory(json))
-          .toList();
-    } catch (e) {
-      throw RepositoryException('Failed to load categories: $e');
-    }
-  }
-
-  // Convert DTO to domain entity
-  Product _convertToProduct(Map<String, dynamic> json) {
-    return Product(
-      id: json['id'].toString(),
-      name: json['name'],
-      price: (json['price'] as String).toDouble(),
-      imageUrl: json['images']?[0]?['src'],
-      description: json['description'],
-      // ... other fields
-    );
-  }
-
-  Category _convertToCategory(Map<String, dynamic> json) {
-    return Category(
-      id: json['id'].toString(),
-      name: json['name'],
-      slug: json['slug'],
-      imageUrl: json['image']?['src'],
-    );
-  }
-
-  Map<String, dynamic> _buildQueryParams(ProductFilters? filters) {
-    if (filters == null) return {};
-
-    return {
-      if (filters.categoryId != null) 'category': filters.categoryId,
-      if (filters.minPrice != null) 'min_price': filters.minPrice,
-      if (filters.maxPrice != null) 'max_price': filters.maxPrice,
-      if (filters.search != null) 'search': filters.search,
-      'per_page': filters.limit ?? 10,
-      'page': filters.page ?? 1,
-    };
-  }
+  WooProductsRepository(this._client, {
+    required CacheManager cache,
+    required EventBus eventBus,
+    required HookRegistry hooks,
+  })  : _cache = cache,
+        _eventBus = eventBus,
+        _hooks = hooks;
 
   @override
   void initialize() {
-    // Called automatically after instantiation
-    // Setup listeners, initialize state, etc.
-    _setupListeners();
+    // Synchronous setup only. Fire async work without awaiting.
+    _prefetchFeaturedProducts(); // fire-and-forget
   }
 
-  void _setupListeners() {
-    // Setup any event listeners or hooks
+  Future<void> _prefetchFeaturedProducts() async {
+    try {
+      final products = await _client.get('/products', {'featured': true});
+      await _cache.memory.set('featured_products', products);
+    } catch (_) {} // silent — cache miss is acceptable
+  }
+
+  @override
+  Future<ProductListResult> getProducts({
+    ProductFilters? filters,
+    Duration? cacheTTL,
+  }) async {
+    final cacheKey = 'products:${filters?.toJson()}';
+    final cached = _cache.memory.get<ProductListResult>(cacheKey);
+    if (cached != null) return cached;
+
+    final raw = await _client.get('/products', _buildParams(filters));
+    final result = ProductListResult(
+      products: raw.map(_toProduct).toList(),
+      totalCount: raw.totalCount,
+    );
+
+    // Apply transformations registered by plugins
+    final transformed = result.products.map((p) {
+      return _hooks.execute('product:transform', p);
+    }).toList();
+
+    _eventBus.fire(ProductsLoadedEvent(count: transformed.length));
+
+    if (cacheTTL != null) {
+      _cache.memory.set(cacheKey, result, ttl: cacheTTL);
+    }
+    return ProductListResult(products: transformed, totalCount: result.totalCount);
+  }
+
+  @override
+  Future<Product> getProductById(String id, {Duration? cacheTTL}) async {
+    final cacheKey = 'product:$id';
+    final cached = _cache.memory.get<Product>(cacheKey);
+    if (cached != null) return cached;
+
+    final raw = await _client.get('/products/$id');
+    final product = _hooks.execute('product:transform', _toProduct(raw));
+    if (cacheTTL != null) _cache.memory.set(cacheKey, product, ttl: cacheTTL);
+    return product;
+  }
+
+  Product _toProduct(Map<String, dynamic> json) {
+    return Product(
+      id: json['id'].toString(),
+      name: json['name'] as String,
+      price: double.parse(json['price'] as String),
+      imageUrl: (json['images'] as List?)?.isNotEmpty == true
+          ? json['images'][0]['src'] as String?
+          : null,
+      description: json['description'] as String?,
+      extensions: {'woo_status': json['status']},
+    );
+  }
+
+  Map<String, dynamic> _buildParams(ProductFilters? f) {
+    if (f == null) return {};
+    return {
+      if (f.categoryId != null) 'category': f.categoryId,
+      if (f.minPrice != null) 'min_price': f.minPrice,
+      if (f.maxPrice != null) 'max_price': f.maxPrice,
+      if (f.search != null) 'search': f.search,
+      'per_page': f.limit ?? 20,
+      'page': f.page ?? 1,
+    };
   }
 }
 ```
 
-### Step 3: Create the Adapter
+### Step 2: Create the adapter class
 
 ```dart
 class WooCommerceAdapter extends BackendAdapter {
-  late WooCommerceApiClient _apiClient;
+  late WooApiClient _client;
 
   @override
   String get name => 'woocommerce';
@@ -287,77 +236,93 @@ class WooCommerceAdapter extends BackendAdapter {
   String get version => '1.0.0';
 
   @override
-  Future<void> initialize(Map<String, dynamic> config) async {
-    // Validate configuration
-    _validateConfig(config);
+  Map<String, dynamic> get configSchema => {
+    'type': 'object',
+    'required': ['baseUrl', 'consumerKey', 'consumerSecret'],
+    'properties': {
+      'baseUrl': {
+        'type': 'string',
+        'format': 'uri',
+        'description': 'WooCommerce store URL',
+      },
+      'consumerKey': {
+        'type': 'string',
+        'minLength': 1,
+        'description': 'WooCommerce API consumer key',
+      },
+      'consumerSecret': {
+        'type': 'string',
+        'minLength': 1,
+        'description': 'WooCommerce API consumer secret',
+      },
+      'apiVersion': {
+        'type': 'string',
+        'description': 'WooCommerce REST API version',
+      },
+      'timeout': {
+        'type': 'integer',
+        'minimum': 0,
+        'description': 'Request timeout in seconds',
+      },
+    },
+    'additionalProperties': false,
+  };
 
-    // Initialize API client
-    _apiClient = WooCommerceApiClient(
-      baseUrl: config['baseUrl'],
-      consumerKey: config['consumerKey'],
-      consumerSecret: config['consumerSecret'],
-      version: config['apiVersion'] ?? 'wc/v3',
+  @override
+  Map<String, dynamic> getDefaultSettings() => {
+    'apiVersion': 'wc/v3',
+    'timeout': 30,
+  };
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    // config is already validated against configSchema — no manual checks needed.
+    _client = WooApiClient(
+      baseUrl: config['baseUrl'] as String,
+      consumerKey: config['consumerKey'] as String,
+      consumerSecret: config['consumerSecret'] as String,
+      apiVersion: config['apiVersion'] as String,
+      timeout: Duration(seconds: config['timeout'] as int),
     );
 
-    // Test connection
-    await _testConnection();
-
-    // Register repositories
+    // Register repository factories.
+    // The factory closures capture `this` so they can pass shared services
+    // (hookRegistry, eventBus, cache) to repository constructors.
     _registerRepositories();
   }
 
-  void _validateConfig(Map<String, dynamic> config) {
-    final required = ['baseUrl', 'consumerKey', 'consumerSecret'];
-    for (final key in required) {
-      if (!config.containsKey(key) || config[key] == null) {
-        throw AdapterConfigurationException(
-          'Missing required configuration: $key',
-        );
-      }
-    }
-  }
-
-  Future<void> _testConnection() async {
-    try {
-      await _apiClient.get('/system_status');
-    } catch (e) {
-      throw AdapterInitializationException(
-        'Failed to connect to WooCommerce: $e',
-      );
-    }
-  }
-
   void _registerRepositories() {
-    // Synchronous repositories
     registerRepositoryFactory<ProductsRepository>(
-      () => WooProductsRepository(_apiClient),
+      () => WooProductsRepository(
+        _client,
+        cache: cache,
+        eventBus: eventBus,
+        hooks: hookRegistry,
+      ),
     );
 
     registerRepositoryFactory<CartRepository>(
-      () => WooCartRepository(_apiClient),
+      () => WooCartRepository(_client, cache: cache, eventBus: eventBus),
     );
 
-    registerRepositoryFactory<CategoryRepository>(
-      () => WooCategoryRepository(_apiClient),
+    registerRepositoryFactory<AuthRepository>(
+      () => WooAuthRepository(_client, cache: cache),
     );
 
-    // Asynchronous repositories (if initialization requires async operations)
+    // Use async factory when repository setup itself needs awaiting
     registerAsyncRepositoryFactory<ReviewRepository>(
       () async {
-        final config = await _loadReviewConfig();
-        return WooReviewRepository(_apiClient, config);
+        final tokenCache = await cache.persistent.getString('review_token');
+        return WooReviewRepository(_client, cachedToken: tokenCache);
       },
     );
-  }
-
-  Future<ReviewConfig> _loadReviewConfig() async {
-    // Load additional configuration if needed
-    return ReviewConfig(enableModeration: true);
   }
 }
 ```
 
-### Step 4: Register with AdapterRegistry via MooseBootstrapper
+### Step 3: Register with MooseBootstrapper
+
+Pass adapter **instances** directly to `adapters:`. The bootstrapper calls `adapterRegistry.registerAdapter(() => adapter)` internally, which injects `appContext` and calls `initializeFromConfig()`.
 
 ```dart
 void main() async {
@@ -367,471 +332,566 @@ void main() async {
 
   runApp(MooseScope(
     appContext: ctx,
-    child: MaterialApp(home: _BootstrapScreen(appContext: ctx)),
+    child: MaterialApp(home: BootstrapScreen(appContext: ctx)),
   ));
 }
 
-// In bootstrap screen:
+// Inside your BootstrapScreen.initState / FutureBuilder:
+final config = await rootBundle.loadString('assets/environment.json');
+
 final report = await MooseBootstrapper(appContext: ctx).run(
-  config: await loadConfiguration(),
-  // Pass adapter instances directly — MooseBootstrapper registers them:
-  adapters: [WooCommerceAdapter()],
-  plugins: [() => ProductsPlugin()],
-);
-```
-
-> **Note:** `MooseBootstrapper` calls `appContext.adapterRegistry.registerAdapter(() => adapter)` after wiring the registry to the scoped `MooseAppContext`, so adapters receive `appContext` before `initializeFromConfig()`. For manual registration outside a bootstrapper, call `appContext.adapterRegistry.registerAdapter(factory)` directly.
-
-## Repository Factory Pattern
-
-### Lazy Initialization
-
-Repositories are only created when first accessed, and their `initialize()` method is automatically called:
-
-```dart
-// First access - repository is created and initialized
-final productsRepo = adapter.getRepository<ProductsRepository>();
-// Behind the scenes:
-// 1. Factory creates instance
-// 2. initialize() method is called
-// 3. Instance is cached
-
-// Second access - cached repository is returned
-final productsRepo2 = adapter.getRepository<ProductsRepository>();
-
-assert(identical(productsRepo, productsRepo2));  // Same instance
-```
-
-**Initialization Flow:**
-1. Factory function creates repository instance
-2. Adapter automatically calls `repository.initialize()`
-3. Repository is cached for subsequent access
-4. Cached instance is returned on future calls
-
-### Synchronous vs Asynchronous Factories
-
-**Synchronous Factory** (most common):
-```dart
-registerRepositoryFactory<ProductsRepository>(
-  () => WooProductsRepository(_apiClient),
+  config: jsonDecode(config),
+  adapters: [
+    WooCommerceAdapter(),
+    FCMAdapter(),          // push notifications
+  ],
+  plugins: [
+    () => ProductsPlugin(),
+    () => CartPlugin(),
+  ],
 );
 
-// Get synchronously
-final repo = adapter.getRepository<ProductsRepository>();
+if (!report.succeeded) {
+  // report.failures is Map<String, Object>
+  // keys: "adapter:<name>" or "plugin:<name>"
+  debugPrint('Bootstrap failures: ${report.failures}');
+}
 ```
 
-**Asynchronous Factory** (for async initialization):
-```dart
-registerAsyncRepositoryFactory<ReviewRepository>(
-  () async {
-    final config = await loadConfig();
-    return WooReviewRepository(_apiClient, config);
+**Bootstrap sequence (executed by `MooseBootstrapper.run`):**
+
+1. `configManager.initialize(config)` — loads `environment.json` map
+2. `cache.initPersistent()` — opens SharedPreferences
+3. `AppNavigator.setEventBus(appContext.eventBus)` — wires navigation
+4. For each adapter: `adapterRegistry.registerAdapter(() => adapter)` — injects `appContext`, calls `initializeFromConfig()`
+5. For each plugin factory: `pluginRegistry.register(plugin, appContext: appContext)` — injects `appContext`, calls `onRegister()`
+6. `pluginRegistry.initAll()` — calls `initialize()` on all plugins
+7. `pluginRegistry.startAll()` — calls `start()` on all plugins
+
+### Step 4: Provide adapter configuration in environment.json
+
+```json
+{
+  "adapters": {
+    "woocommerce": {
+      "baseUrl": "https://mystore.example.com",
+      "consumerKey": "ck_xxxxxxxxxxxx",
+      "consumerSecret": "cs_xxxxxxxxxxxx",
+      "apiVersion": "wc/v3",
+      "timeout": 30
+    },
+    "fcm": {
+      "projectId": "my-firebase-project"
+    }
   },
-);
-
-// Must get asynchronously
-final repo = await adapter.getRepositoryAsync<ReviewRepository>();
-```
-
-### Type Safety
-
-All repositories must extend `CoreRepository`:
-
-```dart
-// ✅ Correct - extends CoreRepository
-class ProductsRepository extends CoreRepository {
-  // ...
-}
-
-// ❌ Wrong - doesn't extend CoreRepository
-class ProductsService {  // Won't compile!
-  // ...
-}
-```
-
-### Using HookRegistry and EventBus in Repositories
-
-Every repository has access to `hookRegistry` and `eventBus`:
-
-```dart
-class WooProductsRepository extends CoreRepository implements ProductsRepository {
-  final WooCommerceApiClient _apiClient;
-
-  WooProductsRepository(this._apiClient);
-
-  @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
-    try {
-      final response = await _apiClient.get('/products', ...);
-      final products = response.map(_convertToProduct).toList();
-
-      // Use HookRegistry for transformations (e.g., apply pricing rules)
-      final transformedProducts = products.map((product) {
-        return hookRegistry.execute('product:transform', product);
-      }).toList();
-
-      // Fire EventBus events for analytics
-      eventBus.fire(AppProductSearchedEvent(
-        searchQuery: filters?.search ?? '',
-        resultCount: transformedProducts.length,
-        productIds: transformedProducts.map((p) => p.id).toList(),
-      ));
-
-      return transformedProducts;
-    } catch (e) {
-      // Fire error event
-      eventBus.fire(AppApplicationErrorEvent(
-        errorMessage: 'Failed to load products',
-        error: e,
-        context: 'WooProductsRepository.getProducts',
-      ));
-      throw RepositoryException('Failed to load products: $e');
+  "plugins": {
+    "products": {
+      "active": true,
+      "settings": {}
     }
   }
 }
 ```
 
-## Repository Catalog & Samples
+The framework validates `adapters.woocommerce` against `WooCommerceAdapter.configSchema` automatically before calling `initialize()`.
 
-### Interface Overview
+---
 
-| Interface | Primary Entities | Responsibilities | Common Placements |
-|-----------|------------------|------------------|-------------------|
-| `ProductsRepository` | `Product`, `ProductFilters`, `PaginatedResult<Product>` | Catalog browsing, PDP data, merchandising feeds | Home grids, PDP |
-| `CartRepository` | `Cart`, `CartItem` | Cart CRUD, promo codes, shipping costs | Cart drawer, checkout |
-| `PostRepository` | `Post` | Blog/news listings and detail pages | Blog plugin |
-| `ReviewRepository` | `ProductReview`, `ProductReviewStats` | Product reviews, rating summaries | PDP reviews tab |
-| `SearchRepository` | `SearchResult`, `SearchFilters` | Search suggestions, keyword results, facets | Search screens |
-| `BannerRepository` | `PromoBanner` | Hero banners, placement-aware promos, view/click tracking | Hero carousel, category headers |
-| `PushNotificationRepository` | `PushNotification` | Device registration, topic subscriptions | Notification settings |
+## Repository Factory Pattern
 
-Adapters should register implementations for every interface that the active plugins rely on. When in doubt, inspect `widgetRegistry` registrations or plugin READMEs to see which sections pull from which repositories.
+### Lazy initialization
 
-### Sample: Registering `BannerRepository`
+Repository instances are only created on the **first** `getRepository<T>()` call. Until that moment only the factory closure is stored.
 
-```dart
-class MarketingAdapter extends BackendAdapter {
-  @override
-  String get name => 'marketing';
-
-  @override
-  Future<void> initialize(Map<String, dynamic> config) async {
-    final dio = Dio(BaseOptions(
-      baseUrl: config['baseUrl'] as String,
-      headers: {'Authorization': 'Bearer ${config['token']}'},
-    ));
-
-    registerRepositoryFactory<BannerRepository>(
-      () => MarketingBannerRepository(dio),
-    );
-  }
-}
-
-class MarketingBannerRepository extends BannerRepository {
-  MarketingBannerRepository(this._client);
-
-  final Dio _client;
-
-  @override
-  Future<List<PromoBanner>> fetchBanners({
-    String? placement,
-    String? locale,
-    Map<String, dynamic>? filters,
-  }) async {
-    final response = await _client.get<List<dynamic>>(
-      '/banners',
-      queryParameters: {
-        if (placement != null) 'placement': placement,
-        if (locale != null) 'locale': locale,
-        if (filters != null) ...filters,
-      },
-    );
-
-    return (response.data ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(PromoBanner.fromJson)
-        .toList();
-  }
-
-  @override
-  Future<void> trackBannerView(String bannerId, {Map<String, dynamic>? metadata}) {
-    return _client.post('/banner-events', data: {
-      'event': 'view',
-      'bannerId': bannerId,
-      if (metadata != null) 'metadata': metadata,
-    });
-  }
-
-  @override
-  Future<void> trackBannerClick(String bannerId, {Map<String, dynamic>? metadata}) {
-    return _client.post('/banner-events', data: {
-      'event': 'click',
-      'bannerId': bannerId,
-      if (metadata != null) 'metadata': metadata,
-    });
-  }
-}
+```
+registerRepositoryFactory() → stores factory (no instance created)
+         |
+         | (first getRepository<T>() call)
+         ↓
+factory() → creates instance
+         ↓
+instance.initialize() → synchronous setup
+         ↓
+instance cached in _cache[T]
+         |
+         | (all subsequent getRepository<T>() calls)
+         ↓
+returns cached instance (factory never called again)
 ```
 
-The Flutter `BannerSection` now passes a `sectionKey` (from `settings.key`) so adapters can fetch placement-specific creatives (e.g., `home_hero`, `cart_footer`). Returning `PromoBanner` keeps plugins backend-agnostic while exposing structured `UserInteraction` data, subtitles, metadata, and scheduling info for analytics.
-
-## Adapter Registry
-
-### Registering Multiple Adapters
-
-You can register multiple adapters for different purposes:
+### Synchronous factory (most common)
 
 ```dart
-// Pass all adapters to MooseBootstrapper — it registers them with the scoped AdapterRegistry
-final report = await MooseBootstrapper(appContext: ctx).run(
-  config: config,
-  adapters: [
-    WooCommerceAdapter(),   // e-commerce operations
-    OneSignalAdapter(),     // push notifications
-    StripeAdapter(),        // payments
-  ],
-  plugins: [...],
+registerRepositoryFactory<ProductsRepository>(
+  () => WooProductsRepository(_client, cache: cache, eventBus: eventBus, hooks: hookRegistry),
+);
+
+// Retrieval (synchronous)
+final repo = adapter.getRepository<ProductsRepository>();
+```
+
+### Asynchronous factory
+
+Use when the repository constructor itself needs awaiting (e.g., opens a database, fetches a token).
+
+```dart
+registerAsyncRepositoryFactory<ReviewRepository>(
+  () async {
+    final token = await _fetchAuthToken();
+    return WooReviewRepository(_client, token: token);
+  },
+);
+
+// Must be retrieved asynchronously
+final repo = await adapter.getRepositoryAsync<ReviewRepository>();
+```
+
+> Calling `getRepository<T>()` (sync) on an async factory throws `RepositoryNotRegisteredException`. Always use `getRepositoryAsync<T>()` for async factories.
+
+### Cache management
+
+```dart
+// Inspect state
+adapter.hasRepository<ProductsRepository>();    // factory registered?
+adapter.isRepositoryCached<ProductsRepository>(); // instance exists?
+
+// Invalidate (forces re-creation on next access)
+adapter.clearRepositoryCache<ProductsRepository>();
+
+// Invalidate all
+adapter.clearAllRepositoryCaches();
+
+// Enumerate
+List<Type> types = adapter.registeredRepositoryTypes;
+```
+
+---
+
+## AdapterRegistry
+
+`AdapterRegistry` is owned by `MooseAppContext` — never instantiated directly. It sits between `MooseAppContext` / `PluginRegistry` / `FeatureSection` and the concrete adapters.
+
+### How it works
+
+- **Last registration wins.** If two adapters register `ProductsRepository`, the last one provides the instance.
+- **Double lazy.** The registry stores a closure that delegates to `adapter.getRepositoryByType(T)`. The adapter also lazily creates the instance. Both layers cache, so the repository is created exactly once.
+- **No active-adapter concept.** There is no "the" adapter. Each repository type is resolved independently — you can mix adapters (WooCommerce for products, FCM for push notifications).
+
+### Key API
+
+```dart
+// Typical: via MooseAppContext convenience shortcut
+final repo = appContext.getRepository<ProductsRepository>();
+
+// Direct registry access
+final repo = appContext.adapterRegistry.getRepository<ProductsRepository>();
+
+// Guard before accessing
+if (appContext.adapterRegistry.hasRepository<PushNotificationRepository>()) {
+  final repo = appContext.adapterRegistry.getRepository<PushNotificationRepository>();
+}
+
+// Introspection
+List<Type>   available = appContext.adapterRegistry.getAvailableRepositories();
+List<String> adapters  = appContext.adapterRegistry.getInitializedAdapters();
+int repoCount    = appContext.adapterRegistry.repositoryCount;
+int adapterCount = appContext.adapterRegistry.adapterCount;
+bool ready       = appContext.adapterRegistry.isInitialized;
+
+// Direct adapter access (advanced; prefer getRepository<T>())
+final wooAdapter = appContext.adapterRegistry.getAdapter<WooCommerceAdapter>('woocommerce');
+
+// Test teardown
+appContext.adapterRegistry.clearAll();
+```
+
+### Manual registration (without MooseBootstrapper)
+
+```dart
+final ctx = MooseAppContext();
+ctx.configManager.initialize(config);
+await ctx.adapterRegistry.registerAdapter(() => WooCommerceAdapter());
+// autoInitialize defaults to true — reads adapters.woocommerce from ConfigManager
+```
+
+To skip config loading and initialize the adapter manually:
+
+```dart
+await ctx.adapterRegistry.registerAdapter(
+  () async {
+    final adapter = WooCommerceAdapter();
+    await adapter.initialize({'baseUrl': '...', 'consumerKey': '...', 'consumerSecret': '...'});
+    return adapter;
+  },
+  autoInitialize: false,
 );
 ```
 
-### Getting Repositories
+---
+
+## Accessing Repositories in Widgets and Plugins
+
+### In a FeatureSection (synchronous)
 
 ```dart
-// Get repository (whichever adapter registered it last will supply the instance)
-final productsRepo = adapterRegistry.getRepository<ProductsRepository>();
+class ProductGridSection extends FeatureSection {
+  @override
+  Widget build(BuildContext context) {
+    final repo = adapters(context).getRepository<ProductsRepository>();
 
-// Check if repository is available
-if (adapterRegistry.hasRepository<ProductsRepository>()) {
-  final repo = adapterRegistry.getRepository<ProductsRepository>();
+    return BlocProvider(
+      create: (_) => ProductsBloc(repo)..add(LoadProducts()),
+      child: const ProductGridView(),
+    );
+  }
 }
 ```
+
+`adapters(context)` returns the `AdapterRegistry` from the scoped `MooseAppContext`. Use `getRepository<T>()` synchronously in `build()`.
+
+### In a FeaturePlugin (async)
+
+```dart
+class ProductsPlugin extends FeaturePlugin {
+  @override
+  String get name => 'products';
+
+  @override
+  Future<void> initialize() async {
+    // Optionally pre-warm the repository
+    final repo = appContext.getRepository<ProductsRepository>();
+    await repo.getFeaturedProducts(limit: 5);
+  }
+}
+```
+
+### In BLoC / service classes
+
+Pass the repository through the constructor — never call `AdapterRegistry` from inside BLoC or service classes directly.
+
+```dart
+class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
+  final ProductsRepository _repo;
+
+  ProductsBloc(this._repo) : super(ProductsInitial()) {
+    on<LoadProducts>(_onLoad);
+  }
+
+  Future<void> _onLoad(LoadProducts event, Emitter emit) async {
+    emit(ProductsLoading());
+    try {
+      final result = await _repo.getProducts(filters: event.filters);
+      emit(ProductsLoaded(result.products));
+    } catch (e) {
+      emit(ProductsError(e.toString()));
+    }
+  }
+}
+```
+
+---
+
+## Repository Interface Catalog
+
+All interfaces live in `lib/src/repositories/`. They all extend `CoreRepository` with no constructor parameters.
+
+| Interface | Key responsibilities |
+|---|---|
+| `ProductsRepository` | Catalog browsing, PDP, categories, collections, variations, attributes, reviews, stock, related/upsell/cross-sell products |
+| `CartRepository` | Cart CRUD, coupons, shipping methods, payment methods, checkout, orders, payments, refunds |
+| `AuthRepository` | Login, registration, token refresh, logout, password reset |
+| `SearchRepository` | Keyword search, suggestions, faceted results |
+| `ReviewRepository` | Product review listing and submission |
+| `PostRepository` | Blog / news listing and detail |
+| `ShortsRepository` | Short-form video content |
+| `BannerRepository` | Promotional banners by placement; view/click tracking |
+| `StoreRepository` | Store info, policies, contact details |
+| `PushNotificationRepository` | Device token registration, topic subscriptions |
+| `LocationRepository` | Address lookup, shipping zone resolution |
+
+Adapters only need to implement the repositories that their active plugins actually use. If a plugin requests a repository the adapter does not provide, `AdapterRegistry.getRepository<T>()` throws `RepositoryNotRegisteredException` at runtime.
+
+### ProductsRepository signature highlights
+
+```dart
+abstract class ProductsRepository extends CoreRepository {
+  Future<ProductListResult> getProducts({ProductFilters? filters, Duration? cacheTTL});
+  Future<Product> getProductById(String id, {Duration? cacheTTL});
+  Future<List<Product>> getProductsByIds(List<String> ids, {bool includeVariations = false, Duration? cacheTTL});
+  Future<List<Category>> getCategories({String? parentId, bool hideEmpty = false, String? orderBy, Duration? cacheTTL});
+  Future<List<Collection>> getCollections({CollectionFilters? filters, Duration? cacheTTL});
+  Future<List<ProductVariation>> getProductVariations(String productId, {Duration? cacheTTL});
+  Future<ProductStock> getProductStock(String productId, {String? variationId, Duration? cacheTTL});
+  Future<ProductAvailability> validateProductAvailability({required String productId, required int quantity, String? variationId, Duration? cacheTTL});
+  Future<List<Product>> getFeaturedProducts({int limit = 10, String? categoryId, Duration? cacheTTL});
+  Future<List<Product>> getRelatedProducts(String productId, {int limit = 10, Duration? cacheTTL});
+  Future<ProductReview> createReview(ProductReview review);
+  // ... and more
+}
+```
+
+### CartRepository signature highlights
+
+```dart
+abstract class CartRepository extends CoreRepository {
+  Future<Cart> getCart({String? cartId, String? customerId});
+  Future<Cart> addItem({required String productId, String? variationId, int quantity = 1, Map<String, dynamic>? metadata});
+  Future<Cart> updateItemQuantity({required String itemId, required int quantity});
+  Future<Cart> removeItem({required String itemId});
+  Future<Cart> applyCoupon({required String couponCode});
+  Future<Cart> calculateTotals({String? shippingMethodId, Address? shippingAddress});
+  Future<List<ShippingMethod>> getShippingMethods({required Address shippingAddress});
+  Future<List<PaymentMethod>> getPaymentMethods();
+  Future<CartValidationResult> validateCart();
+  Future<CheckoutResult> checkout({required CheckoutRequest checkoutRequest});
+  Future<Order> getOrder({required String orderId});
+  Future<PaymentResult> processPayment({required String orderId, required String paymentMethodId, Map<String, dynamic>? paymentData});
+  Future<RefundResult> requestRefund({required String orderId, double? amount, String? reason});
+  // ... and more
+}
+```
+
+Always read the interface file in `lib/src/repositories/` for the authoritative method signatures before implementing.
+
+---
+
+## Configuration: Schema and Defaults
+
+See [ADAPTER_SCHEMA_VALIDATION.md](./ADAPTER_SCHEMA_VALIDATION.md) for full schema reference and examples. Summary:
+
+### configSchema
+
+Override `configSchema` with a JSON Schema object. `initializeFromConfig()` calls `validateConfig()` automatically before your `initialize()` is called — you never receive invalid config.
+
+```dart
+@override
+Map<String, dynamic> get configSchema => {
+  'type': 'object',
+  'required': ['baseUrl', 'apiKey'],
+  'properties': {
+    'baseUrl': {'type': 'string', 'format': 'uri'},
+    'apiKey': {'type': 'string', 'minLength': 1},
+    'timeout': {'type': 'integer', 'minimum': 0},
+    'enableLogging': {'type': 'boolean'},
+  },
+  'additionalProperties': false, // reject unknown keys
+};
+```
+
+Use `'additionalProperties': false` to prevent silent misconfiguration from typos in environment.json.
+
+### getDefaultSettings
+
+Override to provide fallback values for optional config keys. These are registered in `ConfigManager` when the adapter is registered — before `initialize()` is called.
+
+```dart
+@override
+Map<String, dynamic> getDefaultSettings() => {
+  'timeout': 30,
+  'enableLogging': false,
+};
+```
+
+### environment.json structure
+
+```json
+{
+  "adapters": {
+    "<adapter.name>": {
+      /* fields validated against configSchema */
+    }
+  }
+}
+```
+
+The key must exactly match `adapter.name`.
+
+---
+
+## Convenience Services on BackendAdapter
+
+After `AdapterRegistry` injects `appContext`, the following getters are available inside `initialize()` and factory closures:
+
+| Getter | Type | Common use |
+|---|---|---|
+| `hookRegistry` | `HookRegistry` | Pass to repositories for data transformation hooks |
+| `eventBus` | `EventBus` | Pass to repositories for analytics / cross-plugin events |
+| `cache` | `CacheManager` | Pass to repositories for memory and persistent caching |
+| `cacheManager` | `CacheManager` | Alias for `cache` (backward compat) |
+| `configManager` | `ConfigManager` | Read additional config keys during initialization |
+| `actionRegistry` | `ActionRegistry` | Register deep-link / custom action handlers |
+| `logger` | `AppLogger` | Log adapter initialization progress |
+| `appContext` | `MooseAppContext` | Full context — use sparingly; prefer specific getters |
+
+Example — using services in a factory:
+
+```dart
+registerRepositoryFactory<ProductsRepository>(
+  () => WooProductsRepository(
+    _client,
+    cache: cache,           // from BackendAdapter getter
+    eventBus: eventBus,     // from BackendAdapter getter
+    hooks: hookRegistry,    // from BackendAdapter getter
+  ),
+);
+```
+
+---
 
 ## Best Practices
 
-### DO
-
 ```dart
-// ✅ Extend CoreRepository
-abstract class ProductsRepository extends CoreRepository {
-  Future<List<Product>> getProducts();
-}
-
-// ✅ Return domain entities
+// ✅ Use configSchema — let the framework validate
 @override
-Future<List<Product>> getProducts() async {
-  final dtos = await _apiClient.getProducts();
-  return dtos.map(_convertToProduct).toList();
-}
+Map<String, dynamic> get configSchema => {
+  'type': 'object',
+  'required': ['apiKey'],
+  'properties': {'apiKey': {'type': 'string', 'minLength': 1}},
+  'additionalProperties': false,
+};
 
-// ✅ Handle errors gracefully
+// ✅ Return domain entities, never DTOs
 @override
-Future<Product> getProductById(String id) async {
-  try {
-    final dto = await _apiClient.getProduct(id);
-    return _convertToProduct(dto);
-  } catch (e) {
-    throw RepositoryException('Failed to load product: $e');
-  }
+Future<Product> getProductById(String id, {Duration? cacheTTL}) async {
+  final raw = await _client.get('/products/$id');
+  return _toProduct(raw); // mapped to domain entity
 }
 
-// ✅ Validate configuration
-void _validateConfig(Map<String, dynamic> config) {
-  if (!config.containsKey('apiKey')) {
-    throw AdapterConfigurationException('Missing apiKey');
-  }
-}
-
-// ✅ Use factory pattern for registration
-registerRepositoryFactory<ProductsRepository>(
-  () => MyProductsRepository(_client),
-);
-
-// ✅ Override initialize() for setup tasks
+// ✅ Keep initialize() synchronous; fire async work
 @override
 void initialize() {
-  _setupEventListeners();
-  _loadCachedData();  // Fire-and-forget async operation
+  _subscribeToEvents();    // sync
+  _prefetchData();         // async, fire-and-forget
 }
 
-// ✅ Use hookRegistry for transformations
-@override
-Future<Product> getProductById(String id) async {
-  final product = await _apiClient.getProduct(id);
-  return hookRegistry.execute('product:transform', product);
-}
+// ✅ Use HookRegistry for plugin-extensible transformations
+final product = hookRegistry.execute('product:transform', _toProduct(raw));
 
-// ✅ Use eventBus for analytics and notifications
+// ✅ Use EventBus for observable side effects
+eventBus.fire(ProductViewedEvent(productId: id));
+
+// ✅ Cache with TTL when the caller requests it
+if (cacheTTL != null) cache.memory.set(cacheKey, result, ttl: cacheTTL);
+
+// ✅ Use additionalProperties: false in configSchema
+'additionalProperties': false,
+
+// ✅ Provide sensible defaults in getDefaultSettings()
 @override
-Future<Cart> addToCart(String productId) async {
-  final cart = await _apiClient.addToCart(productId);
-  eventBus.fire(AppCartItemAddedEvent(...));
-  return cart;
-}
+Map<String, dynamic> getDefaultSettings() => {'timeout': 30, 'retries': 3};
 ```
 
-### DON'T
+---
+
+## Anti-Patterns
 
 ```dart
-// ❌ Don't return DTOs
-@override
-Future<List<ProductDTO>> getProducts() async {  // Wrong!
-  return await _apiClient.getProducts();
+// ❌ Do NOT pass hookRegistry/eventBus via CoreRepository constructor
+// CoreRepository has NO constructor parameters.
+class BadRepo extends CoreRepository {
+  BadRepo({required this.hookRegistry});  // WRONG — will not compile
+  final HookRegistry hookRegistry;
 }
 
-// ❌ Don't put business logic in repositories
+// ❌ Do NOT make initialize() async
 @override
-Future<List<Product>> getProducts() async {
-  final products = await _apiClient.getProducts();
-  // ❌ Don't filter or sort here - that's business logic!
-  return products.where((p) => p.price > 10).toList();
+Future<void> initialize() async {  // WRONG
+  await _loadData();
 }
 
-// ❌ Don't directly instantiate - use factories
+// ❌ Do NOT call AdapterRegistry inside a BLoC or service
+class ProductsBloc extends Bloc<...> {
+  ProductsBloc(BuildContext context) {
+    final repo = context.moose.adapterRegistry.getRepository<ProductsRepository>(); // WRONG
+  }
+}
+
+// ❌ Do NOT perform manual config validation when using configSchema
+@override
+Future<void> initialize(Map<String, dynamic> config) async {
+  if (!config.containsKey('apiKey')) throw Exception('...'); // WRONG — schema handles this
+}
+
+// ❌ Do NOT store repositories as adapter fields
 class BadAdapter extends BackendAdapter {
+  late ProductsRepository _productsRepo;  // WRONG — use factory pattern
+
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
-    // ❌ Don't do this
-    _productsRepo = WooProductsRepository(_client);
+    _productsRepo = WooProductsRepository(_client); // bypasses lazy caching
   }
 }
 
-// ❌ Don't skip CoreRepository
-abstract class ProductsService {  // ❌ Doesn't extend CoreRepository
-  Future<List<Product>> getProducts();
-}
+// ❌ Do NOT instantiate repositories directly — use factories
+registerRepositoryFactory<ProductsRepository>(
+  () => WooProductsRepository(_client),
+);
+// NOT: _productsRepo = WooProductsRepository(_client);
 
-// ❌ Don't make initialize() async
+// ❌ Do NOT use getRepository<T>() (sync) on an async factory
+registerAsyncRepositoryFactory<ReviewRepository>(() async => WooReviewRepository());
+adapter.getRepository<ReviewRepository>(); // WRONG — throws RepositoryNotRegisteredException
+// CORRECT:
+await adapter.getRepositoryAsync<ReviewRepository>();
+
+// ❌ Do NOT put business logic in repositories
 @override
-Future<void> initialize() async {  // ❌ Should be synchronous
-  await _loadData();  // This will block the adapter initialization
-}
-
-// ❌ Don't await in initialize() - use fire-and-forget
-@override
-void initialize() {
-  _loadData();  // ✅ Correct - triggers async operation without awaiting
+Future<List<Product>> getProducts({ProductFilters? filters, Duration? cacheTTL}) async {
+  final all = await _client.getProducts();
+  return all.where((p) => p.price > 10).toList(); // WRONG — filtering is business logic
 }
 ```
 
-### Error Handling
+---
 
-Define custom exceptions for better error handling:
+## Testing Adapters
 
-```dart
-class RepositoryException implements Exception {
-  final String message;
-  RepositoryException(this.message);
-
-  @override
-  String toString() => 'RepositoryException: $message';
-}
-
-class AdapterConfigurationException implements Exception {
-  final String message;
-  AdapterConfigurationException(this.message);
-
-  @override
-  String toString() => 'AdapterConfigurationException: $message';
-}
-
-class AdapterInitializationException implements Exception {
-  final String message;
-  AdapterInitializationException(this.message);
-
-  @override
-  String toString() => 'AdapterInitializationException: $message';
-}
-```
-
-### Documentation
-
-Document your adapter:
-
-```dart
-/// WooCommerce Backend Adapter
-///
-/// Provides integration with WooCommerce REST API.
-///
-/// **Required Configuration:**
-/// - `baseUrl`: WooCommerce store URL (e.g., 'https://example.com')
-/// - `consumerKey`: WooCommerce API consumer key
-/// - `consumerSecret`: WooCommerce API consumer secret
-///
-/// **Optional Configuration:**
-/// - `apiVersion`: API version (default: 'wc/v3')
-/// - `timeout`: Request timeout in seconds (default: 30)
-///
-/// **Provided Repositories:**
-/// - `ProductsRepository`: Product catalog operations
-/// - `CartRepository`: Shopping cart operations
-/// - `OrderRepository`: Order management
-/// - `CategoryRepository`: Category management
-///
-/// **Example:**
-/// ```dart
-/// final adapter = WooCommerceAdapter();
-/// await adapter.initialize({
-///   'baseUrl': 'https://store.example.com',
-///   'consumerKey': 'ck_xxx',
-///   'consumerSecret': 'cs_xxx',
-/// });
-/// ```
-class WooCommerceAdapter extends BackendAdapter {
-  // ...
-}
-```
-
-## Testing
-
-### Mock Adapter for Testing
+### Minimal mock adapter
 
 ```dart
 class MockAdapter extends BackendAdapter {
-  @override
-  String get name => 'mock';
-
-  @override
-  String get version => '1.0.0';
+  @override String get name => 'mock';
+  @override String get version => '1.0.0';
+  @override Map<String, dynamic> get configSchema => {
+    'type': 'object',
+    'properties': {},
+  };
 
   @override
   Future<void> initialize(Map<String, dynamic> config) async {
     registerRepositoryFactory<ProductsRepository>(
       () => MockProductsRepository(),
     );
-
     registerRepositoryFactory<CartRepository>(
       () => MockCartRepository(),
     );
   }
 }
 
-class MockProductsRepository extends CoreRepository implements ProductsRepository {
-  MockProductsRepository() : super(hookRegistry: HookRegistry(), eventBus: EventBus());
-
-  bool _initialized = false;
+class MockProductsRepository extends ProductsRepository {
+  bool initializeCalled = false;
 
   @override
   void initialize() {
-    _initialized = true;
+    initializeCalled = true;
   }
 
   @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
-    return [
-      Product(id: '1', name: 'Test Product', price: 10.0),
-    ];
+  Future<ProductListResult> getProducts({
+    ProductFilters? filters,
+    Duration? cacheTTL,
+  }) async {
+    return ProductListResult(
+      products: [Product(id: '1', name: 'Test Product', price: 9.99)],
+      totalCount: 1,
+    );
   }
 
-  @override
-  Future<Product> getProductById(String id) async {
-    return Product(id: id, name: 'Test Product', price: 10.0);
-  }
-
-  bool get isInitialized => _initialized;
+  // implement remaining abstract methods...
 }
 ```
 
-### Unit Test Adapter
+### Unit-testing an adapter
 
 ```dart
 void main() {
@@ -842,163 +902,118 @@ void main() {
       adapter = WooCommerceAdapter();
     });
 
-    test('initializes successfully with valid config', () async {
-      final config = {
-        'baseUrl': 'https://test.com',
-        'consumerKey': 'ck_test',
-        'consumerSecret': 'cs_test',
-      };
-
-      await adapter.initialize(config);
-
-      expect(adapter.name, equals('woocommerce'));
-      expect(adapter.hasRepository<ProductsRepository>(), isTrue);
-    });
-
-    test('throws on missing configuration', () async {
-      final config = {'baseUrl': 'https://test.com'};
-
+    test('configSchema rejects missing required fields', () {
       expect(
-        () => adapter.initialize(config),
-        throwsA(isA<AdapterConfigurationException>()),
+        () => adapter.validateConfig({'timeout': 30}), // missing baseUrl, keys, secret
+        throwsA(isA<AdapterConfigValidationException>()),
       );
     });
 
-    test('provides ProductsRepository', () async {
-      final config = {
-        'baseUrl': 'https://test.com',
-        'consumerKey': 'ck_test',
-        'consumerSecret': 'cs_test',
-      };
-
-      await adapter.initialize(config);
-
-      final repo = adapter.getRepository<ProductsRepository>();
-      expect(repo, isA<ProductsRepository>());
+    test('configSchema rejects additional properties', () {
+      expect(
+        () => adapter.validateConfig({
+          'baseUrl': 'https://example.com',
+          'consumerKey': 'ck_x',
+          'consumerSecret': 'cs_x',
+          'unknown': 'value',
+        }),
+        throwsA(isA<AdapterConfigValidationException>()),
+      );
     });
 
-    test('repository initialize is called automatically', () async {
-      final config = {
-        'baseUrl': 'https://test.com',
-        'consumerKey': 'ck_test',
-        'consumerSecret': 'cs_test',
-      };
+    test('initialize registers expected repositories', () async {
+      await adapter.initialize({
+        'baseUrl': 'https://example.com',
+        'consumerKey': 'ck_x',
+        'consumerSecret': 'cs_x',
+        'apiVersion': 'wc/v3',
+        'timeout': 30,
+      });
 
-      await adapter.initialize(config);
-
-      final repo = adapter.getRepository<MockProductsRepository>();
-      expect(repo.isInitialized, isTrue);
+      expect(adapter.hasRepository<ProductsRepository>(), isTrue);
+      expect(adapter.hasRepository<CartRepository>(), isTrue);
+      expect(adapter.isRepositoryCached<ProductsRepository>(), isFalse); // lazy
     });
 
-    test('cached repositories are not re-initialized', () async {
-      final config = {
-        'baseUrl': 'https://test.com',
-        'consumerKey': 'ck_test',
-        'consumerSecret': 'cs_test',
-      };
+    test('repositories are lazy — not created until getRepository()', () async {
+      await adapter.initialize({...});
 
-      await adapter.initialize(config);
+      expect(adapter.isRepositoryCached<ProductsRepository>(), isFalse);
+      adapter.getRepository<ProductsRepository>();
+      expect(adapter.isRepositoryCached<ProductsRepository>(), isTrue);
+    });
 
-      final repo1 = adapter.getRepository<ProductsRepository>();
-      final repo2 = adapter.getRepository<ProductsRepository>();
+    test('getRepository() returns same instance on repeated calls', () async {
+      await adapter.initialize({...});
 
-      expect(identical(repo1, repo2), isTrue);
+      final r1 = adapter.getRepository<ProductsRepository>();
+      final r2 = adapter.getRepository<ProductsRepository>();
+      expect(identical(r1, r2), isTrue);
+    });
+
+    test('clearRepositoryCache() forces re-creation', () async {
+      await adapter.initialize({...});
+
+      final r1 = adapter.getRepository<ProductsRepository>();
+      adapter.clearRepositoryCache<ProductsRepository>();
+      final r2 = adapter.getRepository<ProductsRepository>();
+      expect(identical(r1, r2), isFalse);
     });
   });
 }
 ```
 
-## Example Adapters
-
-### Shopify Adapter
+### Integration test with MooseAppContext
 
 ```dart
-class ShopifyAdapter extends BackendAdapter {
-  @override
-  String get name => 'shopify';
+void main() {
+  group('WooCommerceAdapter integration', () {
+    late MooseAppContext ctx;
 
-  @override
-  String get version => '1.1.0';
-
-  @override
-  Map<String, dynamic> get configSchema => {
-        'type': 'object',
-        'required': ['storeUrl', 'storefrontAccessToken'],
-        'properties': {
-          'storeUrl': {'type': 'string', 'format': 'uri'},
-          'storefrontAccessToken': {'type': 'string', 'minLength': 1},
-          'apiVersion': {'type': 'string', 'default': '2024-01'},
+    setUp(() {
+      ctx = MooseAppContext();
+      ctx.configManager.initialize({
+        'adapters': {
+          'woocommerce': {
+            'baseUrl': 'https://example.com',
+            'consumerKey': 'ck_test',
+            'consumerSecret': 'cs_test',
+          },
         },
-      };
+      });
+    });
 
-  @override
-  Map<String, dynamic> getDefaultSettings() => {
-        'apiVersion': '2024-01',
-      };
+    tearDown(() {
+      ctx.adapterRegistry.clearAll();
+    });
 
-  @override
-  Future<void> initialize(Map<String, dynamic> config) async {
-    final client = ShopifyApiClient(
-      storeUrl: config['storeUrl'] as String,
-      accessToken: config['storefrontAccessToken'] as String,
-      apiVersion: config['apiVersion'] as String,
-    );
+    test('repository available after adapter registration', () async {
+      await ctx.adapterRegistry.registerAdapter(() => WooCommerceAdapter());
 
-    registerRepositoryFactory<ProductsRepository>(
-      () => ShopifyProductsRepository(client),
-    );
-
-    registerRepositoryFactory<CartRepository>(
-      () => ShopifyCartRepository(client),
-    );
-  }
-}
-
-// main.dart — pass via MooseBootstrapper
-final report = await MooseBootstrapper(appContext: ctx).run(
-  config: config,
-  adapters: [ShopifyAdapter()],  // initializeFromConfig() called automatically
-  plugins: [...],
-);
-```
-
-### Custom REST API Adapter
-
-```dart
-class CustomApiAdapter extends BackendAdapter {
-  @override
-  String get name => 'custom_api';
-
-  @override
-  String get version => '1.0.0';
-
-  @override
-  Future<void> initialize(Map<String, dynamic> config) async {
-    final client = HttpClient(
-      baseUrl: config['apiUrl'],
-      headers: {
-        'Authorization': 'Bearer ${config['apiToken']}',
-      },
-    );
-
-    registerRepositoryFactory<ProductsRepository>(
-      () => CustomProductsRepository(client),
-    );
-  }
+      expect(ctx.adapterRegistry.hasRepository<ProductsRepository>(), isTrue);
+      expect(ctx.getRepository<ProductsRepository>(), isA<ProductsRepository>());
+    });
+  });
 }
 ```
-
-## Related Documentation
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Overall architecture
-- **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Creating plugins
-- **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
 
 ---
 
-**Last Updated:** 2026-02-26
-**Version:** 4.0.0
+## Related Documentation
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall system architecture
+- [ADAPTER_SCHEMA_VALIDATION.md](./ADAPTER_SCHEMA_VALIDATION.md) — Full JSON schema reference
+- [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — How plugins consume repositories
+- [REGISTRIES.md](./REGISTRIES.md) — All registry APIs
+- [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — EventBus and HookRegistry usage
+- [ANTI_PATTERNS.md](./ANTI_PATTERNS.md) — Expanded anti-patterns list
+
+---
+
+**Last Updated:** 2026-03-01
+**Version:** 5.0.0
 
 **Changelog:**
-- **v4.0.0 (2026-02-26)**: `initializeFromConfig()` now requires `configManager:` (named, required) — no global fallback. `AdapterRegistry` registers lazy factories only; no repo instances created during adapter registration. `MooseAppContext.getRepository<T>()` convenience shortcut added.
-- **v3.0.0 (2026-02-22)**: `CoreRepository` requires `hookRegistry`/`eventBus` constructor params. `AdapterRegistry()` singleton removed — use `MooseBootstrapper` or `appContext.adapterRegistry`.
+- **v5.0.0 (2026-03-01)**: Full rewrite against actual source. `CoreRepository` is now a pure no-arg lifecycle base — no `hookRegistry`/`eventBus` fields. `BackendAdapter` convenience getters documented (`hookRegistry`, `eventBus`, `cache`, `configManager`, `logger`, `actionRegistry`). `AdapterRegistry` API documented (`getAdapter`, `getAvailableRepositories`, `getInitializedAdapters`, `clearAll`). Repository interface catalog expanded with real method signatures. Mock testing patterns corrected. Anti-patterns and bootstrap sequence updated.
+- **v4.0.0 (2026-02-26)**: `initializeFromConfig()` requires `configManager:` named param. `AdapterRegistry` lazy factory design documented. `MooseAppContext.getRepository<T>()` shortcut added.
+- **v3.0.0 (2026-02-22)**: `CoreRepository` required `hookRegistry`/`eventBus` constructor params (now removed).
