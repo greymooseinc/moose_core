@@ -1,250 +1,428 @@
-# Cache System Guide
-
-> Complete guide to caching in moose_core
+# Cache System
 
 ## Overview
 
-The moose_core package provides a scoped, fully instance-based caching system.
-Every `MooseAppContext` owns its own `CacheManager`, which in turn owns
-independent `MemoryCache` and `PersistentCache` instances.
+`moose_core` provides a two-tier cache system through `CacheManager`:
 
-**There is no static or singleton state.** Two `MooseAppContext` instances never
-share cache data.
+- **`MemoryCache`** — In-process, in-memory cache with TTL, eviction policies, and statistics. Fast; cleared on app restart.
+- **`PersistentCache`** — `SharedPreferences`-backed persistent storage. Survives app restarts; must be initialized before use.
 
-## Cache Components
+`CacheManager` is owned by `MooseAppContext`. There is no global singleton — two `MooseAppContext` instances never share cache data.
 
-### CacheManager
-
-Owned by `MooseAppContext`. Exposes two properties:
-
-| Property | Type | Description |
-|---|---|---|
-| `memory` | `MemoryCache` | Fast in-memory, session-scoped storage |
-| `persistent` | `PersistentCache` | SharedPreferences-backed, survives restarts |
-
-Access via `appContext.cache` or `context.moose.cache` in widgets.
-
-```dart
-// Direct access
-appContext.cache.memory.set('key', value);
-await appContext.cache.persistent.setString('pref', 'value');
-
-// Widget tree
-context.moose.cache.memory.get<String>('key');
-```
-
-### MemoryCache
-
-In-memory cache with TTL support, eviction policies, and statistics.
-
-```dart
-void set(String key, dynamic value, {Duration? ttl})
-T? get<T>(String key)
-bool has(String key)
-void remove(String key)
-void clear()
-void dispose()  // stops the cleanup timer
-```
-
-### PersistentCache
-
-Disk-based cache using SharedPreferences.
-
-```dart
-Future<void> init()
-Future<bool> setString(String key, String value)
-Future<String?> getString(String key)
-Future<bool> has(String key)
-Future<bool> remove(String key)
-Future<bool> clear()
-```
+---
 
 ## Accessing the Cache
 
-### From a widget
-
 ```dart
-// via BuildContext
-final cache = context.moose.cache;
-cache.memory.set('api_response', data, ttl: const Duration(minutes: 5));
-final data = cache.memory.get<List<Product>>('api_response');
+// From a FeaturePlugin or BackendAdapter (via injected appContext)
+final cacheManager = appContext.cache;          // CacheManager
+final memory = appContext.cache.memory;         // MemoryCache
+final disk = appContext.cache.persistent;       // PersistentCache
 
-// static accessor
-final cache = MooseScope.cacheOf(context);
+// From a BackendAdapter (convenience getter on BackendAdapter base class)
+cacheManager.memory.set('key', value);
+
+// From a widget
+final cache = context.moose.cache;             // via MooseScope
+final cache = MooseScope.cacheOf(context);     // static accessor
 ```
 
-### From MooseAppContext directly
+---
+
+## CacheManager API
 
 ```dart
-appContext.cache.memory.set('key', value);
-await appContext.cache.persistent.setString('theme', 'dark');
+class CacheManager {
+  MemoryCache get memory;
+  PersistentCache get persistent;
+
+  /// Initialize persistent cache. Must be called before using persistent.get<T>().
+  Future<void> initPersistent();
+
+  /// Clears both caches.
+  Future<void> clearAll();
+
+  /// Clears only the in-memory cache.
+  void clearMemory();
+
+  /// Clears only the persistent cache.
+  Future<void> clearPersistent();
+
+  /// Disposes the memory cache (stops auto-cleanup timer).
+  void dispose();
+}
 ```
 
-## Bootstrap Initialization
+`MooseBootstrapper.run()` calls `initPersistent()` automatically. In tests or custom setups, call it manually before using `persistent.get<T>()`.
 
-`MooseBootstrapper.run()` automatically calls `appContext.cache.initPersistent()`
-before adapters are registered. No manual initialization is needed.
+---
+
+## MemoryCache
+
+### Configuration
 
 ```dart
-// ✅ No manual CacheManager.initPersistentCache() call needed
-final report = await MooseBootstrapper(appContext: appContext).run(
-  config: config,
-  adapters: [MyAdapter()],
-  plugins: [() => MyPlugin()],
+// Default configuration (applied automatically by MooseAppContext)
+memory.configure(
+  maxSize: 1000,                        // max entries
+  maxMemoryBytes: 50 * 1024 * 1024,    // 50 MB
+  evictionPolicy: EvictionPolicy.lru,
+  cleanupInterval: Duration(minutes: 1),
 );
 ```
 
-## Usage Examples
+Reconfigure at any time with `configure()`. All previously cached entries remain.
 
-### Basic Memory Caching
+### Core API
 
 ```dart
-final cache = appContext.cache;
+// Store with optional TTL
+void set<T>(String key, T value, {Duration? ttl});
 
-// Store with 5-minute TTL
-cache.memory.set('products:featured', products, ttl: const Duration(minutes: 5));
+// Retrieve (returns null if absent or expired)
+T? get<T>(String key);
 
-// Retrieve
-final cached = cache.memory.get<List<Product>>('products:featured');
-if (cached != null) {
-  return cached;
+// Check existence (without triggering eviction stats)
+bool has(String key);
+
+// Remove an entry
+void remove(String key);
+
+// Remove all entries
+void clear();
+
+// Get with fallback default (does not cache the default)
+T getOrDefault<T>(String key, T defaultValue);
+
+// Get or compute and cache (atomic fetch-or-store)
+T getOrSet<T>(String key, T Function() compute, {Duration? ttl});
+```
+
+#### `getOrSet` — preferred pattern for expensive lookups
+
+```dart
+final products = cacheManager.memory.getOrSet(
+  'products:featured',
+  () => _fetchProductsFromApi(),
+  ttl: const Duration(minutes: 5),
+);
+```
+
+If `key` exists and is not expired, returns the cached value. Otherwise calls `compute()`, stores the result, and returns it.
+
+### Bulk Operations
+
+```dart
+void setAll(Map<String, dynamic> entries, {Duration? ttl});
+void removeAll(List<String> keys);
+Map<String, dynamic> getAll(List<String> keys); // returns only present, non-expired entries
+```
+
+### TTL Management
+
+```dart
+// Remaining TTL for a key; null if no TTL or key absent
+Duration? getRemainingTTL(String key);
+
+// Reset TTL to original value; returns false if key not found
+bool refreshTTL(String key);
+```
+
+### Evict and Return
+
+```dart
+// Remove a key and return its value (null if absent)
+T? pop<T>(String key);
+```
+
+### Updating Entries
+
+```dart
+// Update an existing entry in-place; no-op if key is absent
+void update<T>(String key, T Function(T current) updater);
+```
+
+### Maintenance
+
+```dart
+// Remove all expired entries immediately
+void cleanExpired();
+
+// Manually trigger cleanup (same as cleanExpired but also resets the timer)
+void cleanup();
+
+// Stop the background auto-cleanup timer
+void stopAutoCleanup();
+
+// Dispose the cache (calls stopAutoCleanup)
+void dispose();
+```
+
+### Statistics
+
+```dart
+CacheStats get stats;
+void resetStats();
+void printStats(); // prints to debug console
+```
+
+`CacheStats` fields:
+
+```dart
+class CacheStats {
+  int size;               // current entry count
+  int maxSize;            // configured max entries
+  int hits;
+  int misses;
+  int evictions;
+  int expirations;
+  int estimatedMemoryBytes;
+  double hitRate;          // hits / (hits + misses)
+  double estimatedMemoryMB;
 }
-
-// Miss — fetch and store
-final products = await repository.getProducts();
-cache.memory.set('products:featured', products, ttl: const Duration(minutes: 5));
-return products;
 ```
 
-### Persistent Caching
+### Introspection Getters
 
 ```dart
-final cache = appContext.cache;
-
-// Store user preference
-await cache.persistent.setString('theme', 'dark');
-
-// Retrieve
-final theme = await cache.persistent.getString('theme') ?? 'light';
+int get size;
+bool get isEmpty;
+bool get isNotEmpty;
+int get maxSize;
+int get maxMemoryBytes;
+EvictionPolicy get evictionPolicy;
+List<String> get keys; // snapshot of current keys
 ```
 
-### Cache Invalidation
+### Eviction Policies
+
+| Policy | Description | Best For |
+|--------|-------------|----------|
+| `EvictionPolicy.lru` | Evicts least recently used | General purpose (default) |
+| `EvictionPolicy.lfu` | Evicts least frequently used | Data with a stable hot set |
+| `EvictionPolicy.fifo` | Evicts oldest inserted entry | Time-ordered data |
 
 ```dart
-// Remove specific key
-appContext.cache.memory.remove('products:featured');
-
-// Clear all memory
-appContext.cache.clearMemory();
-
-// Clear all persistent
-await appContext.cache.clearPersistent();
-
-// Clear both
-await appContext.cache.clearAll();
+memory.configure(evictionPolicy: EvictionPolicy.lfu);
 ```
 
-### Repository with Caching
+---
+
+## PersistentCache
+
+Backed by `SharedPreferences`. All write operations are async. The generic `get<T>()` is **synchronous** — it reads from an in-memory snapshot loaded during `init()`. Always call `initPersistent()` (or `await persistent.init()`) before calling `get<T>()`.
+
+### Initialization
 
 ```dart
-class CachedProductsRepository implements ProductsRepository {
-  final ProductsRepository _source;
-  final MemoryCache _cache;
+// Done automatically by MooseBootstrapper. In tests or custom setups:
+await appContext.cache.initPersistent();
+// or directly:
+await appContext.cache.persistent.init();
+```
 
-  CachedProductsRepository(this._source, this._cache);
+### Generic Read (Synchronous)
 
+```dart
+// Synchronous after init(); returns null if key is absent
+T? get<T>(String key);
+```
+
+### Typed Async Reads
+
+These read directly from `SharedPreferences` and return a `Future`:
+
+```dart
+Future<String?>           getString(String key);
+Future<int?>              getInt(String key);
+Future<double?>           getDouble(String key);
+Future<bool?>             getBool(String key);
+Future<List<String>?>     getStringList(String key);
+Future<Map<String, dynamic>?> getJson(String key);
+```
+
+### Generic Write
+
+```dart
+// Auto-detects type: String, int, double, bool, List<String>, Map<String, dynamic>
+Future<void> set(String key, dynamic value);
+```
+
+### Typed Async Writes
+
+```dart
+Future<void> setString(String key, String value);
+Future<void> setInt(String key, int value);
+Future<void> setDouble(String key, double value);
+Future<void> setBool(String key, bool value);
+Future<void> setStringList(String key, List<String> value);
+Future<void> setJson(String key, Map<String, dynamic> value);
+```
+
+### Bulk Operations
+
+```dart
+Future<void> setAll(Map<String, dynamic> entries);
+Future<void> removeAll(List<String> keys);
+```
+
+### Other Operations
+
+```dart
+// Get with fallback; does not persist the default
+Future<T?> getOrDefault<T>(String key, T defaultValue);
+
+bool has(String key);               // synchronous, reads from snapshot
+Future<void> remove(String key);
+Future<void> clear();
+List<String> get keys;             // synchronous snapshot of current keys
+
+// Re-load in-memory snapshot from SharedPreferences
+Future<void> reload();
+```
+
+---
+
+## Decision Matrix
+
+| Scenario | Cache Type |
+|----------|------------|
+| API response caching | `memory` |
+| Session tokens | `memory` |
+| Computed / derived values | `memory` |
+| Cart ID (session-scoped) | `memory` |
+| User preferences / settings | `persistent` |
+| App theme / language | `persistent` |
+| Search history | `persistent` |
+| Favourites / wishlist | `persistent` |
+
+---
+
+## Common Patterns
+
+### Cache-aside in a BackendAdapter
+
+```dart
+class MyAdapter extends BackendAdapter {
   @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
-    final key = 'products:${filters?.hashCode ?? "all"}';
-    final cached = _cache.get<List<Product>>(key);
+  Future<List<Product>> fetchProducts() async {
+    const key = 'products:all';
+    final cached = cacheManager.memory.get<List<Product>>(key);
     if (cached != null) return cached;
 
-    final products = await _source.getProducts(filters);
-    _cache.set(key, products, ttl: const Duration(minutes: 5));
+    final products = await apiClient.get('/products');
+    cacheManager.memory.set(key, products, ttl: const Duration(minutes: 5));
     return products;
   }
 }
 ```
 
-## MemoryCache Configuration
+Or concisely with `getOrSet`:
 
 ```dart
-appContext.cache.memory.configure(
-  maxSize: 1000,
-  maxMemoryBytes: 50 * 1024 * 1024, // 50MB
-  evictionPolicy: EvictionPolicy.lru,
-  cleanupInterval: const Duration(minutes: 1),
+return cacheManager.memory.getOrSet(
+  'products:all',
+  () => apiClient.get('/products'),
+  ttl: const Duration(minutes: 5),
 );
 ```
 
-**Eviction Policies:**
-- `EvictionPolicy.lru` — Least Recently Used (default, recommended)
-- `EvictionPolicy.lfu` — Least Frequently Used
-- `EvictionPolicy.fifo` — First In First Out
-
-## Cache Statistics
+### User preferences in PersistentCache
 
 ```dart
-final stats = appContext.cache.memory.stats;
-print(stats.hitRate);           // 0.0 – 1.0
-print(stats.estimatedMemoryMB); // "2.34"
-print(stats.evictions);
+// Write
+await cacheManager.persistent.setBool('notifications_enabled', true);
+
+// Synchronous read (requires prior initPersistent())
+final enabled = cacheManager.persistent.get<bool>('notifications_enabled') ?? true;
 ```
 
-## Best Practices
+### Invalidate on mutation
 
 ```dart
-// ✅ Use memory cache for session-scoped data
-appContext.cache.memory.set('api_temp', data, ttl: const Duration(minutes: 5));
-
-// ✅ Use persistent cache for user preferences
-await appContext.cache.persistent.setString('theme', 'dark');
-
-// ✅ Always dispose cache when context is torn down
-appContext.cache.dispose();
-
-// ❌ Do not use old static API
-CacheManager.memoryCacheInstance(); // removed
-CacheManager.persistentCacheInstance(); // removed
-
-// ❌ Do not construct MemoryCache() / PersistentCache() directly outside tests
-final cache = MemoryCache(); // bypass DI — use appContext.cache.memory instead
+Future<void> updateProduct(Product product) async {
+  await apiClient.put('/products/${product.id}', product.toJson());
+  cacheManager.memory.remove('products:all');
+  cacheManager.memory.remove('product:${product.id}');
+}
 ```
 
-## Decision Matrix
-
-| Scenario | Cache Type |
-|---|---|
-| API response caching | `memory` |
-| Session tokens | `memory` |
-| User preferences / settings | `persistent` |
-| Search history | `persistent` |
-| App theme / language | `persistent` |
-| Computed values | `memory` |
-| Cart ID (session) | `memory` |
-| Favourites / wishlist | `persistent` |
-
-## Testing
-
-Inject a custom `CacheManager` or individual caches for full isolation:
+### Namespace keys by adapter
 
 ```dart
-final customCache = CacheManager(
-  memory: MemoryCache(),
-  persistent: PersistentCache(),
-);
-final ctx = MooseAppContext(cache: customCache);
-
-// Each test context is fully isolated — no shared state
+// Prefix keys with the adapter name to avoid collisions across adapters
+final key = '${name}:catalog:$categoryId';
+cacheManager.memory.set(key, data, ttl: const Duration(minutes: 10));
 ```
 
-## Related Documentation
+### Clear cache on user sign-out
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall architecture
-- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — Repository pattern
-- [AI_CACHE_GUIDE.md](./AI_CACHE_GUIDE.md) — AI agent quick reference
+```dart
+Future<void> onUserSignOut() async {
+  await appContext.cache.clearAll();
+}
+```
+
+### Debug monitoring
+
+```dart
+assert(() {
+  cacheManager.memory.printStats();
+  return true;
+}());
+```
 
 ---
 
-**Last Updated:** 2026-02-26
-**Version:** 1.2.0
+## Lifecycle Integration
+
+- `MooseBootstrapper.run()` calls `cacheManager.initPersistent()` automatically — no manual call needed.
+- `MooseScope.dispose()` calls `cacheManager.dispose()`, which stops the memory auto-cleanup timer.
+- `BackendAdapter` receives `cacheManager` via `appContext` injected by `AdapterRegistry` during `initializeFromConfig()`.
+- `FeaturePlugin` receives `appContext` (including `appContext.cache`) after `PluginRegistry.register()` injects it.
+
+---
+
+## Testing
+
+`MemoryCache` is a plain Dart class with no Flutter binding dependency. For `PersistentCache`, use `SharedPreferences.setMockInitialValues({})`.
+
+```dart
+setUp(() async {
+  SharedPreferences.setMockInitialValues({});
+  final ctx = MooseAppContext();
+  await ctx.cache.initPersistent();
+});
+
+tearDown(() {
+  appContext.cache.memory.clear();
+  appContext.cache.memory.stopAutoCleanup();
+});
+```
+
+Shrink limits in unit tests:
+
+```dart
+appContext.cache.memory.configure(
+  maxSize: 10,
+  cleanupInterval: const Duration(seconds: 1),
+);
+```
+
+---
+
+## Architecture Notes
+
+- `CacheManager` is instantiated by `MooseAppContext`; one instance per app context — never construct it directly in production code.
+- Never store `CacheManager` in a static field. Always access through `appContext.cache` or the convenience getter on `BackendAdapter`/`FeaturePlugin`.
+- Cache keys are plain strings. Use a consistent naming convention (e.g., `<adapter>:<entity>:<id>`) to prevent collisions between adapters or plugins.
+- `MemoryCache.dispose()` is called by `CacheManager.dispose()` — do not call it directly.
+
+---
+
+## Related Documentation
+
+- [ADAPTER_SYSTEM.md](ADAPTER_SYSTEM.md)
+- [PLUGIN_SYSTEM.md](PLUGIN_SYSTEM.md)
+- [PLUGIN_ADAPTER_CONFIG_GUIDE.md](PLUGIN_ADAPTER_CONFIG_GUIDE.md)
+- [ADAPTER_SCHEMA_VALIDATION.md](ADAPTER_SCHEMA_VALIDATION.md)
