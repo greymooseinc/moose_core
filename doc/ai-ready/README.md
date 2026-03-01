@@ -1,36 +1,83 @@
-# moose_core Documentation
+# moose_core — AI-Ready Documentation
 
-> AI-ready documentation for the moose_core package - A modular, plugin-based architecture for Flutter e-commerce applications
+> Reference documentation for AI agents building plugins, adapters, and sections on the `moose_core` Flutter framework.
 
-## Overview
+---
 
-The `moose_core` package provides a comprehensive architectural foundation for building scalable, maintainable e-commerce applications in Flutter. It implements industry-standard patterns including Plugin Architecture, Repository Pattern, BLoC State Management, and Adapter Pattern.
+## What is moose_core?
+
+`moose_core` is a modular, backend-agnostic Flutter framework for e-commerce and content applications. It provides the architectural skeleton — registries, lifecycle, configuration, caching, events — so that features (plugins) and backends (adapters) can be developed independently and composed at runtime.
+
+**Core guarantees:**
+- No singletons — every registry is owned by a `MooseAppContext` instance
+- Backend-agnostic — all data access goes through repository interfaces, never directly to an API
+- Plugin-isolated — plugins communicate via `EventBus` and `HookRegistry`, not direct calls
+- Configuration-driven — section layouts, plugin settings, and adapter credentials all flow through `ConfigManager` from a single `environment.json`
+
+---
 
 ## Quick Start
 
-### Installation
+### 1. Install moose_cli
 
-Add to your `pubspec.yaml`:
+`moose_cli` is the official scaffolding tool. Activate it globally once:
+
+```bash
+dart pub global activate moose_cli
+```
+
+Verify installation:
+
+```bash
+moose version
+```
+
+### 2. Scaffold a new app
+
+```bash
+# Empty app
+moose init my_app
+
+# From a built-in template (e.g. shopify)
+moose init my_app --template shopify
+
+# From a custom manifest file or HTTPS URL
+moose init my_app --manifest ./moose.manifest.json
+moose init my_app --manifest https://example.com/my-template.json
+
+# Pre-fill environment.json values at scaffold time
+moose init my_app --template shopify --configurations adapters.shopify.storeUrl=mystore.myshopify.com
+```
+
+### 3. Add plugins and adapters
+
+```bash
+# Install a plugin from a git repository
+moose plugin add loyalty --git https://github.com/greymooseinc/moose_extensions.git
+
+# Install an adapter from a local path
+moose adapter add stripe --path ./extensions/lib/adapters
+
+# Add a localization file
+moose locale add si
+```
+
+### 4. Wire up manually (without moose_cli)
+
+Add to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core: ^0.1.3
+  moose_core:
+    git:
+      url: https://github.com/greymooseinc/moose_core.git
+      ref: main
 ```
 
-### Basic Usage
+Bootstrap in `main.dart`:
 
 ```dart
-// Import entire package
-import 'package:moose_core/moose_core.dart';
-
-// Or import specific modules
-import 'package:moose_core/entities.dart';
-import 'package:moose_core/repositories.dart';
-import 'package:moose_core/plugin.dart';
-import 'package:moose_core/widgets.dart';
-import 'package:moose_core/adapters.dart';
-import 'package:moose_core/cache.dart';
-import 'package:moose_core/services.dart';
+import 'package:moose_core/app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,11 +106,18 @@ class _AppBootstrapState extends State<AppBootstrap> {
   }
 
   Future<void> _bootstrap() async {
-    await MooseBootstrapper(appContext: widget.appContext).run(
-      config: await loadConfiguration(),
+    final config = await loadEnvironmentJson(); // Map<String, dynamic>
+
+    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+      config: config,
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin(), () => CartPlugin()],
     );
+
+    if (!report.succeeded) {
+      // report.failures: Map<String, Object>
+      // keys are 'adapter:<name>' or 'plugin:<name>'
+    }
   }
 
   @override
@@ -71,428 +125,500 @@ class _AppBootstrapState extends State<AppBootstrap> {
 }
 ```
 
-## Modular Package Structure
+---
 
-The package is organized into focused modules for better maintainability and selective imports:
+## Architecture at a Glance
 
-| Module | Description | Key Exports |
-|--------|-------------|-------------|
-| **entities.dart** | Domain entities | Product, Cart, Order, Category, etc. |
-| **repositories.dart** | Repository interfaces | ProductsRepository, CartRepository, etc. |
-| **plugin.dart** | Plugin system | FeaturePlugin, PluginRegistry |
-| **widgets.dart** | UI components | FeatureSection, WidgetRegistry, AddonRegistry |
-| **adapters.dart** | Adapter pattern | BackendAdapter, AdapterRegistry |
-| **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
-| **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
-
-### Import Options
-
-```dart
-// Option 1: Import everything (recommended for most cases)
-import 'package:moose_core/moose_core.dart';
-
-// Option 2: Import only what you need (for optimized builds)
-import 'package:moose_core/entities.dart';      // Just domain entities
-import 'package:moose_core/repositories.dart';  // Just repository interfaces
-import 'package:moose_core/adapters.dart';      // Just adapter pattern
-
-// Option 3: Mix and match
-import 'package:moose_core/entities.dart';
-import 'package:moose_core/plugin.dart';
-import 'package:moose_core/services.dart';
+```
+┌─────────────────────────────────────────────────────┐
+│              Presentation Layer                      │
+│    Screens · FeatureSection · Widgets                │
+└──────────────────────┬──────────────────────────────┘
+                       │ events / states
+┌──────────────────────▼──────────────────────────────┐
+│           Business Logic Layer (BLoC)                │
+│    Blocs receive repositories via constructor        │
+└──────────────────────┬──────────────────────────────┘
+                       │ repository calls
+┌──────────────────────▼──────────────────────────────┐
+│           Repository Layer (abstract)                │
+│    ProductsRepository, CartRepository, ...           │
+└──────────────────────┬──────────────────────────────┘
+                       │ concrete implementation
+┌──────────────────────▼──────────────────────────────┐
+│           Adapter Layer (BackendAdapter)             │
+│    WooCommerceAdapter, ShopifyAdapter, ...           │
+└─────────────────────────────────────────────────────┘
 ```
 
-## Documentation Index
+**Key classes:**
 
-### Core Architectural Patterns
+| Class | Role |
+|---|---|
+| `MooseAppContext` | Owns all registries and services for one app instance |
+| `MooseScope` | `InheritedWidget` serving `MooseAppContext` to the widget tree |
+| `MooseBootstrapper` | Orchestrates the 7-step startup sequence |
+| `FeaturePlugin` | Base class for feature modules |
+| `BackendAdapter` | Base class for backend implementations |
+| `FeatureSection` | Base class for configurable UI sections |
+| `CoreRepository` | Base class for all repository interfaces |
 
-1. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Core architectural patterns
-   - Plugin System
-   - Repository Pattern
-   - FeatureSection Pattern
-   - BLoC Pattern
-   - Adapter Pattern
-   - Configuration System
+---
 
-2. **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Plugin architecture guide
-   - Creating plugins
-   - Plugin lifecycle
-   - Registration patterns
-   - Best practices
+## MooseAppContext — The DI Container
 
-3. **[FEATURE_SECTION.md](./FEATURE_SECTION.md)** - FeatureSection pattern
-   - Creating configurable sections
-   - Configuration patterns
-   - Use cases and examples
-   - Content vs Sliver sections
-
-4. **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Backend adapter pattern
-   - BackendAdapter abstraction
-   - Creating custom adapters
-   - Repository factory pattern
-   - Lazy loading and caching
-
-5. **[MANIFEST.md](./MANIFEST.md)** - moose.manifest.json reference
-   - Complete manifest file structure
-   - Field definitions and validation rules
-   - Plugin and adapter manifest examples
-   - Best practices and common patterns
-   - Troubleshooting guide
-
-### Registry Systems
-
-6. **[REGISTRIES.md](./REGISTRIES.md)** - Complete registry guide
-   - WidgetRegistry
-   - AdapterRegistry
-   - ActionRegistry
-   - HookRegistry
-   - AddonRegistry
-
-### Event-Driven Communication
-
-7. **[EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md)** - ⚡ Complete event system guide for AI agents
-   - TL;DR decision matrix
-   - EventBus: Asynchronous pub/sub for notifications
-   - HookRegistry: Synchronous callbacks for data transformation
-   - String-based events with dot notation (e.g., 'cart.item.added')
-   - Common event patterns for all domains
-   - BLoC integration examples
-   - Testing strategies
-   - Common pitfalls and best practices
-   - **START HERE for event systems**
-
-### Advanced Topics
-
-8. **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
-   - CacheManager
-   - MemoryCache
-   - PersistentCache
-   - TTL configuration
-
-9. **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
-   - State management anti-patterns
-   - Architecture violations
-   - Common mistakes
-   - Quick reference checklist
-
-10. **[API.md](./API.md)** - Public API reference
-    - Exported classes and methods
-    - Usage examples
-    - Type definitions
-
-### Authentication & Authorization
-
-11. **[AUTH_ADAPTER_GUIDE.md](./AUTH_ADAPTER_GUIDE.md)** - Authentication adapter guide
-    - Multi-provider authentication
-    - AuthRepository implementation
-    - Provider-specific integration (Firebase, Auth0, custom)
-    - User entity with provider data
-    - Complete examples for AI agents
-
-### Domain Entities
-
-12. **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product Sections System
-    - Dynamic content sections for products
-    - Flexible backend mapping
-    - Custom section types
-    - UI rendering patterns
-    - Migration from legacy fields
-
-13. **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick Reference for AI Agents
-    - Product sections quick guide
-    - Copy-paste templates
-    - Common patterns
-    - Decision trees
-
-## Key Concepts
-
-### Plugin Architecture
-
-Every feature is a self-contained plugin that can be independently developed, tested, and maintained:
+`MooseAppContext` is the single dependency-injection container. It owns every registry and service:
 
 ```dart
-class MyFeaturePlugin extends FeaturePlugin {
+final ctx = MooseAppContext();
+
+// All registries are independent instances — no global state
+ctx.pluginRegistry    // PluginRegistry
+ctx.widgetRegistry    // WidgetRegistry
+ctx.addonRegistry     // AddonRegistry
+ctx.hookRegistry      // HookRegistry
+ctx.actionRegistry    // ActionRegistry
+ctx.adapterRegistry   // AdapterRegistry
+ctx.configManager     // ConfigManager
+ctx.eventBus          // EventBus
+ctx.cache             // CacheManager (memory + persistent)
+ctx.logger            // AppLogger
+
+// Shortcut for repository access
+ctx.getRepository<ProductsRepository>()
+```
+
+In widgets, access via `context.moose`:
+
+```dart
+final ctx = context.moose;
+final products = ctx.adapterRegistry.getRepository<ProductsRepository>();
+```
+
+Custom or mock instances can be injected via constructor — useful for testing:
+
+```dart
+final ctx = MooseAppContext(
+  hookRegistry: MockHookRegistry(),
+  configManager: MockConfigManager(),
+);
+```
+
+---
+
+## Bootstrap Sequence
+
+`MooseBootstrapper.run()` executes these steps in order:
+
+1. `ConfigManager.initialize(config)` — loads `environment.json` map
+2. `CacheManager.initPersistent()` — opens persistent cache
+3. `AppNavigator.setEventBus(eventBus)` — wires navigation to scoped event bus
+4. Register each adapter — `AdapterRegistry.registerAdapter()` → validates config schema → calls `adapter.initialize(config)`
+5. Register each plugin (sync) — injects `MooseAppContext`, calls `plugin.onRegister()`
+6. Initialize all plugins (async) — calls `plugin.onInit()` in registration order
+7. Start all plugins (async) — calls `plugin.onStart()` in registration order
+
+Returns a `BootstrapReport` with per-plugin timings and a `failures` map (empty means success).
+
+---
+
+## Module Imports
+
+```dart
+import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, MooseBootstrapper
+import 'package:moose_core/entities.dart';      // Domain entities (Product, Cart, Order, ...)
+import 'package:moose_core/repositories.dart';  // Repository interfaces
+import 'package:moose_core/plugin.dart';        // FeaturePlugin, PluginRegistry
+import 'package:moose_core/widgets.dart';       // FeatureSection, WidgetRegistry, AddonRegistry
+import 'package:moose_core/adapters.dart';      // BackendAdapter, AdapterRegistry
+import 'package:moose_core/cache.dart';         // CacheManager, MemoryCache, PersistentCache
+import 'package:moose_core/services.dart';      // EventBus, HookRegistry, ActionRegistry, AppLogger, ApiClient
+```
+
+---
+
+## Plugin System
+
+A plugin is a self-contained feature module. It extends `FeaturePlugin` and follows this lifecycle:
+
+```
+onRegister() [sync] → onInit() [async] → onStart() [async] → onAppLifecycle() → onStop()
+```
+
+```dart
+class ProductsPlugin extends FeaturePlugin {
   @override
-  String get name => 'my_feature';
+  String get name => 'products';    // must match environment.json key
 
   @override
   String get version => '1.0.0';
 
   @override
-  Future<void> initialize() async {
-    // Register sections, routes, etc.
-  }
+  Map<String, dynamic> get configSchema => {
+    'type': 'object',
+    'properties': {
+      'display': {
+        'type': 'object',
+        'properties': {
+          'itemsPerPage': {'type': 'integer', 'minimum': 1},
+        },
+      },
+    },
+  };
+
+  @override
+  Map<String, dynamic> getDefaultSettings() => {
+    'display': {'itemsPerPage': 20},
+  };
 
   @override
   void onRegister() {
-    // Register hooks, actions, etc.
+    // Sync: register widgets, routes, addons, hooks
+    widgetRegistry.register(
+      'products.featured_section',
+      (context, {data, onEvent}) => FeaturedProductsSection(
+        settings: data?['settings'] as Map<String, dynamic>?,
+      ),
+    );
   }
+
+  @override
+  Future<void> onInit() async {
+    // Async: warm caches, subscribe to events
+    final perPage = getSetting<int>('display:itemsPerPage');
+  }
+
+  @override
+  Map<String, WidgetBuilder>? getRoutes() => {
+    '/products': (_) => const ProductsScreen(),
+    '/product/detail': (_) => const ProductDetailScreen(),
+  };
 }
 ```
 
-### Repository Pattern
-
-Abstract data operations from specific backends:
+**Read plugin config with `getSetting<T>(key)`** — resolves `plugins:<name>:settings:<key>` automatically:
 
 ```dart
-// Core repository interface
-abstract class ProductsRepository extends CoreRepository {
-  Future<List<Product>> getProducts(ProductFilters? filters);
-  Future<Product> getProductById(String id);
-}
+final perPage = getSetting<int>('display:itemsPerPage');
+```
 
-// Implementation in your adapter
-class WooProductsRepository implements ProductsRepository {
-  @override
-  Future<List<Product>> getProducts(ProductFilters? filters) async {
-    // WooCommerce-specific implementation
+**Activate/deactivate via `environment.json`:**
+
+```json
+{
+  "plugins": {
+    "products": { "active": true, "settings": { "display": { "itemsPerPage": 24 } } },
+    "reviews":  { "active": false }
   }
 }
 ```
 
-### FeatureSection Pattern
+---
 
-Create configurable, reusable UI sections:
+## Adapter System
+
+An adapter connects `moose_core` to a specific backend. It extends `BackendAdapter`, declares a `configSchema`, and registers repository factories inside `initialize()`.
+
+```dart
+class WooCommerceAdapter extends BackendAdapter {
+  @override
+  String get name => 'woocommerce';   // must match environment.json key
+
+  @override
+  String get version => '1.0.0';
+
+  // Required — compile error if omitted. Validated before initialize() is called.
+  @override
+  Map<String, dynamic> get configSchema => {
+    'type': 'object',
+    'required': ['baseUrl', 'consumerKey', 'consumerSecret'],
+    'properties': {
+      'baseUrl':        {'type': 'string', 'format': 'uri'},
+      'consumerKey':    {'type': 'string', 'minLength': 1},
+      'consumerSecret': {'type': 'string', 'minLength': 1},
+      'timeout':        {'type': 'integer', 'minimum': 0},
+    },
+    'additionalProperties': false,
+  };
+
+  @override
+  Map<String, dynamic> getDefaultSettings() => {'timeout': 30};
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    // config is already validated — read directly
+    final client = WooApiClient(
+      baseUrl: config['baseUrl'] as String,
+      consumerKey: config['consumerKey'] as String,
+      consumerSecret: config['consumerSecret'] as String,
+      timeout: Duration(seconds: config['timeout'] as int),
+    );
+
+    registerRepositoryFactory<ProductsRepository>(
+      () => WooProductsRepository(client, cache: cache, eventBus: eventBus),
+    );
+    registerRepositoryFactory<CartRepository>(
+      () => WooCartRepository(client, cache: cache, eventBus: eventBus),
+    );
+  }
+}
+```
+
+**Adapter config in `environment.json`:**
+
+```json
+{
+  "adapters": {
+    "woocommerce": {
+      "baseUrl": "https://mystore.example.com",
+      "consumerKey": "ck_xxxx",
+      "consumerSecret": "cs_xxxx"
+    }
+  }
+}
+```
+
+---
+
+## Repository System
+
+Repositories are abstract interfaces. Adapters implement them. Plugins and sections consume them through `AdapterRegistry`.
+
+```dart
+// From a plugin
+final products = adapterRegistry.getRepository<ProductsRepository>();
+
+// From a FeatureSection (inside build() only)
+final products = adaptersOf(context).getRepository<ProductsRepository>();
+
+// Guard for optional repositories
+if (adapterRegistry.hasRepository<PushNotificationRepository>()) {
+  final push = adapterRegistry.getRepository<PushNotificationRepository>();
+}
+```
+
+All repositories extend `CoreRepository` and override `initialize()` for synchronous setup. Repository instances are created lazily on first `getRepository<T>()` call and cached permanently.
+
+| Repository | Key responsibility |
+|---|---|
+| `ProductsRepository` | Catalog, categories, collections, variations, reviews, stock |
+| `CartRepository` | Cart, checkout, orders, payments, refunds |
+| `AuthRepository` | Sign-in/up, profile, tokens, MFA, account linking |
+| `SearchRepository` | Full-text search, suggestions, history |
+| `ReviewRepository` | Entity-agnostic reviews (products, posts, any type) |
+| `PostRepository` | CMS posts, pages, articles |
+| `BannerRepository` | Promotional banners with click tracking |
+| `PushNotificationRepository` | Device tokens, topics, notification streams |
+| `ShortsRepository` | Short-form video/story content |
+| `StoreRepository` | Store metadata, policies, locations, hours |
+| `LocationRepository` | Geocoding, autocomplete, country/address data |
+
+---
+
+## FeatureSection Pattern
+
+`FeatureSection` extends `StatelessWidget`. It is the standard unit of configurable UI. Settings merge constructor-supplied values over `getDefaultSettings()`. Use `getSetting<T>(key)` to read them.
 
 ```dart
 class FeaturedProductsSection extends FeatureSection {
   const FeaturedProductsSection({super.key, super.settings});
 
   @override
-  Map<String, dynamic> getDefaultSettings() {
-    return {
-      'title': 'Featured Products',
-      'perPage': 10,
-      'columns': 2,
-    };
-  }
+  Map<String, dynamic> getDefaultSettings() => {
+    'title': 'Featured',
+    'limit': 10,
+    'columns': 2,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final repository = adapters.getRepository<ProductsRepository>();
-    // Build your UI using getSetting<T>() for configuration
+    final title   = getSetting<String>('title');
+    final limit   = getSetting<int>('limit');
+    final columns = getSetting<int>('columns');
+
+    // adaptersOf(context) must be called inside build()
+    final products = adaptersOf(context).getRepository<ProductsRepository>();
+
+    return BlocProvider(
+      create: (_) => ProductsBloc(products)..add(LoadFeatured(limit: limit)),
+      child: ProductGrid(title: title, columns: columns),
+    );
   }
 }
 ```
 
-### BLoC Pattern
+**Automatic type coercions in `getSetting<T>`:**
 
-Mandatory state management pattern:
+| Requested `T` | Accepted source type | Conversion |
+|---|---|---|
+| `double` | `num` | `.toDouble()` |
+| `int` | `num` | `.toInt()` |
+| `Color` | `String` | `ColorHelper.parse()` — supports `#RGB`, `#RRGGBB`, `#AARRGGBB`, named colors, `rgba(...)` |
+
+---
+
+## Registry Overview
+
+| Registry | Purpose |
+|---|---|
+| `WidgetRegistry` | Maps string keys → `FeatureSection` builders; `buildSectionGroup()` renders a group |
+| `AddonRegistry` | Priority-ordered widget slots; multiple builders per slot; null = skip |
+| `HookRegistry` | Synchronous filter pipelines; descending priority; errors skipped |
+| `ActionRegistry` | `UserInteraction` dispatch by type (`internal`, `external`, `custom`, `none`) |
+| `AdapterRegistry` | Lazy repository factory management; last registered adapter wins |
+| `EventBus` | Async pub/sub; string-named events; `Map<String, dynamic>` payload |
+
+---
+
+## Configuration System
+
+Configuration flows from `environment.json` through `ConfigManager` with a three-tier fallback:
+
+```
+environment.json  →  getDefaultSettings() defaults  →  call-site defaultValue
+```
 
 ```dart
-// Event
-class LoadProducts extends ProductsEvent {
-  final ProductFilters? filters;
-  const LoadProducts({this.filters});
-}
+// Plugin settings — has 'settings' segment
+configManager.get('plugins:products:settings:display:itemsPerPage')
 
-// State
-class ProductsLoaded extends ProductsState {
-  final List<Product> products;
-  const ProductsLoaded(this.products);
-}
+// Adapter settings — NO 'settings' segment
+configManager.get('adapters:woocommerce:timeout')
 
-// BLoC
-class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
-  final ProductsRepository repository;
+// Check if explicitly set in environment.json (not from defaults)
+configManager.has('plugins:products:settings:display:itemsPerPage')
 
-  ProductsBloc(this.repository) : super(ProductsInitial()) {
-    on<LoadProducts>(_onLoadProducts);
-  }
-}
+// Inline fallback
+configManager.get('plugins:products:settings:display:itemsPerPage', defaultValue: 20)
 ```
 
-## Extending the Core
+Both `.` and `:` work as path separators — they are interchangeable.
 
-### Creating a Custom Plugin
+---
 
-1. Extend `FeaturePlugin`
-2. Implement required methods
-3. Register sections, routes, hooks
-4. Initialize resources
+## moose_cli Reference
 
-See [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) for complete guide.
+`moose_cli` scaffolds apps, installs plugins, and installs adapters from git repos, local paths, or custom manifest files.
 
-### Creating a Custom Adapter
+### Installation
 
-1. Extend `BackendAdapter`
-2. Implement repository factories
-3. Register repositories
-4. Initialize with configuration
-
-See [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) for complete guide.
-
-### Creating Custom Sections
-
-1. Extend `FeatureSection`
-2. Implement `getDefaultSettings()`
-3. Use `getSetting<T>()` for configuration
-4. Use BLoC for state management
-
-See [FEATURE_SECTION.md](./FEATURE_SECTION.md) for complete guide.
-
-## Architecture Layers
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Presentation Layer                       │
-│              (Screens, Sections, Widgets)                    │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ Events/States
-┌──────────────────────▼──────────────────────────────────────┐
-│                  Business Logic Layer (BLoC)                 │
-│                  (Events, States, BLoCs)                     │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ Repository Calls
-┌──────────────────────▼──────────────────────────────────────┐
-│                    Repository Layer                          │
-│              (Abstract Interfaces)                           │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ Implementation
-┌──────────────────────▼──────────────────────────────────────┐
-│                     Adapter Layer                            │
-│         (Backend-Specific Implementation)                    │
-└─────────────────────────────────────────────────────────────┘
+```bash
+dart pub global activate moose_cli
+moose version   # verify
 ```
 
-## Best Practices
+### Commands
 
-### DO
+| Command | Description |
+|---|---|
+| `moose version` | Print CLI version |
+| `moose init <name>` | Scaffold a new Flutter app |
+| `moose init <name> --template <name>` | Scaffold from a built-in template |
+| `moose init <name> --manifest <path\|url>` | Scaffold from a manifest file or HTTPS URL |
+| `moose plugin add <name>` | Install a plugin into `lib/plugins/<name>` |
+| `moose adapter add <name>` | Install an adapter into `lib/adapters/<name>` |
+| `moose locale add <localeCode>` | Create a new ARB localization file |
+| `moose help <command>` | Show detailed usage for a command |
 
-- Use BLoC for ALL state management
-- Extend FeatureSection for configurable sections
-- Define all settings in getDefaultSettings()
-- Use repository interfaces for data access
-- Keep plugins focused and independent
-- Use double for UI dimensions
-- Implement Equatable for Events and States
+### Flags — `moose init`
 
-### DON'T
+| Flag | Description |
+|---|---|
+| `--template <name>` | Built-in template (mutually exclusive with `--manifest`) |
+| `--manifest <path\|url>` | Custom manifest file or HTTPS URL |
+| `--configurations <path=value>` | Pre-fill `environment.json` values (repeatable) |
+| `--verbose` | Stream git output during cloning |
 
-- Use StatefulWidget with setState() for business logic
-- Make direct API calls from BLoCs or widgets
-- Hardcode values in sections
-- Put business logic in repositories
-- Return DTOs from repositories
-- Use int for UI dimensions
-- Skip BLoC pattern for stateful operations
+### Flags — `moose plugin add` / `moose adapter add`
 
-## Testing
+| Flag | Description |
+|---|---|
+| `--git <repo>` | Install from a remote git repository |
+| `--path <dir>` | Install from a local directory |
 
-The core package is designed for testability:
+### Examples
 
-```dart
-// Mock repository
-class MockProductsRepository extends Mock implements ProductsRepository {}
+```bash
+# New app from built-in template, pre-fill store URL
+moose init my_app --template shopify \
+  --configurations adapters.shopify.storeUrl=mystore.myshopify.com
 
-// Test BLoC
-blocTest<ProductsBloc, ProductsState>(
-  'emits ProductsLoaded when LoadProducts succeeds',
-  build: () => ProductsBloc(MockProductsRepository()),
-  act: (bloc) => bloc.add(LoadProducts()),
-  expect: () => [ProductsLoading(), ProductsLoaded(products)],
-);
+# Add a plugin from the official extensions repo
+moose plugin add loyalty \
+  --git https://github.com/greymooseinc/moose_extensions.git
+
+# Add an adapter from a local extensions workspace
+moose adapter add stripe --path ./extensions/lib/adapters
+
+# Add a Sinhala locale file
+moose locale add si
 ```
 
-## Contributing
+---
 
-When contributing to the core package:
+## Documentation Index
 
-1. Read [ARCHITECTURE.md](./ARCHITECTURE.md) first
-2. Follow patterns in [ANTI_PATTERNS.md](./ANTI_PATTERNS.md)
-3. Add tests for new features
-4. Update documentation
-5. Follow the plugin architecture
+### Start here
 
-## Related Documentation
+| Document | What it covers |
+|---|---|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Bootstrap sequence, DI architecture, all layers in detail |
+| [ANTI_PATTERNS.md](./ANTI_PATTERNS.md) | What NOT to do — common mistakes, violations, pitfalls |
 
-### Core Architecture
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete architectural guide
-- **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Plugin development guide
-- **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Backend adapter guide
-- **[REGISTRIES.md](./REGISTRIES.md)** - Registry systems
-- **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
+### Building features (plugins + sections)
 
-### Domain Entities
-- **[PRODUCT_SECTIONS.md](./PRODUCT_SECTIONS.md)** - Product sections comprehensive guide
-- **[../ai_agent_quick_reference.md](../ai_agent_quick_reference.md)** - Quick reference for AI agents
+| Document | What it covers |
+|---|---|
+| [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) | Full plugin lifecycle, config, routes, bottom tabs |
+| [FEATURE_SECTION.md](./FEATURE_SECTION.md) | FeatureSection pattern, getSetting coercions, AddonRegistry slots |
+| [REPOSITORIES.md](./REPOSITORIES.md) | All 11 repository interfaces and their full method signatures |
+| [ENTITY_EXTENSIONS.md](./ENTITY_EXTENSIONS.md) | CoreEntity extensions map, copyWith vs copyWithExtensions |
+
+### Building backends (adapters)
+
+| Document | What it covers |
+|---|---|
+| [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) | BackendAdapter lifecycle, registerRepositoryFactory, lazy caching |
+| [ADAPTER_SCHEMA_VALIDATION.md](./ADAPTER_SCHEMA_VALIDATION.md) | JSON Schema reference for configSchema |
+| [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) | environment.json structure, ConfigManager fallback chain |
+| [PLUGIN_ADAPTER_MANIFEST.md](./PLUGIN_ADAPTER_MANIFEST.md) | moose.manifest.json schema (tooling convention, not runtime) |
+
+### Infrastructure
+
+| Document | What it covers |
+|---|---|
+| [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, AddonRegistry, HookRegistry, ActionRegistry, EventBus |
+| [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) | EventBus vs HookRegistry decision matrix, patterns, BLoC integration |
+| [CACHE_SYSTEM.md](./CACHE_SYSTEM.md) | CacheManager, MemoryCache, PersistentCache, TTL configuration |
+| [API.md](./API.md) | Public API reference — exported classes, type definitions |
+
+---
+
+## Key Rules for AI Agents
+
+1. **Register in `onRegister()`, not `onInit()`** — widget, route, hook, and addon registration is synchronous and must happen in `onRegister()`. `onInit()` is for async work only.
+
+2. **Never call APIs from BLoCs or sections** — sections create BLoCs. BLoCs call repository methods. Repositories call the API client.
+
+3. **BLoC for all state** — `FeatureSection.build()` creates a `BlocProvider`. Never use `setState` for business logic.
+
+4. **`adaptersOf(context)` inside `build()` only** — it requires a live `BuildContext` with `MooseScope` above it.
+
+5. **`configSchema` is required on adapters** — it is abstract; omitting it is a compile error. It is validated before `initialize()` is called.
+
+6. **`configSchema` is optional on plugins** — defaults to `{'type': 'object'}`. Override it to document the plugin's configuration surface.
+
+7. **Adapter config path has no `settings` segment** — `adapters:woocommerce:timeout`, not `adapters:woocommerce:settings:timeout`.
+
+8. **Plugin config path includes `settings`** — `plugins:products:settings:display:itemsPerPage`. Use `getSetting<T>(key)` as the shortcut.
+
+9. **`moose.manifest.json` is not parsed at runtime** — it is a developer/tooling convention for `moose_cli` and AI agents to discover what a package provides.
+
+10. **Subscribe in `onInit()`/`onStart()`, unsubscribe in `onStop()`** — all `EventBus` subscriptions must be cancelled in `onStop()` to prevent memory leaks.
+
+---
 
 ## Support
 
 - GitHub Issues: https://github.com/greymooseinc/moose_core/issues
-- Documentation: https://github.com/greymooseinc/moose_core/blob/main/README.md
-- Examples: https://github.com/greymooseinc/moose_core/tree/main/example
-
----
-
-**Version:** 0.1.3
-**Last Updated:** 2026-02-18
-**License:** MIT
-
----
-
-## Instructions for AI Agents
-
-### Code Generation Best Practices
-
-This package follows industry best practices for AI-ready codebases. All architectural patterns are explicitly documented to enable consistent code generation and maintenance.
-
-### Git Workflow
-
-**IMPORTANT:** After completing a batch of file changes in response to a user request, you MUST commit the changes to git with a descriptive commit message.
-
-#### Git Commit Guidelines:
-
-1. **When to Commit:**
-   - After completing all file modifications for a single user request
-   - One commit per user prompt (not per file)
-   - Before finishing your response to the user
-
-2. **Commit Message Format:**
-   ```
-   <type>: <short description>
-
-   <optional detailed description>
-
-   🤖 Generated with Claude Code
-
-   Co-Authored-By: Claude <noreply@anthropic.com>
-   ```
-
-3. **Commit Types:**
-   - `feat:` - New features or functionality
-   - `fix:` - Bug fixes
-   - `refactor:` - Code restructuring without behavior change
-   - `docs:` - Documentation updates
-   - `test:` - Test additions or modifications
-   - `chore:` - Maintenance tasks
-
-4. **Example Commit Workflow:**
-   ```bash
-   # After making changes to multiple files
-   cd /path/to/repo
-   git add .
-   git commit -m "$(cat <<'EOF'
-   refactor: Convert EventBus to string-based events
-
-   - Removed typed event classes
-   - Updated EventBus API to use string event names
-   - Updated all plugins to use dot notation (e.g., 'cart.item.added')
-   - Updated documentation with new patterns
-
-   🤖 Generated with Claude Code
-
-   Co-Authored-By: Claude <noreply@anthropic.com>
-   EOF
-   )"
-   ```
-
-5. **What NOT to Commit:**
-   - `.claude/settings.local.json` (user-specific settings)
-   - Temporary or build files
-   - IDE-specific configuration files
-
-6. **Before Committing:**
-   - Verify changes with `git status`
-   - Check for any unintended modifications
-   - Ensure all related files are included
+- moose_cli on pub.dev: https://pub.dev/packages/moose_cli
