@@ -837,6 +837,7 @@ hookRegistry.register('hook:name', (data) {
 - [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — HookRegistry and EventBus
 - [ANTI_PATTERNS.md](./ANTI_PATTERNS.md) — Extended anti-patterns
 - [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) — Config deep-dive
+- [PLUGIN_ADAPTER_MANIFEST.md](./PLUGIN_ADAPTER_MANIFEST.md) — moose.manifest.json reference for distributable plugin packages
 
 ---
 
