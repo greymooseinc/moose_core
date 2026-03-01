@@ -1,368 +1,465 @@
-# Registry Systems Guide
-
-> Comprehensive guide to the four core registry systems: HookRegistry, WidgetRegistry, AddonRegistry, and ActionRegistry
-
-## Table of Contents
-- [Overview](#overview)
-- [HookRegistry](#hookregistry)
-- [WidgetRegistry](#widgetregistry)
-- [AddonRegistry](#addonregistry)
-- [ActionRegistry](#actionregistry)
-- [Best Practices](#best-practices)
-
----
+# Registry Systems
 
 ## Overview
 
-The application uses four registry systems to provide extensibility, modularity, and loose coupling between components. All registries are instance-based (no singletons) and owned by `MooseAppContext`. Access them in plugins via convenience getters (`hookRegistry`, `widgetRegistry`, etc.) or in widgets via `MooseScope`/`context.moose`.
+`moose_core` provides five registry systems, all owned by `MooseAppContext` and injected into plugins and adapters via convenience getters. All registries are instance-based — there are no singletons. Each `MooseAppContext` owns an independent set.
 
-| Registry | Purpose | Use When |
-|----------|---------|----------|
-| **HookRegistry** | Data transformation and event interception | Need to modify data flow without changing source code |
-| **WidgetRegistry** | Dynamic section creation and composition | Building configurable UI screens from JSON config |
-| **AddonRegistry** | Injecting optional UI widgets into named slots | Adding supplementary widgets (badges, banners, overlays) to existing sections |
-| **ActionRegistry** | User interaction handling | Processing taps, clicks, and custom actions |
+| Registry | Purpose |
+|---|---|
+| `HookRegistry` | Synchronous data transformation pipeline — modify data passing through named hook points |
+| `EventBus` | Asynchronous publish/subscribe — fire-and-forget notifications across plugins |
+| `WidgetRegistry` | Dynamic UI composition — map string keys to `FeatureSection` builders |
+| `AddonRegistry` | Slot-based UI injection — multiple plugins contribute widgets to named slots |
+| `ActionRegistry` | User interaction handling — route `UserInteraction` entities to navigation/URL/custom handlers |
+
+Access in plugins via convenience getters (`hookRegistry`, `eventBus`, `widgetRegistry`, `addonRegistry`, `actionRegistry`). Access in widgets via `context.moose.<registry>` or `MooseScope.<registry>Of(context)`.
 
 ---
 
 ## HookRegistry
 
 ### Purpose
-HookRegistry provides a **filter/action hook system** similar to WordPress hooks. It allows plugins and components to intercept and modify data at specific execution points without modifying the original code.
 
-### Location
-```
-lib/src/events/hook_registry.dart
-```
+HookRegistry implements a **synchronous filter pipeline**. A hook point is a named string. Callbacks registered on that name receive a value, transform it (or observe it), and return it. All callbacks execute in sequence; the output of each becomes the input of the next. If no callbacks are registered, the original value is returned unchanged.
 
-### Core API
+Use `HookRegistry` when:
+- A repository needs to let plugins modify or enrich data before returning it (e.g., apply price adjustments to a product)
+- A plugin needs to intercept a data flow from another plugin without direct coupling
+- Multiple transformations must compose in a defined order
+
+**Do not** use `HookRegistry` for asynchronous side effects or notifications — use `EventBus` for those.
+
+### API
 
 ```dart
 class HookRegistry {
-  HookRegistry(); // Each instance is independent
+  HookRegistry();
 
-  /// Register a hook callback
-  /// @param hookName - Name of the hook point
-  /// @param callback - Function that receives and returns data
-  /// @param priority - Execution order (higher = earlier, default: 1)
+  /// Register a callback on a named hook point.
+  /// Callbacks execute in descending priority order (highest first).
+  /// Default priority is 1.
   void register(String hookName, dynamic Function(dynamic) callback, {int priority = 1});
 
-  /// Execute all registered hooks for a hook point
-  /// @param hookName - Name of the hook point
-  /// @param data - Initial data to pass through hooks
-  /// @returns Transformed data after all hooks execute
+  /// Execute all callbacks registered on hookName, threading data through.
+  /// Returns the original data if no callbacks are registered.
+  /// Errors in individual callbacks are logged and skipped — remaining callbacks still run.
   T execute<T>(String hookName, T data);
 
-  /// Remove a specific hook callback
+  /// Remove a specific callback from a hook point (by function reference equality).
   void removeHook(String hookName, dynamic Function(dynamic) callback);
 
-  /// Clear all hooks for a hook point
+  /// Remove all callbacks from a specific hook point.
   void clearHooks(String hookName);
 
-  /// Clear all hooks
+  /// Remove all callbacks from all hook points.
   void clearAllHooks();
 
-  /// Check if a hook has any registered callbacks
+  /// Returns true if the hook point has at least one registered callback.
   bool hasHook(String hookName);
 
-  /// Get count of registered callbacks for a hook
+  /// Number of callbacks registered on a hook point.
   int getHookCount(String hookName);
 
-  /// Get all registered hook names
+  /// All currently registered hook names.
   List<String> getRegisteredHooks();
 }
 ```
 
-### Usage Examples
+### Priority
 
-#### Example 1: Modifying Product Data After Load
+Callbacks execute in **descending** priority order — higher number runs first:
 
-**Register Hook (in plugin):**
 ```dart
-class CustomPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    hookRegistry.register('product:after_load_product', (product) {
-      // Add 10% discount to all products
-      final p = product as Product;
-      return p.copyWith(price: p.price * 0.9);
-    }, priority: 10);
-  }
-}
+hookRegistry.register('product:transform', modifyPrices, priority: 20); // runs first
+hookRegistry.register('product:transform', addBadges,    priority: 10); // runs second
+hookRegistry.register('product:transform', logView,      priority: 1);  // runs last (default)
 ```
 
-**Execute Hook (in repository):**
+### Defining a hook point (in a repository)
+
+Adapters fire hooks inside repository methods to allow plugins to extend behaviour:
+
 ```dart
 class WooProductsRepository extends ProductsRepository {
-  @override
-  Future<Product> getProductById(String id) async {
-    // ... fetch product from API ...
-    Product product = WooProductMapper.toEntity(dto);
+  final HookRegistry _hooks;
 
-    // Execute hooks - allows plugins to modify product
-    product = hookRegistry.execute('product:after_load_product', product);
+  WooProductsRepository({required HookRegistry hooks}) : _hooks = hooks;
+
+  @override
+  Future<Product> getProductById(String id, {Duration? cacheTTL}) async {
+    final raw = await _client.get('/products/$id');
+    Product product = _toProduct(raw);
+
+    // Let plugins transform the product before returning it
+    product = _hooks.execute('product:transform', product);
 
     return product;
   }
 }
 ```
 
-#### Example 2: Cart Operations
+The hook name is a contract between the adapter and any plugins that want to extend it. Document hook names in the adapter's source or docs.
 
-**Register Cart Hooks:**
+### Consuming a hook point (in a plugin)
+
 ```dart
-class CartPlugin extends FeaturePlugin {
+class PromotionsPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    // Hook for adding items to cart
-    hookRegistry.register('cart:add_to_cart', (data) {
-      if (data is Map<String, dynamic>) {
-        final productId = data['product_id']?.toString();
-        final quantity = data['quantity'] as int? ?? 1;
-
-        if (productId != null) {
-          _cartBloc.add(AddToCart(
-            productId: productId,
-            quantity: quantity,
-          ));
-        }
-      }
-      return data;
-    });
-
-    // Hook to get cart item count
-    hookRegistry.register('cart:get_cart_item_count', (data) {
-      if (_cartBloc.state is CartLoaded) {
-        final state = _cartBloc.state as CartLoaded;
-        return state.cart.itemCount;
-      }
-      return 0;
-    });
+    // Apply a 10% discount to all products
+    hookRegistry.register(
+      'product:transform',
+      (product) {
+        final p = product as Product;
+        return p.copyWith(price: p.price * 0.9);
+      },
+      priority: 10,
+    );
   }
 }
-```
 
-**Trigger Cart Hooks:**
-```dart
-// From a widget: access via MooseScope
-final hookRegistry = context.moose.hookRegistry;
-
-// Add item to cart without direct dependency on CartPlugin
-hookRegistry.execute('cart:add_to_cart', {
-  'product_id': '123',
-  'quantity': 2,
-  'metadata': {'source': 'quick_add'},
-});
-
-// Get cart item count
-int itemCount = hookRegistry.execute('cart:get_cart_item_count', 0);
-```
-
-#### Example 3: Analytics Tracking
-
-```dart
 class AnalyticsPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    // Track checkout events
-    hookRegistry.register('after_checkout', (order) {
-      analytics.logPurchase(
-        orderId: order.id,
-        total: order.total,
-        items: order.items,
-      );
-      return order; // Always return data for next hook
-    });
-
-    // Track product views
-    hookRegistry.register('product:after_load_product', (product) {
-      analytics.logProductView(product.id);
-      return product;
-    }, priority: 5); // Lower priority runs later
+    // Observe product views without modifying the product
+    hookRegistry.register(
+      'product:transform',
+      (product) {
+        _analytics.logView((product as Product).id);
+        return product; // always return — even if not modified
+      },
+      priority: 1,
+    );
   }
 }
 ```
 
-### Available Hook Points
+### Hook naming convention
 
-#### Product Hooks
-- `product:before_load_products` - Modify product filters before API call
-- `product:after_load_product` - Modify product data after loading single product
-- `before_load_product_request` - Modify product ID before fetch
-- `after_load_product_response` - Modify raw API response
+Use `<domain>:<action>` dot notation for sub-paths if needed:
 
-#### Cart Hooks
-- `cart:add_to_cart` - Trigger add to cart action
-- `cart:get_cart_state` - Retrieve current cart state
-- `cart:get_cart_item_count` - Get cart item count
-- `cart:refresh_cart` - Trigger cart refresh
-- `cart:clear_cart` - Clear cart
-- `after_get_cart` - Modify cart after fetching
-- `after_add_cart_item` - Modify cart after adding item
-
-#### Checkout Hooks
-- `before_checkout` - Modify checkout request before submission
-- `after_checkout` - Process order after checkout
-
-### Hook Priority
-
-Hooks execute in **descending priority order** (highest first):
-
-```dart
-hookRegistry.register('my_hook', callback1, priority: 10); // Runs first
-hookRegistry.register('my_hook', callback2, priority: 5);  // Runs second
-hookRegistry.register('my_hook', callback3, priority: 1);  // Runs third (default)
+```
+product:transform          // transform a product entity
+cart:item.added           // observe/modify a cart item being added
+checkout:before.submit    // intercept a checkout request before submission
+bottom_tabs:filter_tabs   // built-in: modify the bottom navigation tab list
 ```
 
-### Best Practices
+Hook names are defined by the adapter or plugin that executes them — `moose_core` itself only defines `bottom_tabs:filter_tabs` (used by `PluginRegistry` for bottom navigation).
 
-✅ **DO:**
-- Always return the data (potentially modified)
-- Use descriptive hook names with namespace (e.g., `plugin:action`)
-- Document your hook points in plugin documentation
-- Handle errors gracefully - hooks continue executing even if one fails
-- Use priority to control execution order when needed
+### Built-in hook: bottom_tabs:filter_tabs
 
-❌ **DON'T:**
-- Modify data types (return same type as received)
-- Create side effects without returning data
-- Use hooks for direct widget rendering (use WidgetRegistry instead)
-- Rely on hook execution order without setting priority
+`PluginRegistry` automatically wires bottom navigation tabs declared by plugins through this hook. Plugins expose tabs via `get bottomTabs => [BottomTab(...)]` — no manual hook registration is needed. Consuming the hook to extend the tab list:
+
+```dart
+hookRegistry.register(
+  'bottom_tabs:filter_tabs',
+  (tabs) {
+    final list = List<BottomTab>.from(tabs as List<BottomTab>);
+    list.add(BottomTab(id: 'wishlist', label: 'Wishlist', route: '/wishlist'));
+    return list;
+  },
+  priority: 5,
+);
+```
+
+---
+
+## EventBus
+
+### Purpose
+
+`EventBus` implements an **asynchronous publish/subscribe** system. Events are string-named and carry a `Map<String, dynamic>` payload. Subscribers receive events on a broadcast stream — there is no return value and no ordering guarantee.
+
+Use `EventBus` when:
+- A repository or plugin needs to notify the rest of the app about something that happened (e.g., a payment completed)
+- Multiple unrelated components need to react to the same event
+- The publisher must not know who is listening
+
+**Do not** use `EventBus` to transform data — use `HookRegistry` for that.
+
+### API
+
+```dart
+class Event {
+  final String name;
+  final Map<String, dynamic> data;
+  final DateTime timestamp;
+  final Map<String, dynamic>? metadata;
+}
+
+class EventSubscription {
+  Future<void> cancel();
+  bool get isActive;
+  void pause([Future<void>? resumeSignal]);
+  void resume();
+}
+
+class EventBus {
+  EventBus();
+
+  /// Subscribe synchronously to a named event. Returns a handle for cancellation.
+  EventSubscription on(
+    String eventName,
+    void Function(Event event) onEvent, {
+    Function? onError,
+    void Function()? onDone,
+  });
+
+  /// Subscribe asynchronously — handler is a Future. Errors are caught and logged.
+  EventSubscription onAsync(
+    String eventName,
+    Future<void> Function(Event event) onEvent, {
+    Function? onError,
+    void Function()? onDone,
+  });
+
+  /// Publish an event to all current subscribers. Fire-and-forget.
+  void fire(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
+
+  /// Publish an event and await one microtask cycle before returning.
+  /// Useful when you need subscribers to have been notified before continuing.
+  Future<void> fireAndWait(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
+
+  /// Raw Stream<Event> for the named event — supports stream operators.
+  Stream<Event> stream(String eventName);
+
+  /// Cancel all subscriptions for a specific event name.
+  Future<void> cancelSubscriptionsForEvent(String eventName);
+
+  /// Cancel all active subscriptions across all events.
+  Future<void> cancelAllSubscriptions();
+
+  /// Destroy the EventBus: cancel all subscriptions and close all controllers.
+  Future<void> destroy();
+
+  /// Alias for destroy(). Useful in tests.
+  Future<void> reset();
+
+  // Introspection
+  int get activeSubscriptionCount;
+  int get registeredEventCount;
+  bool hasSubscribers(String eventName);
+  List<String> getRegisteredEvents();
+}
+```
+
+### Firing events (in a repository or adapter)
+
+```dart
+class WooCartRepository extends CartRepository {
+  final EventBus _eventBus;
+
+  WooCartRepository({required EventBus eventBus}) : _eventBus = eventBus;
+
+  @override
+  Future<Cart> addItem({required String productId, int quantity = 1, ...}) async {
+    final cart = await _client.post('/cart/add', {...});
+
+    _eventBus.fire('cart.item.added', data: {
+      'productId': productId,
+      'quantity': quantity,
+      'cartId': cart.id,
+    });
+
+    return _toCart(cart);
+  }
+}
+```
+
+### Subscribing to events (in a plugin)
+
+Store the subscription and cancel it in `onStop()` to prevent memory leaks:
+
+```dart
+class AnalyticsPlugin extends FeaturePlugin {
+  EventSubscription? _cartSubscription;
+  EventSubscription? _orderSubscription;
+
+  @override
+  void onRegister() {
+    // Sync subscription
+    _cartSubscription = eventBus.on('cart.item.added', (event) {
+      _analytics.trackAddToCart(
+        productId: event.data['productId'] as String,
+        quantity: event.data['quantity'] as int,
+      );
+    });
+
+    // Async subscription
+    _orderSubscription = eventBus.onAsync('order.placed', (event) async {
+      await _analytics.trackPurchase(event.data['orderId'] as String);
+    });
+  }
+
+  @override
+  Future<void> onStop() async {
+    await _cartSubscription?.cancel();
+    await _orderSubscription?.cancel();
+  }
+}
+```
+
+### Stream operator usage
+
+```dart
+// Debounce rapid search events
+eventBus.stream('search.query.changed')
+    .debounceTime(const Duration(milliseconds: 300))
+    .listen((event) => _performSearch(event.data['query'] as String));
+```
+
+### Event naming convention
+
+Use dot notation: `<domain>.<action>` or `<domain>.<entity>.<action>`:
+
+```
+cart.item.added
+cart.coupon.applied
+order.placed
+order.payment.completed
+user.logged.in
+user.logged.out
+search.query.changed
+notification.received
+```
+
+### HookRegistry vs EventBus
+
+| | HookRegistry | EventBus |
+|---|---|---|
+| **Return value** | Transformed data (same type) | None |
+| **Execution** | Synchronous, sequential | Asynchronous, broadcast |
+| **Ordering** | Priority-controlled | No guarantee |
+| **Use for** | Data transformation | Notifications / side effects |
+| **Multiple handlers** | Yes, all run in priority order | Yes, all receive the event |
+| **Subscription handle** | N/A | `EventSubscription` (cancel in `onStop`) |
 
 ---
 
 ## WidgetRegistry
 
 ### Purpose
-WidgetRegistry enables **dynamic widget composition** from JSON configuration. It maps string identifiers to widget builder functions, allowing UI layouts to be configured at runtime without code changes.
 
-### Location
-```
-lib/src/widgets/widget_registry.dart
-```
+`WidgetRegistry` maps string keys to `FeatureSection` builder functions. Screens call `buildSectionGroup` to render all sections declared in `environment.json` for a plugin/group combination, without any compile-time dependency on the section classes themselves.
 
-### Core API
+### API
 
 ```dart
-class WidgetRegistry {
-  WidgetRegistry(); // Each instance is independent
+typedef SectionBuilderFn = FeatureSection Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String event, dynamic payload)? onEvent,
+});
 
-  /// Register a section builder
-  /// @param name - Unique identifier for the section
-  /// @param builder - Function that builds the FeatureSection
+class WidgetRegistry {
+  WidgetRegistry();
+
+  /// Register a FeatureSection builder under a key.
   void register(String name, SectionBuilderFn builder);
 
-  /// Build a single widget by name
-  /// @param name - Widget identifier
-  /// @param context - Build context
-  /// @param data - Optional configuration data
-  /// @param onEvent - Optional event callback
-  Widget build(String name, BuildContext context, {
+  /// Build a single registered section by key.
+  /// In debug mode: returns UnknownSectionWidget if key is not registered.
+  /// In release mode: returns SizedBox.shrink() if key is not registered.
+  Widget build(
+    String name,
+    BuildContext context, {
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
   });
 
-  /// Build multiple widgets from a plugin's section group config
-  /// @param context - Build context
-  /// @param pluginName - Plugin name (matches plugin key in environment.json)
-  /// @param groupName - Section group name (e.g., 'main', 'featured')
-  /// @param data - Optional shared data passed to all sections
-  /// @param onEvent - Optional event callback passed to all sections
-  List<Widget> buildSectionGroup(BuildContext context, {
+  /// Read section configs from environment.json for pluginName/groupName,
+  /// filter to active:true entries, build each, and return the list.
+  List<Widget> buildSectionGroup(
+    BuildContext context, {
     required String pluginName,
     required String groupName,
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
   });
 
-  /// Get section configs for a plugin's group from environment.json
+  /// Read SectionConfig objects from environment.json without building.
   List<SectionConfig> getSections(String pluginName, String groupName);
 
-  /// Check if widget is registered
   bool isRegistered(String name);
-
-  /// Get all registered widget names
   List<String> getRegisteredWidgets();
-
-  /// Unregister a widget
   void unregister(String name);
 }
-
-/// Section builder function type - returns a FeatureSection (not a plain Widget)
-typedef SectionBuilderFn = FeatureSection Function(
-  BuildContext context, {
-  Map<String, dynamic>? data,
-  void Function(String event, dynamic payload)? onEvent,
-});
 ```
 
-### Usage Examples
+`SectionConfig` fields: `name` (String), `description` (String), `active` (bool, default true), `settings` (Map).
 
-#### Example 1: Registering Sections in Plugin
+`buildSectionGroup` merges each section's settings from `SectionConfig` with any additional `data` passed by the caller. Inactive sections (`active: false`) are skipped.
+
+### Registering sections (in a plugin)
+
+Register in `onRegister()` — always synchronous, always before `onInit`:
 
 ```dart
 class ProductsPlugin extends FeaturePlugin {
   @override
-  Future<void> initialize() async {
-    // Register featured products section
+  void onRegister() {
     widgetRegistry.register(
-      'product.featured_products_section',
+      'products.featured_section',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
 
-    // Register collections section
     widgetRegistry.register(
-      'product.collections_section',
-      (context, {data, onEvent}) => CollectionsSection(
+      'products.related_section',
+      (context, {data, onEvent}) => RelatedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
-      ),
-    );
-
-    // Register category section with callback
-    widgetRegistry.register(
-      'product.categories_section',
-      (context, {data, onEvent}) => CategoryListSection(
-        showTitle: true,
-        onCategorySelected: (categoryId) {
-          Navigator.pushNamed(context, '/products', arguments: categoryId);
-        },
+        productId: data?['productId'] as String?,
+        onEvent: onEvent,
       ),
     );
   }
 }
 ```
 
-#### Example 2: Building Widgets from JSON Config
+### Building a section group (in a screen)
 
-**environment.json:**
+```dart
+class HomeScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final sections = context.moose.widgetRegistry.buildSectionGroup(
+      context,
+      pluginName: 'home',
+      groupName: 'main',
+      onEvent: (event, payload) {
+        if (event == 'banner_tapped') {
+          final route = (payload as Map<String, dynamic>?)?['route'] as String?;
+          if (route != null) Navigator.pushNamed(context, route);
+        }
+      },
+    );
+
+    return Scaffold(body: ListView(children: sections));
+  }
+}
+```
+
+Corresponding environment.json:
+
 ```json
 {
   "plugins": {
     "home": {
+      "active": true,
       "sections": {
         "main": [
           {
-            "name": "product.categories_section",
-            "description": "Product categories grid",
-            "settings": {}
+            "name": "products.featured_section",
+            "description": "Featured products grid",
+            "active": true,
+            "settings": { "title": "Top Picks", "perPage": 8 }
           },
           {
-            "name": "banner_section",
-            "description": "Promotional banners",
-            "settings": {
-              "height": 200,
-              "showIndicators": true
-            }
-          },
-          {
-            "name": "product.featured_products_section",
-            "description": "Featured products carousel",
-            "settings": {
-              "title": "FEATURED PRODUCTS",
-              "perPage": 10
-            }
+            "name": "products.categories_section",
+            "description": "Category grid",
+            "active": false
           }
         ]
       }
@@ -371,198 +468,88 @@ class ProductsPlugin extends FeaturePlugin {
 }
 ```
 
-**Building the UI:**
-```dart
-class HomeScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView(
-        children: context.moose.widgetRegistry.buildSectionGroup(
-          context,
-          pluginName: 'home',
-          groupName: 'main',
-        ),
-      ),
-    );
-  }
-}
-```
-
-#### Example 3: Dynamic Widget with Event Handling
+### Building a single section
 
 ```dart
-// Register widget with event handling
-widgetRegistry.register(
-  'custom.interactive_banner',
-  (context, {data, onEvent}) {
-    return GestureDetector(
-      onTap: () {
-        // Trigger event
-        onEvent?.call('banner_clicked', {
-          'banner_id': data?['id'],
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-      },
-      child: BannerWidget(data: data),
-    );
-  },
-);
-
-// Build widget with event handler
-final widget = widgetRegistry.build(
-  'custom.interactive_banner',
+final widget = context.moose.widgetRegistry.build(
+  'products.featured_section',
   context,
-  data: {'id': 'promo_1', 'image': 'https://...'},
-  onEvent: (eventName, eventData) {
-    print('Event: $eventName, Data: $eventData');
-    // Handle event (navigation, analytics, etc.)
+  data: {
+    'settings': {'title': 'Override', 'perPage': 4},
   },
 );
 ```
 
-### Widget Naming Convention
+### Naming convention
 
-Use namespaced names to avoid conflicts:
+`<plugin_name>.<section_name>` — the plugin prefix prevents collisions:
 
 ```
-{plugin_name}.{widget_type}_{descriptor}
-
-Examples:
-- product.featured_products_section
-- product.collections_section
-- cart.mini_cart_widget
-- banner_section
-- home.hero_section
+products.featured_section
+products.categories_section
+cart.mini_cart_widget
+home.hero_section
+checkout.order_summary_section
 ```
-
-### Best Practices
-
-✅ **DO:**
-- Use descriptive, namespaced names
-- Pass configuration through `data` parameter
-- Support both data and onEvent parameters
-- Register widgets during plugin initialization
-- Document available settings for each widget
-
-❌ **DON'T:**
-- Register widgets with generic names (e.g., "list", "card")
-- Create widgets that require specific parent widgets
-- Ignore the data parameter structure
-- Register the same name twice from different plugins
 
 ---
 
 ## AddonRegistry
 
 ### Purpose
-AddonRegistry enables **slot-based UI injection** — plugins can register optional widgets into named slots that existing sections expose. Unlike WidgetRegistry (which owns the full section), AddonRegistry is for _supplementary_ content: badges, banners, overlays, or any widget added on top of an existing component.
 
-Multiple addons can be registered for the same slot; they are rendered in **descending priority order** (highest priority first). Each builder may return `null` to opt out of rendering for a particular call.
+`AddonRegistry` enables **slot-based UI injection**. A section exposes a named slot; other plugins register builders for that slot. All registered builders are called; each may return a widget or `null`. Non-null results are collected into a `List<Widget>` in descending priority order.
 
-### Location
-```
-lib/src/widgets/addon_registry.dart
-```
+Unlike `WidgetRegistry` (one builder owns a full section), `AddonRegistry` supports zero-to-many contributors per slot.
 
-### Core API
+### API
 
 ```dart
-/// Addon builder function type - may return null to skip rendering
 typedef WidgetBuilderFn = Widget? Function(
   BuildContext context, {
   Map<String, dynamic>? data,
   void Function(String event, dynamic payload)? onEvent,
 });
 
-class Addon {
-  final int priority;
-  final WidgetBuilderFn builder;
-}
-
 class AddonRegistry {
-  AddonRegistry(); // Each instance is independent
+  AddonRegistry();
 
-  /// Register an addon builder for a named slot.
-  /// @param name     - Slot identifier (e.g., 'product.card:badge')
-  /// @param builder  - Builder that returns a Widget or null
-  /// @param priority - Render order; higher = rendered first (default: 1)
-  /// Duplicate builders (same function reference) for the same slot are ignored.
+  /// Register a builder for a named slot.
+  /// Duplicate builder references for the same slot are silently ignored.
   void register(String name, WidgetBuilderFn builder, {int priority = 1});
 
-  /// Build all addons for a named slot.
-  /// Returns a list of non-null widgets in priority order.
-  /// Builder errors are caught and logged; other addons continue rendering.
+  /// Call all builders for the slot; collect non-null results in priority order.
+  /// Builder errors are caught and logged; other builders continue running.
   List<Widget> build<T>(String name, BuildContext context, {
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
   });
 
-  /// Remove a specific builder from a slot
+  /// Remove a specific builder from a slot (by function reference equality).
   void removeAddon(String name, WidgetBuilderFn builder);
 
-  /// Remove all builders from a slot
+  /// Remove all builders from a slot.
   void clearAddons(String name);
 
-  /// Remove all builders from all slots
+  /// Remove all builders from all slots.
   void clearAllAddons();
 
-  /// Get all registered slot names
+  /// All registered slot names.
   List<String> getRegisteredAddons();
 
-  /// Count of registered builders for a slot
+  /// Count of builders registered for a slot.
   int getAddonCount(String name);
 
-  /// Whether a slot has at least one registered builder
+  /// True if a slot has at least one registered builder.
   bool hasAddon(String name);
 }
 ```
 
-### Key Differences from WidgetRegistry
+### Exposing a slot (in a section)
 
-| | WidgetRegistry | AddonRegistry |
-|---|---|---|
-| **Returns** | Single `Widget` | `List<Widget>` (zero or more) |
-| **Builder return** | Always a `FeatureSection` | `Widget?` (null = skip) |
-| **Multiple registrations** | Not recommended (last wins) | Designed for multiple (priority-ordered) |
-| **Use case** | Full section owning a screen area | Supplementary widgets injected into slots |
-
-### Usage Examples
-
-#### Example 1: Adding a Sale Badge to Product Cards
-
-**Register the addon (in plugin):**
-```dart
-class PromotionsPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    // Inject a sale badge into every product card that shows a product on sale
-    addonRegistry.register(
-      'product.card:badge',
-      (context, {data, onEvent}) {
-        final product = data?['product'] as Product?;
-        if (product == null || !product.onSale) return null; // opt out
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text('SALE', style: TextStyle(color: Colors.white, fontSize: 10)),
-        );
-      },
-      priority: 10,
-    );
-  }
-}
-```
-
-**Render the slot (in the section/widget):**
 ```dart
 class ProductCard extends StatelessWidget {
   final Product product;
-  const ProductCard({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -587,478 +574,350 @@ class ProductCard extends StatelessWidget {
 }
 ```
 
-#### Example 2: Priority-Ordered Addons
+### Contributing to a slot (in a plugin)
+
+Register in `onRegister()`:
 
 ```dart
-// Register multiple addons for the same slot with different priorities
-addonRegistry.register(
-  'checkout:summary_extras',
-  (context, {data, onEvent}) => LoyaltyPointsWidget(data: data),
-  priority: 20, // renders first
-);
+class PromotionsPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    addonRegistry.register(
+      'product.card:badge',
+      (context, {data, onEvent}) {
+        final product = data?['product'] as Product?;
+        if (product == null || !product.onSale) return null; // opt out
 
-addonRegistry.register(
-  'checkout:summary_extras',
-  (context, {data, onEvent}) => GiftMessageWidget(data: data),
-  priority: 10, // renders second
-);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text('SALE', style: TextStyle(color: Colors.white, fontSize: 10)),
+        );
+      },
+      priority: 10,
+    );
+  }
+}
 
-// Render all - returns [LoyaltyPointsWidget, GiftMessageWidget]
-final extras = context.moose.addonRegistry.build('checkout:summary_extras', context);
+class LoyaltyPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    addonRegistry.register(
+      'product.card:badge',
+      (context, {data, onEvent}) {
+        final product = data?['product'] as Product?;
+        final points = product?.getExtension<int>('loyalty_points');
+        if (points == null || points == 0) return null;
+
+        return LoyaltyBadge(points: points);
+      },
+      priority: 5, // renders after sale badge
+    );
+  }
+}
 ```
 
-#### Example 3: Conditional Rendering with Null
+### Slot naming convention
 
-```dart
-addonRegistry.register(
-  'product.card:overlay',
-  (context, {data, onEvent}) {
-    final product = data?['product'] as Product?;
-    // Return null when condition isn't met - this addon is skipped entirely
-    if (product == null || product.inStock) return null;
-
-    return const OutOfStockOverlay();
-  },
-);
-```
-
-### Slot Naming Convention
-
-Use namespaced dot-notation with a colon separating the component from the slot:
+`<component>:<slot>` or `<plugin>.<component>:<slot>`:
 
 ```
-{plugin_or_component}.{widget_name}:{slot_name}
-
-Examples:
-- product.card:badge          // badge slot on product cards
-- product.card:overlay        // overlay slot on product cards
-- cart.item:actions           // extra action buttons on cart items
-- checkout:summary_extras     // extra rows in checkout summary
-- home.hero:overlay           // overlay on the hero section
+product.card:badge        // badge slot on product cards
+product.card:overlay      // overlay slot on product cards
+cart.item:actions         // action button slot on cart line items
+checkout:summary.extras   // extra rows in the checkout summary
+pdp:above.price           // slot above the price on the product detail page
+home.hero:overlay         // overlay on the home hero section
 ```
 
-### Best Practices
+### WidgetRegistry vs AddonRegistry
 
-✅ **DO:**
-- Return `null` when the addon should not render (e.g., condition not met)
-- Use namespaced slot names to avoid conflicts between plugins
-- Use priority to control render order when multiple addons share a slot
-- Keep addon builders lightweight — they may be called on every rebuild
-- Register addons in `onRegister()` (not `initialize()`)
-
-❌ **DON'T:**
-- Use AddonRegistry to own a full section area — use WidgetRegistry for that
-- Register the same builder function reference twice (silently ignored)
-- Throw exceptions from builders — return `null` instead to skip gracefully
-- Assume any addon will be present — always guard with `hasAddon()` or check list length
+| | WidgetRegistry | AddonRegistry |
+|---|---|---|
+| Returns | Single `Widget` | `List<Widget>` (zero or more) |
+| Builder return type | `FeatureSection` (never null) | `Widget?` (null = skip) |
+| Multiple registrations | Last registered wins | All registered run, priority-ordered |
+| Owns the area | Yes — owns a full section | No — supplements an existing section |
+| Configured in JSON | Yes (`environment.json` sections) | No |
 
 ---
 
 ## ActionRegistry
 
 ### Purpose
-ActionRegistry provides a **centralized system for handling user interactions** such as taps, clicks, and custom actions. It enables declarative action definitions and extensible custom action handlers.
 
-### Location
-```
-lib/src/actions/action_registry.dart
-```
+`ActionRegistry` handles `UserInteraction` entities — the standard way entities in `moose_core` carry tap/action data. It dispatches to the correct handler based on `UserInteractionType`:
 
-### Core API
+- `internal` → `AppNavigator.pushNamed` with the route and parameters
+- `external` → external URL handler (default: shows a SnackBar; override in production with `url_launcher`)
+- `custom` → a custom handler registered with `registerCustomHandler`
+- `none` → no-op
+
+### UserInteraction and UserInteractionType
 
 ```dart
-class ActionRegistry {
-  ActionRegistry(); // Each instance is independent
+enum UserInteractionType { internal, external, custom, none }
 
-  /// Register a custom action handler
-  /// @param actionId - Unique identifier for the action
-  /// @param handler - Function that executes the action
-  void registerCustomHandler(String actionId, CustomActionHandler handler);
+class UserInteraction {
+  final UserInteractionType interactionType;
+  final String? route;          // for internal
+  final String? url;            // for external
+  final Map<String, dynamic>? parameters;
+  final String? customActionId; // for custom
 
-  /// Handle a user interaction
-  /// @param context - Build context
-  /// @param interaction - User interaction definition
-  void handleInteraction(BuildContext context, UserInteraction? interaction);
+  // Factory constructors:
+  factory UserInteraction.internal({required String route, Map<String, dynamic>? parameters});
+  factory UserInteraction.external({required String url, Map<String, dynamic>? parameters});
+  factory UserInteraction.custom({required String actionId, Map<String, dynamic>? parameters});
+  factory UserInteraction.none();
 
-  /// Check if custom handler is registered
-  bool hasCustomHandler(String actionId);
-
-  /// Get all registered custom action IDs
-  List<String> getRegisteredActions();
-
-  /// Unregister a custom action handler
-  void unregisterCustomHandler(String actionId);
+  bool get isValid; // false for invalid state (e.g. internal with no route)
 }
+```
 
-/// Custom action handler function type
+### API
+
+```dart
 typedef CustomActionHandler = void Function(
   BuildContext context,
   Map<String, dynamic>? parameters,
 );
-```
 
-### UserInteraction Entity
+class ActionRegistry {
+  ActionRegistry();
 
-```dart
-enum UserInteractionType {
-  internalNavigation,  // Navigate to app route
-  externalUrl,         // Open external URL
-  customAction,        // Execute custom handler
-  none,               // No action
-}
+  /// Register a handler for a custom action ID. Last registration wins.
+  void registerCustomHandler(String actionId, CustomActionHandler handler);
 
-class UserInteraction {
-  final UserInteractionType interactionType;
-  final String? route;              // For internalNavigation
-  final String? url;                // For externalUrl
-  final Map<String, dynamic>? parameters;
-  final String? customActionId;     // For customAction
+  /// Register multiple handlers at once.
+  void registerMultipleHandlers(Map<String, CustomActionHandler> handlers);
 
-  // Factory constructors for common patterns
-  factory UserInteraction.navigate({
-    required String route,
-    Map<String, dynamic>? parameters,
-  });
+  /// Unregister a custom action handler.
+  void unregisterCustomHandler(String actionId);
 
-  factory UserInteraction.openUrl({
-    required String url,
-  });
+  /// Remove all custom handlers.
+  void clearCustomHandlers();
 
-  factory UserInteraction.custom({
-    required String actionId,
-    Map<String, dynamic>? parameters,
-  });
+  /// Dispatch a UserInteraction to the appropriate handler.
+  /// Null or invalid interactions are silently ignored.
+  void handleInteraction(BuildContext context, UserInteraction? interaction);
 
-  factory UserInteraction.none();
+  bool hasCustomHandler(String actionId);
+  List<String> getRegisteredHandlers();
 }
 ```
 
-### Usage Examples
-
-#### Example 1: Built-in Navigation Actions
+### Registering custom handlers (in a plugin)
 
 ```dart
-// Define action in entity
-class Collection {
-  final String id;
-  final String title;
-  final UserInteraction? action;
-
-  const Collection({
-    required this.id,
-    required this.title,
-    this.action,
-  });
-}
-
-// Create collection with navigation action
-final collection = Collection(
-  id: '1',
-  title: 'Summer Sale',
-  action: UserInteraction.navigate(
-    route: '/products',
-    parameters: {'categoryId': 'summer'},
-  ),
-);
-
-// Handle tap in widget
-GestureDetector(
-  onTap: () {
-    context.moose.actionRegistry.handleInteraction(context, collection.action);
-  },
-  child: CollectionCard(collection: collection),
-)
-```
-
-#### Example 2: External URL Actions
-
-```dart
-// Open external link
-final action = UserInteraction.openUrl(
-  url: 'https://example.com/promo',
-);
-
-context.moose.actionRegistry.handleInteraction(context, action);
-```
-
-#### Example 3: Custom Action Handlers
-
-**Register Custom Handler (in plugin — use `actionRegistry` convenience getter):**
-```dart
-class CameraPlugin extends FeaturePlugin {
+class DeepLinkPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    // Register camera action via injected actionRegistry
-    actionRegistry.registerCustomHandler('open_camera', (context, params) {
-      final mode = params?['mode'] ?? 'photo';
-      Navigator.pushNamed(context, '/camera', arguments: {'mode': mode});
+    actionRegistry.registerCustomHandler('open_filter', (context, params) {
+      final categoryId = params?['categoryId'] as String?;
+      Navigator.pushNamed(context, '/filter', arguments: {'categoryId': categoryId});
     });
 
-    // Register share action
-    actionRegistry.registerCustomHandler('share', (context, params) async {
-      final content = params?['content'] ?? '';
-      await Share.share(content);
+    actionRegistry.registerCustomHandler('show_loyalty_modal', (context, params) {
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => LoyaltyModal(tier: params?['tier'] as String?),
+      );
+    });
+
+    // Register multiple at once
+    actionRegistry.registerMultipleHandlers({
+      'share_product': (context, params) => _shareProduct(context, params),
+      'add_to_wishlist': (context, params) => _addToWishlist(context, params),
     });
   }
 }
 ```
 
-**Use Custom Action:**
-```dart
-// Define custom action
-final action = UserInteraction.custom(
-  actionId: 'open_camera',
-  parameters: {'mode': 'video'},
-);
+### Dispatching interactions (in a widget)
 
-// Execute action
+```dart
 GestureDetector(
-  onTap: () => context.moose.actionRegistry.handleInteraction(context, action),
-  child: CameraButton(),
+  onTap: () => context.moose.actionRegistry.handleInteraction(context, item.action),
+  child: CollectionCard(item: item),
 )
 ```
 
-#### Example 4: Collection with Multiple Action Types
+### Building UserInteraction in adapters
 
 ```dart
-// Navigation action
-final navCollection = Collection(
-  id: '1',
-  title: 'New Arrivals',
-  action: UserInteraction.navigate(
-    route: '/products',
-    parameters: {'filter': 'new'},
-  ),
-);
+// Internal navigation (goes through AppNavigator.pushNamed)
+UserInteraction.internal(
+  route: '/products',
+  parameters: {'categoryId': 'summer', 'filter': 'new'},
+)
 
-// External URL action
-final urlCollection = Collection(
-  id: '2',
-  title: 'Blog',
-  action: UserInteraction.openUrl(
-    url: 'https://blog.example.com',
-  ),
-);
+// External URL
+UserInteraction.external(url: 'https://blog.example.com/summer-sale')
 
-// Custom action
-final customCollection = Collection(
-  id: '3',
-  title: 'Share App',
-  action: UserInteraction.custom(
-    actionId: 'share',
-    parameters: {
-      'content': 'Check out this amazing app!',
-      'url': 'https://app.example.com',
-    },
-  ),
-);
+// Custom action (handler must be registered first)
+UserInteraction.custom(
+  actionId: 'show_loyalty_modal',
+  parameters: {'tier': 'gold'},
+)
 
-// No action
-final staticCollection = Collection(
-  id: '4',
-  title: 'Coming Soon',
-  action: UserInteraction.none(),
-);
+// Explicitly no action
+UserInteraction.none()
 ```
-
-### Available Custom Action Examples
-
-Register these inside a plugin's `onRegister()` via the `actionRegistry` convenience getter:
-
-```dart
-// Payment action
-actionRegistry.registerCustomHandler('process_payment', (context, params) {
-  final amount = params?['amount'] as double?;
-  final paymentMethod = params?['method'] as String?;
-  // Process payment...
-});
-
-// Analytics action
-actionRegistry.registerCustomHandler('track_event', (context, params) {
-  final eventName = params?['event'] as String?;
-  final properties = params?['properties'] as Map<String, dynamic>?;
-  analytics.logEvent(eventName, properties);
-});
-
-// Deep link action
-actionRegistry.registerCustomHandler('deep_link', (context, params) {
-  final url = params?['url'] as String?;
-  DeepLinkHandler.handle(url);
-});
-
-// Modal action
-actionRegistry.registerCustomHandler('show_modal', (context, params) {
-  final modalType = params?['type'] as String?;
-  showModalBottomSheet(
-    context: context,
-    builder: (context) => CustomModal(type: modalType),
-  );
-});
-```
-
-### Best Practices
-
-✅ **DO:**
-- Use descriptive action IDs
-- Provide parameter validation in custom handlers
-- Handle errors gracefully in custom handlers
-- Document available parameters for custom actions
-- Use factory constructors for common patterns
-- Return early for `null` or `none` interactions
-
-❌ **DON'T:**
-- Perform async operations without proper error handling
-- Assume parameters exist without null checks
-- Register multiple handlers with same actionId
-- Execute actions without BuildContext when needed
-- Ignore the interaction type
 
 ---
 
-## Best Practices
+## Accessing Registries
 
-### Registry Selection Guide
-
-**Use HookRegistry when:**
-- You need to modify data flow between components
-- You want plugins to extend functionality without code changes
-- You need multiple handlers to process the same data
-- Order of execution matters
-
-**Use WidgetRegistry when:**
-- Building UI from configuration files
-- Creating plugin-based section systems
-- Supporting runtime UI composition
-- Need dynamic section selection
-
-**Use AddonRegistry when:**
-- Injecting supplementary widgets into slots exposed by existing sections
-- Multiple plugins need to contribute to the same UI area (badges, overlays, extras)
-- The additions are optional — builders can return null to opt out
-- You need priority-ordered rendering of multiple injected widgets
-
-**Use ActionRegistry when:**
-- Handling user interactions (taps, clicks)
-- Supporting multiple action types (navigation, URLs, custom)
-- Want declarative action definitions
-- Need extensible custom action handlers
-
-### Common Patterns
-
-#### Pattern 1: Plugin Registration
+### From a plugin (via convenience getters)
 
 ```dart
 class MyPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    // Register hooks first (low-level)
-    hookRegistry.register('my_plugin:data_transform', _transformData);
-
-    // Register custom actions (mid-level)
-    actionRegistry.registerCustomHandler('my_action', _handleAction);
-  }
-
-  @override
-  Future<void> initialize() async {
-    // Register widgets last (high-level)
-    widgetRegistry.register('my_plugin.section', _buildSection);
+    hookRegistry.register('...', ...);
+    widgetRegistry.register('...', ...);
+    addonRegistry.register('...', ...);
+    actionRegistry.registerCustomHandler('...', ...);
+    eventBus.on('...', (event) { ... });
   }
 }
 ```
 
-#### Pattern 2: Cross-Plugin Communication
+### From a widget (via context.moose)
 
 ```dart
-// Plugin A - Exposes hook
-class PluginA extends FeaturePlugin {
-  Future<Data> loadData() async {
-    Data data = await _fetchData();
+context.moose.hookRegistry
+context.moose.widgetRegistry
+context.moose.addonRegistry
+context.moose.actionRegistry
+context.moose.eventBus
+```
 
-    // Allow other plugins to modify data
-    data = hookRegistry.execute('plugin_a:after_load_data', data);
+### From a repository (via constructor injection)
 
-    return data;
-  }
-}
+Repositories receive registries from the adapter's factory closure:
 
-// Plugin B - Modifies data from Plugin A
-class PluginB extends FeaturePlugin {
-  @override
-  void onRegister() {
-    hookRegistry.register('plugin_a:after_load_data', (data) {
-      // Enhance data from Plugin A
-      return enhanceData(data);
-    });
-  }
+```dart
+// In the adapter
+registerRepositoryFactory<ProductsRepository>(
+  () => WooProductsRepository(
+    _client,
+    hooks: hookRegistry,
+    eventBus: eventBus,
+  ),
+);
+
+// In the repository class
+class WooProductsRepository extends ProductsRepository {
+  final HookRegistry _hooks;
+  final EventBus _eventBus;
+
+  WooProductsRepository(this._client, {
+    required HookRegistry hooks,
+    required EventBus eventBus,
+  }) : _hooks = hooks,
+       _eventBus = eventBus;
 }
 ```
 
-#### Pattern 3: Event-Driven Architecture
+---
+
+## Testing
+
+### HookRegistry
 
 ```dart
-// Trigger events through hooks
-hookRegistry.execute('user:logged_in', userId);
-hookRegistry.execute('cart:item_added', cartItem);
-hookRegistry.execute('order:completed', order);
+test('hooks transform data in priority order', () {
+  final registry = HookRegistry();
 
-// Handle events in plugins
-class AnalyticsPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    hookRegistry.register('user:logged_in', (userId) {
-      analytics.logLogin(userId);
-      return userId;
-    });
+  registry.register('test', (v) => (v as int) + 10, priority: 20);
+  registry.register('test', (v) => (v as int) * 2,  priority: 10);
 
-    hookRegistry.register('cart:item_added', (item) {
-      analytics.logAddToCart(item);
-      return item;
-    });
-  }
-}
-```
-
-### Testing
-
-```dart
-// Test hook registration
-test('hook modifies data correctly', () {
-  final hookRegistry = HookRegistry();
-
-  hookRegistry.register('test_hook', (value) => value * 2);
-
-  final result = hookRegistry.execute('test_hook', 5);
-
-  expect(result, equals(10));
+  // priority 20 runs first: 5 + 10 = 15, then * 2 = 30
+  expect(registry.execute('test', 5), equals(30));
 });
 
-// Test widget registration
-test('widget builds correctly', () {
-  final widgetRegistry = WidgetRegistry();
+test('execute returns original value when no hooks registered', () {
+  final registry = HookRegistry();
+  expect(registry.execute('unused', 42), equals(42));
+});
+```
 
-  widgetRegistry.register('test_widget', (context, {data, onEvent}) {
-    return MySection(settings: data?['settings']);
-  });
+### EventBus
 
-  final widget = widgetRegistry.build('test_widget', context,
-    data: {'title': 'Test'});
+```dart
+test('on() receives fired events', () async {
+  final bus = EventBus();
+  final received = <Event>[];
 
-  expect(widget, isA<Text>());
+  bus.on('test.event', received.add);
+  bus.fire('test.event', data: {'key': 'value'});
+
+  await Future.delayed(Duration.zero);
+  expect(received.length, equals(1));
+  expect(received.first.data['key'], equals('value'));
+
+  await bus.reset();
+});
+```
+
+### WidgetRegistry
+
+```dart
+test('build returns UnknownSectionWidget for missing key in debug', () {
+  final registry = WidgetRegistry();
+  // In debug mode, building an unregistered key returns UnknownSectionWidget
+  // rather than throwing — inspect with isA<UnknownSectionWidget>()
 });
 
-// Test action handling — create an independent ActionRegistry instance
-test('action executes custom handler', () {
-  final actionRegistry = ActionRegistry(); // independent instance, not a singleton
-  var executed = false;
+test('isRegistered returns false before register', () {
+  final registry = WidgetRegistry();
+  expect(registry.isRegistered('some.section'), isFalse);
+});
+```
 
-  actionRegistry.registerCustomHandler('test_action', (context, params) {
-    executed = true;
+### AddonRegistry
+
+```dart
+test('build returns only non-null results', () {
+  final registry = AddonRegistry();
+
+  registry.register('slot', (ctx, {data, onEvent}) => const Text('A'), priority: 10);
+  registry.register('slot', (ctx, {data, onEvent}) => null, priority: 5);
+  registry.register('slot', (ctx, {data, onEvent}) => const Text('C'), priority: 1);
+
+  // Requires a real BuildContext — use flutter_test's tester
+});
+
+test('getAddonCount returns correct count', () {
+  final registry = AddonRegistry();
+  registry.register('slot', (ctx, {data, onEvent}) => null);
+  registry.register('slot', (ctx, {data, onEvent}) => null);
+  expect(registry.getAddonCount('slot'), equals(2));
+});
+```
+
+### ActionRegistry
+
+```dart
+test('handleInteraction calls registered custom handler', () {
+  final registry = ActionRegistry();
+  var called = false;
+
+  registry.registerCustomHandler('my_action', (context, params) {
+    called = true;
   });
 
-  final interaction = UserInteraction.custom(actionId: 'test_action');
-  actionRegistry.handleInteraction(context, interaction);
+  // handleInteraction requires BuildContext — use pumpWidget in widget tests
+});
 
-  expect(executed, isTrue);
+test('hasCustomHandler returns false before registration', () {
+  final registry = ActionRegistry();
+  expect(registry.hasCustomHandler('not_registered'), isFalse);
 });
 ```
 
@@ -1066,54 +925,42 @@ test('action executes custom handler', () {
 
 ## Quick Reference
 
-### HookRegistry
 ```dart
-// Register
-hookRegistry.register('hook_name', callback, priority: 10);
+// HookRegistry
+hookRegistry.register('hook:name', callback, priority: 10);
+T result = hookRegistry.execute('hook:name', data);
+bool exists = hookRegistry.hasHook('hook:name');
 
-// Execute
-result = hookRegistry.execute('hook_name', data);
+// EventBus
+final sub = eventBus.on('event.name', (event) { ... });
+eventBus.onAsync('event.name', (event) async { ... });
+eventBus.fire('event.name', data: {'key': 'value'});
+await eventBus.fireAndWait('event.name', data: {...});
+await sub.cancel(); // in onStop()
 
-// Check
-bool exists = hookRegistry.hasHook('hook_name');
+// WidgetRegistry
+widgetRegistry.register('plugin.section_name', (ctx, {data, onEvent}) => MySection(...));
+Widget w = widgetRegistry.build('plugin.section_name', ctx, data: {...});
+List<Widget> ws = widgetRegistry.buildSectionGroup(ctx, pluginName: 'home', groupName: 'main');
+bool exists = widgetRegistry.isRegistered('plugin.section_name');
+
+// AddonRegistry
+addonRegistry.register('component:slot', builder, priority: 10);
+List<Widget> addons = addonRegistry.build('component:slot', ctx, data: {...});
+bool has = addonRegistry.hasAddon('component:slot');
+
+// ActionRegistry
+actionRegistry.registerCustomHandler('action_id', (ctx, params) { ... });
+actionRegistry.handleInteraction(ctx, userInteraction);
+bool has = actionRegistry.hasCustomHandler('action_id');
 ```
 
-### WidgetRegistry
-```dart
-// Register
-widgetRegistry.register('widget_name', builder);
+---
 
-// Build single section
-widget = widgetRegistry.build('widget_name', context, data: {...});
+## Related
 
-// Build all sections in a plugin group
-widgets = widgetRegistry.buildSectionGroup(context, pluginName: 'home', groupName: 'main');
-
-// Check
-bool exists = widgetRegistry.isRegistered('widget_name');
-```
-
-### AddonRegistry
-```dart
-// Register (in plugin onRegister())
-addonRegistry.register('slot.name:zone', builder, priority: 10);
-
-// Build all addons for a slot (in widget — via MooseScope)
-List<Widget> addons = context.moose.addonRegistry.build('slot.name:zone', context, data: {...});
-
-// Check
-bool exists = context.moose.addonRegistry.hasAddon('slot.name:zone');
-int count = context.moose.addonRegistry.getAddonCount('slot.name:zone');
-```
-
-### ActionRegistry
-```dart
-// Register (in plugin onRegister())
-actionRegistry.registerCustomHandler('action_id', handler);
-
-// Handle (in widget — via MooseScope)
-context.moose.actionRegistry.handleInteraction(context, interaction);
-
-// Check
-bool exists = context.moose.actionRegistry.hasCustomHandler('action_id');
-```
+- [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — Plugin lifecycle and how registries are used from plugins
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — How adapters pass registries to repository constructors
+- [FEATURE_SECTION.md](./FEATURE_SECTION.md) — FeatureSection and AddonRegistry slot integration
+- [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — Extended EventBus and HookRegistry patterns
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall layer structure
