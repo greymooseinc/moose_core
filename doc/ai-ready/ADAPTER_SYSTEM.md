@@ -1,4 +1,4 @@
-# Adapter Pattern Guide
+# Adapter System Guide
 
 > Complete guide to implementing backend adapters in moose_core
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-The Adapter Pattern decouples business logic from backend specifics. Each backend (WooCommerce, Shopify, a custom REST API, etc.) is wrapped in a `BackendAdapter` subclass. The adapter registers lazy factories for each repository type it supports. Plugins and UI sections access repositories through type-safe calls on `AdapterRegistry` — they never depend on any concrete adapter class.
+The Adapter System decouples business logic from backend specifics. Each backend (WooCommerce, Shopify, a custom REST API, etc.) is wrapped in a `BackendAdapter` subclass. The adapter registers lazy factories for each repository type it supports. Plugins and UI sections access repositories through type-safe calls on `AdapterRegistry` — they never depend on any concrete adapter class.
 
 **Core objects:**
 
