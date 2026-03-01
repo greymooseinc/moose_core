@@ -1,408 +1,276 @@
-# Entity Extensions Guide for AI Agents
+# Entity Extensions
 
-> **Quick Reference**: How to use the `extensions` field in core entities to store backend-specific data without modifying entity definitions
+## Overview
 
-## TL;DR
+Every domain entity in `moose_core` extends `CoreEntity`, which provides an `extensions` field (`Map<String, dynamic>?`). This is the standard mechanism for adapters to carry backend-specific or platform-specific data alongside an entity — without subclassing, modifying core, or creating parallel entity hierarchies.
 
-All core entities extend from `CoreEntity` which provides an `extensions` field (`Map<String, dynamic>?`) that allows storing platform-specific data from different backends (WooCommerce, Shopify, custom APIs) without needing to modify or extend the entity classes.
+**The rule**: if the data is universal to all backends, it belongs in a core field. If it is specific to one backend or feature, it belongs in `extensions`.
 
-**CoreEntity** provides a type-safe helper method to access extensions data:
-- `getExtension<T>(key)` - Get an extension value with type casting
+---
 
-```dart
-// Use core entities directly - no need to create custom entities
-final product = Product(
-  id: '123',
-  name: 'T-Shirt',
-  price: 29.99,
-  extensions: {
-    'woocommerce': {
-      'weight': '0.5',
-      'dimensions': {'length': '10', 'width': '8', 'height': '2'},
-      'shipping_class': 'standard',
-    },
-    'shopify': {
-      'handle': 'cool-t-shirt',
-      'vendor': 'Cool Brand',
-      'tags': ['summer', 'casual'],
-    },
-    'custom_data': {
-      'internal_sku': 'TSHIRT-001',
-      'warehouse_location': 'A-12',
-    },
-  },
-);
-```
-
-## Core Entity Base Class
-
-All core entities extend from `CoreEntity`, which provides the `extensions` field and a type-safe getter:
+## CoreEntity Base
 
 ```dart
+@immutable
 abstract class CoreEntity extends Equatable {
   final Map<String, dynamic>? extensions;
 
   const CoreEntity({this.extensions});
 
-  // Type-safe getter for extensions
-  T? getExtension<T>(String key);
-}
-```
-
-## What is the Extensions Field?
-
-The `extensions` field is a `Map<String, dynamic>?` property inherited from `CoreEntity` and available on all core entities:
-- **Product**
-- **Category**
-- **Cart** & **CartItem**
-- **Order** & **OrderLineItem**
-- **User**
-- **ProductVariation**
-- **ProductAttribute**
-- **ProductReview**
-- **Collection**
-- **Post**
-- **SearchResult**
-- And all other core entities
-
-### Purpose
-
-Store backend-specific or custom data that doesn't fit into the standard entity fields, allowing you to:
-- ✅ Use core entities without creating custom subclasses
-- ✅ Support multiple backends with different data requirements
-- ✅ Add platform-specific features without modifying core
-- ✅ Maintain clean separation between core and adapter logic
-
-## When to Use Extensions
-
-### ✅ DO Use Extensions For:
-
-1. **Backend-Specific Data**
-   ```dart
-   extensions: {
-     'woocommerce': {
-       'permalink': 'https://store.com/product/123',
-       'tax_class': 'standard',
-       'shipping_class_id': '5',
-     },
-   }
-   ```
-
-2. **Custom Business Logic Data**
-   ```dart
-   extensions: {
-     'loyalty_points': 150,
-     'membership_tier': 'gold',
-     'last_purchased': '2025-01-15',
-   }
-   ```
-
-3. **Additional Metadata Not in Core**
-   ```dart
-   extensions: {
-     'seo': {
-       'meta_title': 'Best T-Shirt Ever',
-       'meta_description': '...',
-       'keywords': ['tshirt', 'fashion'],
-     },
-   }
-   ```
-
-4. **Adapter-Specific IDs**
-   ```dart
-   extensions: {
-     'shopify_variant_id': 'gid://shopify/ProductVariant/123',
-     'stripe_price_id': 'price_1ABC123',
-   }
-   ```
-
-### ❌ DON'T Use Extensions For:
-
-1. **Data That Should Be Core Fields**
-   ```dart
-   // ❌ BAD - price should be a core field (and it is!)
-   extensions: {
-     'price': 29.99,
-   }
-
-   // ✅ GOOD - use core fields
-   price: 29.99,
-   ```
-
-2. **Large Binary Data**
-   ```dart
-   // ❌ BAD - don't store images as base64
-   extensions: {
-     'image_base64': 'data:image/png;base64,iVBORw0...',
-   }
-
-   // ✅ GOOD - use URLs
-   images: ['https://cdn.example.com/image.png'],
-   ```
-
-3. **Sensitive Information**
-   ```dart
-   // ❌ BAD - don't store sensitive data
-   extensions: {
-     'credit_card': '4111-1111-1111-1111',
-     'password': 'secret123',
-   }
-   ```
-
-## Using Extensions in Adapters
-
-### Pattern 1: Storing Backend-Specific Data
-
-```dart
-class WooProductsRepository extends CoreRepository implements ProductsRepository {
-  @override
-  Future<Product> getProductById(String id) async {
-    final wooProduct = await _apiClient.get('/products/$id');
-
-    return Product(
-      id: wooProduct['id'].toString(),
-      name: wooProduct['name'],
-      price: double.parse(wooProduct['price']),
-      images: (wooProduct['images'] as List).map((i) => i['src'] as String).toList(),
-      // ... other core fields
-
-      extensions: {
-        'woocommerce': {
-          'permalink': wooProduct['permalink'],
-          'tax_status': wooProduct['tax_status'],
-          'tax_class': wooProduct['tax_class'],
-          'weight': wooProduct['weight'],
-          'dimensions': wooProduct['dimensions'],
-          'shipping_class': wooProduct['shipping_class'],
-          'shipping_class_id': wooProduct['shipping_class_id'],
-          'reviews_allowed': wooProduct['reviews_allowed'],
-          'purchase_note': wooProduct['purchase_note'],
-          'menu_order': wooProduct['menu_order'],
-        },
-      },
-    );
+  T? getExtension<T>(String key) {
+    if (extensions == null) return null;
+    final value = extensions![key];
+    if (value == null) return null;
+    return value as T?;
   }
 }
 ```
 
-### Pattern 2: Reading Extensions Data
+`getExtension<T>(key)` performs a typed cast. It returns `null` if `extensions` is null or the key is absent.
+
+---
+
+## Which Entities Have Extensions
+
+All entities that extend `CoreEntity` carry the `extensions` field. The following table shows every entity in the package and its base class:
+
+| Entity | Extends | Has `extensions` |
+|---|---|---|
+| `Product` | `CoreEntity` | Yes |
+| `ProductVariation` | `CoreEntity` | Yes |
+| `ProductAttribute` | `CoreEntity` | Yes |
+| `ProductReview` | `CoreEntity` | Yes |
+| `Category` | `CoreEntity` | Yes |
+| `Collection` | `CoreEntity` | Yes |
+| `Cart` | `CoreEntity` | Yes |
+| `CartItem` | `CoreEntity` | Yes |
+| `Order` | `CoreEntity` | Yes |
+| `OrderLineItem` | `CoreEntity` | Yes |
+| `User` | `CoreEntity` | Yes |
+| `Address` | `CoreEntity` | Yes |
+| `Post` | `CoreEntity` | Yes |
+| `PromoBanner` | `CoreEntity` | Yes |
+| `SearchResult` | `CoreEntity` | Yes |
+| `CheckoutRequest` | `CoreEntity` | Yes |
+| `PaymentMethod` | `CoreEntity` | Yes |
+| `DeliveryMethod` | `CoreEntity` | Yes |
+| `MediaItem` | `Equatable` | **No** |
+| `PaginatedResult<T>` | `Equatable` | **No** |
+| `CartAmount` | `Equatable` | **No** |
+| `ShippingInfo` | `Equatable` | **No** |
+| `AppliedCoupon` | `Equatable` | **No** |
+
+`MediaItem`, `PaginatedResult`, `CartAmount`, `ShippingInfo`, and `AppliedCoupon` are value/wrapper types that do not extend `CoreEntity` and have no `extensions` field.
+
+---
+
+## Setting Extensions
+
+Extensions are set via the entity constructor. Every `CoreEntity` subclass passes `extensions` to `super.extensions`.
 
 ```dart
-// In your UI or business logic
-final product = await productsRepo.getProductById('123');
-
-// Option 1: Direct access
-final wooData = product.extensions?['woocommerce'] as Map<String, dynamic>?;
-final permalink = wooData?['permalink'] as String?;
-final weight = wooData?['weight'] as String?;
-
-// Option 2: Using CoreEntity getExtension (type-safe)
-final wooData = product.getExtension<Map<String, dynamic>>('woocommerce');
-final permalink = wooData?['permalink'] as String?;
-final weight = wooData?['weight'] as String?;
-final loyaltyPoints = product.getExtension<int>('loyalty_points');
-
-// Check if extension exists
-if (product.extensions?.containsKey('woocommerce') ?? false) {
-  final wooData = product.getExtension<Map<String, dynamic>>('woocommerce');
-  // Use wooData...
-}
-```
-
-### Pattern 3: Using copyWithExtensions
-
-```dart
-// Product has a special helper method
-final updatedProduct = product.copyWithExtensions({
-  'user_preferences': {
-    'favorite': true,
-    'notify_on_sale': true,
-  },
-});
-
-// The helper merges new extensions with existing ones
-// Result: extensions contains both 'woocommerce' and 'user_preferences'
-```
-
-### Pattern 4: Multi-Backend Support
-
-```dart
-class UnifiedProductsRepository extends CoreRepository implements ProductsRepository {
-  final WooCommerceAdapter _wooAdapter;
-  final ShopifyAdapter _shopifyAdapter;
-
-  @override
-  Future<Product> getProductById(String id) async {
-    // Get from both backends
-    final wooProduct = await _wooAdapter.getProduct(id);
-    final shopifyProduct = await _shopifyAdapter.getProduct(id);
-
-    return Product(
-      id: id,
-      name: wooProduct.name, // Use WooCommerce as primary
-      price: wooProduct.price,
-      images: wooProduct.images,
-
-      // Store both backends' data
-      extensions: {
-        'woocommerce': wooProduct.extensions?['woocommerce'],
-        'shopify': shopifyProduct.extensions?['shopify'],
-        'sync': {
-          'last_synced': DateTime.now().toIso8601String(),
-          'source': 'woocommerce',
-        },
-      },
-    );
-  }
-}
-```
-
-## Common Patterns
-
-### Pattern 1: SEO Data
-
-```dart
-extensions: {
-  'seo': {
-    'meta_title': 'Best Product Title',
-    'meta_description': 'Description for search engines',
-    'keywords': ['keyword1', 'keyword2'],
-    'og_image': 'https://example.com/og-image.png',
-  },
-}
-```
-
-### Pattern 2: Inventory Management
-
-```dart
-extensions: {
-  'inventory': {
-    'warehouse_locations': ['A-12', 'B-5'],
-    'reorder_point': 10,
-    'supplier_id': 'SUP-001',
-    'lead_time_days': 7,
-  },
-}
-```
-
-### Pattern 3: Analytics Tracking
-
-```dart
-extensions: {
-  'analytics': {
-    'views_count': 1250,
-    'conversion_rate': 0.12,
-    'average_time_on_page': 45,
-    'last_viewed': '2025-01-15T10:30:00Z',
-  },
-}
-```
-
-### Pattern 4: User Preferences
-
-```dart
-extensions: {
-  'user_preferences': {
-    'favorite': true,
-    'notify_on_stock': true,
-    'notify_on_price_drop': true,
-    'added_to_wishlist': '2025-01-10',
-  },
-}
-```
-
-## Best Practices
-
-### DO:
-
-✅ **Organize by namespace**
-```dart
-extensions: {
-  'backend_name': { /* backend data */ },
-  'feature_name': { /* feature data */ },
-}
-```
-
-✅ **Use type-safe access**
-```dart
-final wooData = product.extensions?['woocommerce'] as Map<String, dynamic>?;
-final permalink = wooData?['permalink'] as String?;
-```
-
-✅ **Document extension structure**
-```dart
-/// Extensions structure:
-/// {
-///   'woocommerce': {
-///     'permalink': String,
-///     'tax_status': String,
-///     'weight': String,
-///   },
-/// }
-```
-
-✅ **Validate extension data**
-```dart
-if (product.extensions != null) {
-  final wooData = product.extensions!['woocommerce'];
-  if (wooData is Map<String, dynamic>) {
-    // Safe to use
-  }
-}
-```
-
-### DON'T:
-
-❌ **Don't duplicate core fields**
-```dart
-// ❌ BAD
-extensions: {
-  'name': 'Product Name',  // Already in core
-  'price': 29.99,          // Already in core
-}
-```
-
-❌ **Don't store functions or complex objects**
-```dart
-// ❌ BAD
-extensions: {
-  'callback': () => print('test'),  // Can't serialize
-  'widget': Container(),             // Can't serialize
-}
-```
-
-❌ **Don't use for critical data**
-```dart
-// ❌ BAD - stock status is critical, should be in core (and it is!)
-extensions: {
-  'stock_status': 'in_stock',
-}
-```
-
-## Examples by Entity
-
-### Product Extensions
-
-```dart
-Product(
+final product = Product(
   id: '123',
-  name: 'T-Shirt',
+  name: 'Slim Fit Tee',
   price: 29.99,
+  media: [MediaItem(url: 'https://cdn.example.com/tee.jpg')],
+  inStock: true,
+  stockQuantity: 50,
   extensions: {
     'woocommerce': {
-      'weight': '0.5',
-      'dimensions': {'length': '10', 'width': '8', 'height': '2'},
+      'permalink': 'https://store.com/product/slim-fit-tee',
+      'tax_status': 'taxable',
       'tax_class': 'standard',
-    },
-    'seo': {
-      'meta_title': 'Cool T-Shirt',
-      'keywords': ['tshirt', 'fashion'],
+      'weight': '0.4',
+      'dimensions': {'length': '30', 'width': '20', 'height': '2'},
+      'shipping_class': 'standard',
     },
   },
 );
 ```
 
-### Category Extensions
+---
+
+## Updating Extensions
+
+### copyWith — replaces extensions entirely
+
+Every `CoreEntity` subclass has `copyWith(extensions: ...)`. Passing a new map **replaces** the existing extensions map; it does not merge.
+
+```dart
+// Replaces extensions — previous keys are lost
+final updated = product.copyWith(extensions: {
+  'analytics': {'views': 500},
+});
+```
+
+To preserve existing data, spread the original map:
+
+```dart
+final updated = product.copyWith(extensions: {
+  ...?product.extensions,
+  'analytics': {'views': 500},
+});
+```
+
+### copyWithExtensions — merges extensions (Product only)
+
+`Product` has an additional helper that performs a shallow merge automatically:
+
+```dart
+// Merges: existing keys are preserved, new keys are added
+final updated = product.copyWithExtensions({
+  'analytics': {'views': 500},
+});
+// Result: extensions contains both 'woocommerce' and 'analytics'
+```
+
+`copyWithExtensions` is **only available on `Product`**. All other entities must use `copyWith` with a manual spread if merging is needed.
+
+---
+
+## Reading Extensions
+
+### Direct map access
+
+```dart
+final wooData = product.extensions?['woocommerce'] as Map<String, dynamic>?;
+final permalink = wooData?['permalink'] as String?;
+```
+
+### Type-safe access via getExtension
+
+```dart
+final wooData = product.getExtension<Map<String, dynamic>>('woocommerce');
+final permalink = wooData?['permalink'] as String?;
+
+final loyaltyPoints = user.getExtension<int>('loyalty_points');
+```
+
+`getExtension<T>` returns `null` for absent or null values. It does not throw; an incorrect type cast will throw a `TypeError` at runtime, so ensure the type parameter matches what was stored.
+
+---
+
+## Serialization
+
+Every entity's `toJson()` includes the extensions field, and `fromJson()` restores it. Extensions round-trip transparently through JSON.
+
+```dart
+final json = product.toJson();
+// json['extensions'] contains the map
+
+final restored = Product.fromJson(json);
+// restored.extensions is identical to the original
+```
+
+`SearchResult` initialises `extensions` to `const {}` (empty map, not null) by default, unlike other entities where it defaults to `null`.
+
+`PromoBanner.fromJson` stores the full raw JSON payload as `extensions: json` — this means the entire backend response is preserved verbatim in extensions, making it straightforward to access any field not mapped to a core property.
+
+---
+
+## Usage in Adapters
+
+The pattern for repository implementations is:
+
+1. Fetch raw data from the backend API.
+2. Map known fields to core entity fields.
+3. Place backend-specific or supplemental data in `extensions`, namespaced by backend name or feature area.
+
+```dart
+class WooProductsRepository extends CoreRepository implements ProductsRepository {
+  final ApiClient _api;
+
+  WooProductsRepository(this._api);
+
+  @override
+  Future<Product> getProductById(String id) async {
+    final raw = await _api.get('/products/$id');
+
+    return Product(
+      id: raw['id'].toString(),
+      name: raw['name'] as String,
+      price: double.tryParse(raw['price'].toString()) ?? 0.0,
+      media: (raw['images'] as List? ?? [])
+          .map((img) => MediaItem(url: img['src'] as String))
+          .toList(),
+      inStock: raw['in_stock'] as bool? ?? false,
+      stockQuantity: raw['stock_quantity'] as int? ?? 0,
+      extensions: {
+        'woocommerce': {
+          'permalink': raw['permalink'],
+          'tax_status': raw['tax_status'],
+          'weight': raw['weight'],
+          'dimensions': raw['dimensions'],
+          'shipping_class': raw['shipping_class'],
+          'menu_order': raw['menu_order'],
+        },
+      },
+    );
+  }
+}
+```
+
+---
+
+## Namespacing Convention
+
+Use a top-level key to namespace extensions by backend or feature. This avoids key collisions when extensions from multiple sources coexist on one entity.
+
+```dart
+extensions: {
+  'woocommerce': { /* WooCommerce-specific fields */ },
+  'seo':         { /* SEO metadata */ },
+  'analytics':   { /* tracking data */ },
+  'loyalty':     { /* loyalty programme data */ },
+}
+```
+
+Avoid flat, unnamespaced keys unless the data is genuinely global to all adapters of a plugin (e.g., `'loyalty_points': 150`).
+
+---
+
+## What to Store in Extensions vs Core Fields
+
+| Situation | Where it goes |
+|---|---|
+| Field present in every backend (price, name, status) | Core field |
+| Backend-specific identifier or raw response field | `extensions` |
+| Platform feature data (SEO, loyalty, analytics) | `extensions` |
+| Data shared across all adapters for a plugin | `extensions` (namespaced by plugin) |
+| Non-serialisable objects (functions, Widgets) | Neither — do not store |
+| Sensitive credentials or card numbers | Neither — do not store |
+| Data that duplicates a core field | Do not duplicate — use the core field |
+
+---
+
+## Examples by Entity
+
+### Product
+
+```dart
+Product(
+  id: '123',
+  name: 'Slim Fit Tee',
+  price: 29.99,
+  media: [MediaItem(url: 'https://cdn.example.com/tee.jpg')],
+  inStock: true,
+  stockQuantity: 50,
+  extensions: {
+    'woocommerce': {
+      'permalink': 'https://store.com/product/slim-fit-tee',
+      'tax_class': 'standard',
+      'weight': '0.4',
+    },
+    'seo': {
+      'meta_title': 'Slim Fit Tee — Best Price',
+      'meta_description': 'Premium slim fit cotton tee.',
+    },
+  },
+);
+```
+
+### Category
 
 ```dart
 Category(
@@ -412,8 +280,8 @@ Category(
   extensions: {
     'display': {
       'icon': 'tshirt',
-      'color': '#FF5722',
-      'banner_image': 'https://...',
+      'accent_color': '#FF5722',
+      'banner_image': 'https://cdn.example.com/clothing-banner.jpg',
     },
     'filters': {
       'show_size_filter': true,
@@ -423,62 +291,91 @@ Category(
 );
 ```
 
-### User Extensions
-
-```dart
-User(
-  id: 'user123',
-  email: 'user@example.com',
-  displayName: 'John Doe',
-  extensions: {
-    'woocommerce': {
-      'customer_id': '456',
-      'billing_address': {...},
-    },
-    'loyalty': {
-      'points': 150,
-      'tier': 'gold',
-      'rewards': [...],
-    },
-  },
-);
-```
-
-### Cart Extensions
+### Cart
 
 ```dart
 Cart(
-  id: 'cart123',
+  id: 'cart-abc',
   items: [...],
-  total: 99.99,
   extensions: {
     'checkout': {
       'gift_message': 'Happy Birthday!',
       'gift_wrap': true,
-      'delivery_instructions': 'Leave at door',
     },
     'promotions': {
       'auto_applied_coupons': ['SAVE10'],
-      'available_offers': [...],
     },
   },
 );
 ```
 
+### User
+
+```dart
+User(
+  id: 'user-123',
+  email: 'user@example.com',
+  displayName: 'Jane Smith',
+  extensions: {
+    'woocommerce': {
+      'customer_id': '456',
+    },
+    'loyalty': {
+      'points': 1500,
+      'tier': 'gold',
+    },
+  },
+);
+```
+
+### Order
+
+```dart
+Order(
+  id: 'order-789',
+  status: 'processing',
+  total: 89.99,
+  lineItems: [...],
+  extensions: {
+    'woocommerce': {
+      'payment_method': 'stripe',
+      'transaction_id': 'txn_abc123',
+      'customer_ip': '192.168.1.1',
+    },
+  },
+);
+```
+
+### PromoBanner
+
+`PromoBanner.fromJson` stores the entire raw JSON payload as extensions, so all backend fields are accessible even if not mapped to a core property:
+
+```dart
+// In your repository
+final banner = PromoBanner.fromJson(rawApiResponse);
+
+// Access unmapped backend fields via extensions
+final campaignId = banner.extensions?['campaign_id'] as String?;
+final impressionUrl = banner.extensions?['impression_tracking_url'] as String?;
+```
+
+---
+
 ## Testing with Extensions
 
 ```dart
-test('should preserve extensions through serialization', () {
+test('extensions round-trip through serialization', () {
   final product = Product(
     id: '1',
     name: 'Test Product',
     price: 10.0,
-    images: [],
+    media: [],
     inStock: true,
     stockQuantity: 5,
     extensions: {
-      'test_data': {
+      'test_backend': {
         'custom_field': 'value',
+        'numeric_field': 42,
       },
     },
   );
@@ -486,42 +383,32 @@ test('should preserve extensions through serialization', () {
   final json = product.toJson();
   final restored = Product.fromJson(json);
 
-  expect(restored.extensions?['test_data'], isNotNull);
-  expect(restored.extensions?['test_data']['custom_field'], equals('value'));
+  expect(restored.extensions?['test_backend'], isNotNull);
+  expect(restored.extensions?['test_backend']['custom_field'], equals('value'));
+  expect(restored.extensions?['test_backend']['numeric_field'], equals(42));
+});
+
+test('copyWith replaces extensions', () {
+  final product = Product(/* ... */, extensions: {'old': 'data'});
+  final updated = product.copyWith(extensions: {'new': 'data'});
+
+  expect(updated.extensions?.containsKey('old'), isFalse);
+  expect(updated.extensions?['new'], equals('data'));
+});
+
+test('copyWithExtensions merges extensions (Product only)', () {
+  final product = Product(/* ... */, extensions: {'woocommerce': {'weight': '0.4'}});
+  final updated = product.copyWithExtensions({'analytics': {'views': 100}});
+
+  expect(updated.extensions?.containsKey('woocommerce'), isTrue);
+  expect(updated.extensions?.containsKey('analytics'), isTrue);
 });
 ```
 
-## Migration from Old Metadata Field
-
-If you have existing code using `metadata`, it has been renamed to `extensions`:
-
-```dart
-// OLD (before migration)
-product.metadata?['woocommerce']
-
-// NEW (after migration)
-product.extensions?['woocommerce']
-
-// Old helper method
-product.copyWithMetadata({...})
-
-// New helper method
-product.copyWithExtensions({...})
-```
-
-## Summary
-
-- ✅ All core entities have an `extensions` field
-- ✅ Use it for backend-specific, custom, or additional data
-- ✅ Organize by namespace (backend name, feature name)
-- ✅ Type-safe access with null-safety
-- ✅ No need to create custom entity classes
-- ❌ Don't duplicate core fields
-- ❌ Don't store sensitive or critical data
-- ❌ Don't store non-serializable objects
-
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2025-11-05
-**Related**: [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md), [ARCHITECTURE.md](./ARCHITECTURE.md)
+## Related
+
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — how adapters populate entities from backend responses
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — overall layer structure and data flow
+- [API.md](./API.md) — full API reference for all entity classes
