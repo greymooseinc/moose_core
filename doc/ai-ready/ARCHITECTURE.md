@@ -1,4 +1,4 @@
-# moose_core Architecture
+# Architecture
 
 Complete architectural reference for AI agents building plugins, adapters, and sections with `moose_core`.
 
