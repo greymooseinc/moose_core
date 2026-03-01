@@ -1,6 +1,7 @@
 # moose_core
 
 [![pub package](https://img.shields.io/pub/v/moose_core.svg)](https://pub.dev/packages/moose_core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A comprehensive, production-ready core architecture package for building modular Flutter e-commerce applications.
 
