@@ -1533,7 +1533,7 @@ class CustomBackendAuthRepository extends AuthRepository {
 
 ## Related Documentation
 
-- **[ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md)** - General adapter pattern guide
+- **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - General adapter pattern guide
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Overall architecture
 - **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
 

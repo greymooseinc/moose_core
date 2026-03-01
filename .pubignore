@@ -4,3 +4,4 @@
 build/
 .dart_tool/
 .vscode/
+example/.flutter-plugins-dependencies

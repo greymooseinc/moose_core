@@ -126,7 +126,7 @@ import 'package:moose_core/services.dart';
    - Use cases and examples
    - Content vs Sliver sections
 
-4. **[ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md)** - Backend adapter pattern
+4. **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Backend adapter pattern
    - BackendAdapter abstraction
    - Creating custom adapters
    - Repository factory pattern
@@ -320,7 +320,7 @@ See [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) for complete guide.
 3. Register repositories
 4. Initialize with configuration
 
-See [ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md) for complete guide.
+See [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) for complete guide.
 
 ### Creating Custom Sections
 
@@ -409,7 +409,7 @@ When contributing to the core package:
 ### Core Architecture
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete architectural guide
 - **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Plugin development guide
-- **[ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md)** - Backend adapter guide
+- **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Backend adapter guide
 - **[REGISTRIES.md](./REGISTRIES.md)** - Registry systems
 - **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
 

@@ -241,7 +241,7 @@ final ctx = MooseAppContext(cache: customCache);
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall architecture
-- [ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md) — Repository pattern
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — Repository pattern
 - [AI_CACHE_GUIDE.md](./AI_CACHE_GUIDE.md) — AI agent quick reference
 
 ---

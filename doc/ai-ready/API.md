@@ -970,7 +970,7 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Overall architecture
 - **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Plugin development
 - **[FEATURE_SECTION.md](./FEATURE_SECTION.md)** - Section patterns
-- **[ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md)** - Adapter implementation
+- **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Adapter implementation
 - **[REGISTRIES.md](./REGISTRIES.md)** - Registry systems
 - **[CACHE_SYSTEM.md](./CACHE_SYSTEM.md)** - Caching system
 

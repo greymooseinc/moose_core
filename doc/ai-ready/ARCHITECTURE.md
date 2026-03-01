@@ -700,7 +700,7 @@ class WooCommerceAdapter extends BackendAdapter {
 
 - **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Complete plugin guide
 - **[FEATURE_SECTION.md](./FEATURE_SECTION.md)** - FeatureSection pattern
-- **[ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md)** - Adapter implementation
+- **[ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md)** - Adapter implementation
 - **[REGISTRIES.md](./REGISTRIES.md)** - Registry systems
 - **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What NOT to do
 

@@ -789,7 +789,7 @@ class ProductsPlugin extends FeaturePlugin {  ← Must match manifest
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Complete architectural guide
 - [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) - Plugin development guide
-- [ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md) - Backend adapter guide
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) - Backend adapter guide
 - [README.md](./README.md) - Documentation index
 
 ---

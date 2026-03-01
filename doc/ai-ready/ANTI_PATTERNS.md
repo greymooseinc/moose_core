@@ -738,7 +738,7 @@ Before committing code, check:
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Complete architectural guide
 - [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) - Plugin development
 - [FEATURE_SECTION.md](./FEATURE_SECTION.md) - Section patterns
-- [ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md) - Adapter implementation
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) - Adapter implementation
 
 ---
 

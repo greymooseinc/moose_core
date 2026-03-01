@@ -831,7 +831,7 @@ hookRegistry.register('hook:name', (data) {
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall system architecture
-- [ADAPTER_PATTERN.md](./ADAPTER_PATTERN.md) — How plugins consume repositories
+- [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — How plugins consume repositories
 - [FEATURE_SECTION.md](./FEATURE_SECTION.md) — Building configurable UI sections
 - [REGISTRIES.md](./REGISTRIES.md) — All registry APIs
 - [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — HookRegistry and EventBus

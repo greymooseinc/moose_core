@@ -1004,6 +1004,7 @@ void main() {
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall system architecture
 - [ADAPTER_SCHEMA_VALIDATION.md](./ADAPTER_SCHEMA_VALIDATION.md) — Full JSON schema reference
 - [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — How plugins consume repositories
+- [PLUGIN_ADAPTER_CONFIG_GUIDE.md](./PLUGIN_ADAPTER_CONFIG_GUIDE.md) — Plugin and adapter configuration deep-dive
 - [REGISTRIES.md](./REGISTRIES.md) — All registry APIs
 - [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — EventBus and HookRegistry usage
 - [ANTI_PATTERNS.md](./ANTI_PATTERNS.md) — Expanded anti-patterns list
