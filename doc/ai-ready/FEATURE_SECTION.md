@@ -1,25 +1,17 @@
-# FeatureSection Pattern Guide
-
-> Complete guide to creating configurable, reusable UI sections
-
-## Table of Contents
-- [Overview](#overview)
-- [FeatureSection Base Class](#featuresection-base-class)
-- [Creating a Section](#creating-a-section)
-- [Configuration Patterns](#configuration-patterns)
-- [Use Cases](#use-cases)
-- [Best Practices](#best-practices)
+# FeatureSection
 
 ## Overview
 
-`FeatureSection` is the base class for all configurable, reusable UI components in moose_core. It provides:
+`FeatureSection` is the abstract base class for all configurable, JSON-driven UI sections in `moose_core`. It extends `StatelessWidget` and adds two things on top:
 
-- **Configuration Management**: Type-safe settings with defaults
-- **Adapter Access**: Direct access to AdapterRegistry
-- **Consistency**: Standard pattern for all sections
-- **Fail-Fast**: Configuration errors caught early
+1. **Settings system** — a merging configuration mechanism via `getDefaultSettings()` and `getSetting<T>(key)`
+2. **Registry access** — `adaptersOf(context)` to reach the scoped `AdapterRegistry` without touching `MooseScope` directly
 
-## FeatureSection Base Class
+Sections are registered in `WidgetRegistry` by plugins, configured via `environment.json`, and rendered by calling `widgetRegistry.buildSectionGroup(...)` or `widgetRegistry.build(...)` from within a screen.
+
+---
+
+## Class Definition
 
 ```dart
 abstract class FeatureSection extends StatelessWidget {
@@ -27,52 +19,49 @@ abstract class FeatureSection extends StatelessWidget {
 
   const FeatureSection({super.key, this.settings});
 
-  /// Access the scoped AdapterRegistry from the widget tree.
-  /// Call this inside build(context) — requires a MooseScope ancestor.
+  /// Returns the scoped AdapterRegistry from the nearest MooseScope.
+  /// Must be called inside build(context).
   AdapterRegistry adaptersOf(BuildContext context) =>
       MooseScope.adapterRegistryOf(context);
 
-  /// Define default settings for this section
-  /// All configurable values MUST be defined here
+  /// All configurable keys with their default values.
+  /// Every key used in getSetting<T> MUST appear here.
   Map<String, dynamic> getDefaultSettings();
 
-  /// Get a setting value with type safety
-  /// Throws [Exception] if key is missing or type mismatches.
-  /// Also handles automatic numeric conversions (num→double, num→int) and Color parsing.
-  T getSetting<T>(String key) {
-    final config = {...getDefaultSettings(), ...(settings ?? {})};
-    final value = config[key];
-
-    // Fail fast if key not found
-    if (value == null) {
-      throw Exception(
-        'Setting "$key" not found in $runtimeType. '
-        'Ensure the key exists in getDefaultSettings() or settings.',
-      );
-    }
-
-    // Handle automatic number conversions
-    if (T == double && value is num) return value.toDouble() as T;
-    if (T == int && value is num) return value.toInt() as T;
-    if (T == Color) return ColorHelper.parse(value) as T;
-
-    // Direct type match
-    if (value is T) return value;
-
-    // Fail fast if type mismatch
-    throw Exception(
-      'Setting "$key" in $runtimeType has type ${value.runtimeType} '
-      'but expected type $T',
-    );
-  }
+  /// Retrieves a setting value, merging defaults with constructor-provided settings.
+  /// Constructor settings override defaults.
+  /// Throws Exception if the key is absent or the type does not match.
+  /// Automatic conversions: num→double, num→int, String→Color (via ColorHelper).
+  T getSetting<T>(String key);
 }
 ```
 
-## Creating a Section
+### getSetting<T> resolution order
 
-### Step 1: Extend FeatureSection
+1. Constructor `settings` map (highest priority)
+2. `getDefaultSettings()` map (fallback)
+
+If the key is absent in both, `getSetting` throws immediately with a descriptive message. If the value is present but cannot be cast to `T`, it also throws. This fail-fast behaviour catches misconfiguration during development rather than silently returning wrong values.
+
+### Automatic type coercions in getSetting
+
+| Requested `T` | Value type | Behaviour |
+|---|---|---|
+| `double` | `num` | `.toDouble()` |
+| `int` | `num` | `.toInt()` |
+| `Color` | `String` | `ColorHelper.parse(value)` |
+| any other `T` | `T` | direct cast |
+
+This means JSON-supplied integers like `20` are accepted when `getSetting<double>` is called, so sections work correctly regardless of whether the JSON author wrote `20` or `20.0`.
+
+---
+
+## Implementing a FeatureSection
+
+### Minimal skeleton
 
 ```dart
+import 'package:flutter/material.dart';
 import 'package:moose_core/moose_core.dart';
 
 class FeaturedProductsSection extends FeatureSection {
@@ -81,68 +70,52 @@ class FeaturedProductsSection extends FeatureSection {
   @override
   Map<String, dynamic> getDefaultSettings() {
     return {
-      'title': 'FEATURED PRODUCTS',
+      'title': 'Featured Products',
       'titleFontSize': 18.0,
       'horizontalPadding': 20.0,
       'verticalPadding': 16.0,
       'perPage': 10,
       'columns': 2,
-      'showLoadMore': true,
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    // Access AdapterRegistry from the widget tree via MooseScope
-    final repository = adaptersOf(context).getRepository<ProductsRepository>();
+    final repo = adaptersOf(context).getRepository<ProductsRepository>();
 
     return BlocProvider(
-      create: (context) => ProductsBloc(repository)
+      create: (_) => ProductsBloc(repo)
         ..add(LoadProducts(limit: getSetting<int>('perPage'))),
-      child: _buildContent(context),
-    );
-  }
-
-  Widget _buildContent(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: getSetting<double>('horizontalPadding'),
-        vertical: getSetting<double>('verticalPadding'),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            getSetting<String>('title'),
-            style: TextStyle(
-              fontSize: getSetting<double>('titleFontSize'),
-              fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: getSetting<double>('horizontalPadding'),
+          vertical: getSetting<double>('verticalPadding'),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              getSetting<String>('title'),
+              style: TextStyle(fontSize: getSetting<double>('titleFontSize')),
             ),
-          ),
-          SizedBox(height: 16),
-          BlocBuilder<ProductsBloc, ProductsState>(
-            builder: (context, state) {
-              if (state is ProductsLoading) {
-                return Center(child: CircularProgressIndicator());
-              }
-              if (state is ProductsLoaded) {
-                return _buildProductGrid(state.products);
-              }
-              if (state is ProductsError) {
-                return Text('Error: ${state.message}');
-              }
-              return SizedBox.shrink();
-            },
-          ),
-        ],
+            BlocBuilder<ProductsBloc, ProductsState>(
+              builder: (context, state) {
+                if (state is ProductsLoading) return const CircularProgressIndicator();
+                if (state is ProductsLoaded) return _buildGrid(state.products);
+                if (state is ProductsError) return Text('Error: ${state.message}');
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProductGrid(List<Product> products) {
+  Widget _buildGrid(List<Product> products) {
     return GridView.builder(
       shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: getSetting<int>('columns'),
         childAspectRatio: 0.75,
@@ -150,280 +123,31 @@ class FeaturedProductsSection extends FeatureSection {
         mainAxisSpacing: 10,
       ),
       itemCount: products.length,
-      itemBuilder: (context, index) {
-        return ProductCard(product: products[index]);
-      },
+      itemBuilder: (_, index) => ProductCard(product: products[index]),
     );
   }
 }
 ```
 
-### Step 2: Register the Section
+### Key rules
 
-Register sections in `onRegister()` (sync), not `initialize()` (reserved for async I/O):
+- Call `adaptersOf(context)` only inside `build()` — it reads from the widget tree.
+- Never access `settings` directly; always go through `getSetting<T>(key)`.
+- Use BLoC for all state management inside a section. Keep business logic out of `build()`.
+- Use `double` for all layout dimensions (padding, font size, height, width). `int` is for counts and limits.
 
-```dart
-class ProductsPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    widgetRegistry.register(
-      'products.featured_section',
-      (context, {data, onEvent}) => FeaturedProductsSection(
-        settings: data?['settings'] as Map<String, dynamic>?,
-      ),
-    );
-  }
-}
-```
+---
 
-### Step 3: Configure in JSON
+## Accepting Additional Runtime Data
 
-```json
-{
-  "plugins": {
-    "home": {
-      "sections": {
-        "main": [
-          {
-            "name": "products.featured_section",
-            "description": "Featured products grid",
-            "settings": {
-              "title": "TOP PICKS FOR YOU",
-              "perPage": 8,
-              "columns": 2,
-              "titleFontSize": 20.0
-            }
-          }
-        ]
-      }
-    }
-  }
-}
-```
-
-## Configuration Patterns
-
-### Pattern 1: Basic Configuration
+Sections often need data beyond settings (e.g., a product ID passed by the caller). Add extra constructor parameters alongside `super.settings`:
 
 ```dart
-@override
-Map<String, dynamic> getDefaultSettings() {
-  return {
-    'title': 'Section Title',
-    'fontSize': 16.0,
-    'padding': 20.0,
-  };
-}
-
-@override
-Widget build(BuildContext context) {
-  return Text(
-    getSetting<String>('title'),
-    style: TextStyle(fontSize: getSetting<double>('fontSize')),
-  );
-}
-```
-
-### Pattern 2: Complex Configuration
-
-```dart
-@override
-Map<String, dynamic> getDefaultSettings() {
-  return {
-    'layout': {
-      'columns': 2,
-      'spacing': 10.0,
-      'padding': 16.0,
-    },
-    'styling': {
-      'backgroundColor': '#FFFFFF',
-      'borderRadius': 8.0,
-    },
-    'behavior': {
-      'autoRefresh': true,
-      'refreshInterval': 30,
-    },
-  };
-}
-
-@override
-Widget build(BuildContext context) {
-  final layout = getSetting<Map<String, dynamic>>('layout');
-  final columns = layout['columns'] as int;
-  final spacing = layout['spacing'] as double;
-
-  return GridView(
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: columns,
-      crossAxisSpacing: spacing,
-    ),
-    // ...
-  );
-}
-```
-
-### Pattern 3: Conditional Configuration
-
-```dart
-@override
-Map<String, dynamic> getDefaultSettings() {
-  return {
-    'showFilters': true,
-    'showSortOptions': true,
-    'enableInfiniteScroll': false,
-    'itemsPerPage': 20,
-  };
-}
-
-@override
-Widget build(BuildContext context) {
-  return Column(
-    children: [
-      if (getSetting<bool>('showFilters'))
-        FiltersWidget(),
-      if (getSetting<bool>('showSortOptions'))
-        SortOptionsWidget(),
-      ProductsList(
-        itemsPerPage: getSetting<int>('itemsPerPage'),
-        infiniteScroll: getSetting<bool>('enableInfiniteScroll'),
-      ),
-    ],
-  );
-}
-```
-
-## Use Cases
-
-### Use Case 1: Content Sections
-
-FeatureSection for content sections registered in WidgetRegistry:
-
-```dart
-class HeroSection extends FeatureSection {
-  const HeroSection({super.key, super.settings});
-
-  @override
-  Map<String, dynamic> getDefaultSettings() {
-    return {
-      'title': 'Welcome',
-      'subtitle': 'Discover amazing products',
-      'backgroundImage': '',
-      'height': 300.0,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: getSetting<double>('height'),
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(getSetting<String>('backgroundImage')),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            getSetting<String>('title'),
-            style: TextStyle(fontSize: 32, color: Colors.white),
-          ),
-          Text(
-            getSetting<String>('subtitle'),
-            style: TextStyle(fontSize: 16, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
-```
-
-**Load with buildSectionGroup:**
-```dart
-final sections = widgetRegistry.buildSectionGroup(
-  context,
-  pluginName: 'home',
-  groupName: 'main',
-);
-```
-
-### Use Case 2: Sliver Sections
-
-FeatureSection for sliver widgets in CustomScrollView:
-
-```dart
-class AppBarSliver extends FeatureSection {
-  final Function(String, dynamic)? onEvent;
-
-  const AppBarSliver({
-    super.key,
-    super.settings,
-    this.onEvent,
-  });
-
-  @override
-  Map<String, dynamic> getDefaultSettings() {
-    return {
-      'title': 'Store',
-      'showSearch': true,
-      'showCart': true,
-      'backgroundColor': '#FFFFFF',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverAppBar(
-      title: Text(getSetting<String>('title')),
-      backgroundColor: Color(
-        int.parse(getSetting<String>('backgroundColor').replaceFirst('#', '0xFF')),
-      ),
-      actions: [
-        if (getSetting<bool>('showSearch'))
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () => onEvent?.call('search_tap', null),
-          ),
-        if (getSetting<bool>('showCart'))
-          IconButton(
-            icon: Icon(Icons.shopping_cart),
-            onPressed: () => onEvent?.call('cart_tap', null),
-          ),
-      ],
-    );
-  }
-}
-```
-
-**Use in CustomScrollView:**
-```dart
-CustomScrollView(
-  slivers: [
-    widgetRegistry.build(
-      'home.app_bar',
-      context,
-      data: {'settings': {'title': 'My Store'}},
-      onEvent: (event, payload) {
-        if (event == 'search_tap') Navigator.pushNamed(context, '/search');
-      },
-    ),
-    // Other slivers...
-  ],
-)
-```
-
-### Use Case 3: Parameterized Sections
-
-Sections that accept additional data:
-
-```dart
-class ReviewListSection extends FeatureSection {
+class RelatedProductsSection extends FeatureSection {
   final String? productId;
-  final Function(String, dynamic)? onEvent;
+  final void Function(String event, dynamic payload)? onEvent;
 
-  const ReviewListSection({
+  const RelatedProductsSection({
     super.key,
     super.settings,
     this.productId,
@@ -433,41 +157,35 @@ class ReviewListSection extends FeatureSection {
   @override
   Map<String, dynamic> getDefaultSettings() {
     return {
-      'perPage': 10,
-      'showRating': true,
-      'allowReply': false,
+      'title': 'Related Products',
+      'perPage': 6,
+      'horizontalPadding': 20.0,
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    if (productId == null) {
-      return SizedBox.shrink();
-    }
+    if (productId == null) return const SizedBox.shrink();
 
-    final repository = adaptersOf(context).getRepository<ReviewRepository>();
+    final repo = adaptersOf(context).getRepository<ProductsRepository>();
 
     return BlocProvider(
-      create: (context) => ReviewsBloc(repository)
-        ..add(LoadReviews(
-          productId: productId!,
-          limit: getSetting<int>('perPage'),
-        )),
-      child: BlocBuilder<ReviewsBloc, ReviewsState>(
-        builder: (context, state) {
-          // Build reviews list
-        },
+      create: (_) => RelatedProductsBloc(repo)
+        ..add(LoadRelated(productId: productId!, limit: getSetting<int>('perPage'))),
+      child: BlocBuilder<RelatedProductsBloc, RelatedProductsState>(
+        builder: (context, state) { /* ... */ },
       ),
     );
   }
 }
 ```
 
-**Register with additional parameters:**
+In the plugin registration, the extra parameter is extracted from `data`:
+
 ```dart
 widgetRegistry.register(
-  'reviews.list_section',
-  (context, {data, onEvent}) => ReviewListSection(
+  'products.related_section',
+  (context, {data, onEvent}) => RelatedProductsSection(
     settings: data?['settings'] as Map<String, dynamic>?,
     productId: data?['productId'] as String?,
     onEvent: onEvent,
@@ -475,207 +193,335 @@ widgetRegistry.register(
 );
 ```
 
-## Best Practices
+---
 
-### DO
+## Registering a Section
+
+Register sections in `FeaturePlugin.onRegister()` — the synchronous registration step, called before any async initialisation.
 
 ```dart
-// ✅ Extend FeatureSection
-class MySection extends FeatureSection {
-  const MySection({super.key, super.settings});
+class ProductsPlugin extends FeaturePlugin {
+  @override
+  String get name => 'products';
+
+  @override
+  String get version => '1.0.0';
+
+  @override
+  void onRegister() {
+    widgetRegistry.register(
+      'products.featured_section',
+      (context, {data, onEvent}) => FeaturedProductsSection(
+        settings: data?['settings'] as Map<String, dynamic>?,
+      ),
+    );
+
+    widgetRegistry.register(
+      'products.related_section',
+      (context, {data, onEvent}) => RelatedProductsSection(
+        settings: data?['settings'] as Map<String, dynamic>?,
+        productId: data?['productId'] as String?,
+        onEvent: onEvent,
+      ),
+    );
+  }
+
+  @override
+  Future<void> onInit() async { /* async setup */ }
 }
-
-// ✅ Define all settings with defaults
-@override
-Map<String, dynamic> getDefaultSettings() {
-  return {
-    'title': 'Default Title',
-    'fontSize': 16.0,
-    'padding': 20.0,
-  };
-}
-
-// ✅ Use getSetting<T>() with proper types
-final title = getSetting<String>('title');
-final fontSize = getSetting<double>('fontSize');  // double for UI dimensions
-
-// ✅ Use BLoC for state management
-return BlocProvider(
-  create: (context) => MyBloc(repository),
-  child: BlocBuilder<MyBloc, MyState>(...),
-);
-
-// ✅ Use adaptersOf(context) for repositories (inside build())
-final repository = adaptersOf(context).getRepository<ProductsRepository>();
 ```
 
-### DON'T
+Naming convention: `<plugin_name>.<section_name>`. This namespacing prevents collisions between plugins.
+
+---
+
+## Configuring Sections in environment.json
+
+Sections are declared under `plugins.<pluginName>.sections.<groupName>` as a list:
+
+```json
+{
+  "plugins": {
+    "home": {
+      "active": true,
+      "sections": {
+        "main": [
+          {
+            "name": "products.featured_section",
+            "description": "Featured products grid",
+            "active": true,
+            "settings": {
+              "title": "Top Picks",
+              "perPage": 8,
+              "columns": 2,
+              "titleFontSize": 20.0,
+              "horizontalPadding": 16.0
+            }
+          },
+          {
+            "name": "products.new_arrivals_section",
+            "description": "New arrivals carousel",
+            "active": false
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Fields in each section entry (`SectionConfig`):
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `name` | String | Yes | — | Registered key in `WidgetRegistry` |
+| `description` | String | No | `''` | Human-readable label |
+| `active` | bool | No | `true` | When `false`, section is skipped by `buildSectionGroup` |
+| `settings` | Object | No | `{}` | Merged over the section's `getDefaultSettings()` |
+
+---
+
+## Rendering Sections
+
+### Building a named group
+
+`WidgetRegistry.buildSectionGroup` reads the JSON config, filters inactive entries, and builds all active sections in order:
 
 ```dart
-// ❌ Don't extend StatelessWidget directly
-class MySection extends StatelessWidget {  // Wrong!
+@override
+Widget build(BuildContext context) {
+  final sections = context.moose.widgetRegistry.buildSectionGroup(
+    context,
+    pluginName: 'home',
+    groupName: 'main',
+  );
+
+  return ListView(children: sections);
 }
+```
 
-// ❌ Don't hardcode values
-return Text(
-  'FEATURED PRODUCTS',  // Hardcoded!
-  style: TextStyle(fontSize: 18),  // Hardcoded!
+With optional shared data and event handler:
+
+```dart
+context.moose.widgetRegistry.buildSectionGroup(
+  context,
+  pluginName: 'home',
+  groupName: 'main',
+  data: {'someSharedKey': 'value'},
+  onEvent: (event, payload) { /* handle section events */ },
 );
+```
 
-// ❌ Don't use int for UI dimensions
+The `data` map is merged into each section's data alongside its settings from config.
+
+### Building a single section by name
+
+```dart
+final widget = context.moose.widgetRegistry.build(
+  'products.featured_section',
+  context,
+  data: {
+    'settings': {'title': 'Override Title', 'perPage': 4},
+  },
+  onEvent: (event, payload) { /* ... */ },
+);
+```
+
+In debug mode, if the name is not registered, `build` returns an `UnknownSectionWidget` showing what was requested and what is available. In release mode it returns `SizedBox.shrink()`.
+
+---
+
+## Settings Type Reference
+
+Always match the Dart type to the semantics of the value:
+
+| Value semantics | Type in defaults | `getSetting` call |
+|---|---|---|
+| Layout dimension (padding, size, spacing) | `double` — `20.0` | `getSetting<double>('padding')` |
+| Font size | `double` — `16.0` | `getSetting<double>('fontSize')` |
+| Count / limit | `int` — `10` | `getSetting<int>('perPage')` |
+| Toggle flag | `bool` — `true` | `getSetting<bool>('showHeader')` |
+| Text | `String` — `'Title'` | `getSetting<String>('title')` |
+| Color | `String` (hex/name) — `'#FF5722'` | `getSetting<Color>('accentColor')` |
+| Nested config | `Map<String, dynamic>` | `getSetting<Map<String, dynamic>>('layout')` |
+
+### Color format support (via ColorHelper.parse)
+
+| Format | Example |
+|---|---|
+| 6-digit hex | `'#FF5733'` or `'FF5733'` |
+| 3-digit hex | `'#F57'` |
+| 8-digit hex with alpha | `'#80FF5733'` |
+| Material color name | `'red'`, `'blue'`, `'white'`, `'transparent'` |
+| RGBA | `'rgba(255, 87, 51, 1.0)'` |
+
+Usage:
+
+```dart
 @override
 Map<String, dynamic> getDefaultSettings() {
   return {
-    'padding': 20,  // Should be 20.0 (double)
-    'fontSize': 16,  // Should be 16.0 (double)
+    'backgroundColor': '#FFFFFF',
+    'titleColor': '#212121',
+    'accentColor': '#FF5722',
   };
 }
 
-// ❌ Don't access settings directly
-return Text(settings?['title'] ?? 'Default');  // Wrong!
-
-// ❌ Don't make direct repository calls
 @override
 Widget build(BuildContext context) {
-  return FutureBuilder(
-    future: repository.getProducts(),  // Wrong!
-    // ...
+  return Container(
+    color: getSetting<Color>('backgroundColor'),
+    child: Text(
+      getSetting<String>('title'),
+      style: TextStyle(color: getSetting<Color>('titleColor')),
+    ),
   );
 }
 ```
 
-### Type Safety
+---
 
-Always use the correct types for settings:
+## onEvent Pattern
 
-```dart
-@override
-Map<String, dynamic> getDefaultSettings() {
-  return {
-    // UI dimensions - use double
-    'padding': 20.0,
-    'fontSize': 16.0,
-    'height': 200.0,
-    'width': 100.0,
-
-    // Counts/quantities - use int
-    'perPage': 10,
-    'columns': 2,
-    'maxItems': 50,
-
-    // Text - use String
-    'title': 'Title',
-    'description': 'Description',
-
-    // Flags - use bool
-    'showHeader': true,
-    'allowEditing': false,
-
-    // Collections - use List/Map
-    'items': <String>[],
-    'config': <String, dynamic>{},
-  };
-}
-```
-
-### Documentation
-
-Document your sections:
+Sections surface user interactions back to their caller without owning navigation or business logic. The `onEvent` callback is a loose contract: the section fires a named event with a payload, and the screen decides what to do.
 
 ```dart
-/// Featured Products Section
-///
-/// Displays a grid of featured products from the catalog.
-///
-/// **Configuration:**
-/// - `title` (String): Section title (default: 'FEATURED PRODUCTS')
-/// - `titleFontSize` (double): Title font size (default: 18.0)
-/// - `perPage` (int): Number of products to display (default: 10)
-/// - `columns` (int): Number of grid columns (default: 2)
-/// - `horizontalPadding` (double): Horizontal padding (default: 20.0)
-/// - `verticalPadding` (double): Vertical padding (default: 16.0)
-///
-/// **Example:**
-/// ```json
-/// {
-///   "name": "products.featured_section",
-///   "settings": {
-///     "title": "TOP PICKS",
-///     "perPage": 8,
-///     "columns": 3
-///   }
-/// }
-/// ```
-class FeaturedProductsSection extends FeatureSection {
-  // ...
-}
-```
+class PromoBannerSection extends FeatureSection {
+  final void Function(String event, dynamic payload)? onEvent;
 
-## Testing
+  const PromoBannerSection({super.key, super.settings, this.onEvent});
 
-### Unit Test Settings
+  @override
+  Map<String, dynamic> getDefaultSettings() => {'height': 200.0};
 
-```dart
-void main() {
-  group('FeaturedProductsSection', () {
-    test('getDefaultSettings returns all required settings', () {
-      final section = FeaturedProductsSection();
-      final defaults = section.getDefaultSettings();
-
-      expect(defaults['title'], isA<String>());
-      expect(defaults['titleFontSize'], isA<double>());
-      expect(defaults['perPage'], isA<int>());
-      expect(defaults['columns'], isA<int>());
-    });
-
-    test('getSetting returns correct value', () {
-      final section = FeaturedProductsSection(
-        settings: {'title': 'Custom Title'},
-      );
-
-      expect(section.getSetting<String>('title'), equals('Custom Title'));
-      expect(section.getSetting<double>('titleFontSize'), equals(18.0));
-    });
-
-    test('getSetting throws on missing key', () {
-      final section = FeaturedProductsSection();
-
-      expect(
-        () => section.getSetting<String>('nonExistent'),
-        throwsA(isA<Exception>()),
-      );
-    });
-  });
-}
-```
-
-### Widget Test
-
-```dart
-void main() {
-  testWidgets('FeaturedProductsSection displays title', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: FeaturedProductsSection(
-            settings: {'title': 'Test Products'},
-          ),
-        ),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onEvent?.call('banner_tapped', {'route': '/sale'}),
+      child: SizedBox(height: getSetting<double>('height')),
     );
-
-    expect(find.text('Test Products'), findsOneWidget);
-  });
+  }
 }
 ```
 
-## Related Documentation
+Screen handler:
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Overall architecture
-- **[PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md)** - Creating plugins
-- **[ANTI_PATTERNS.md](./ANTI_PATTERNS.md)** - What to avoid
+```dart
+context.moose.widgetRegistry.buildSectionGroup(
+  context,
+  pluginName: 'home',
+  groupName: 'main',
+  onEvent: (event, payload) {
+    if (event == 'banner_tapped') {
+      final route = (payload as Map<String, dynamic>?)?['route'] as String?;
+      if (route != null) Navigator.pushNamed(context, route);
+    }
+  },
+);
+```
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+## AddonRegistry Integration
+
+Sections can include addon slots — named injection points where other plugins contribute widgets without modifying the section. Access `addonRegistry` via `context.moose`:
+
+```dart
+@override
+Widget build(BuildContext context) {
+  final addons = context.moose.addonRegistry.build(
+    'products.above_price',
+    context,
+    data: {'productId': productId},
+  );
+
+  return Column(
+    children: [
+      PriceWidget(price: product.price),
+      ...addons,  // zero or more widgets injected by other plugins
+    ],
+  );
+}
+```
+
+Another plugin registers into the same slot:
+
+```dart
+// In LoyaltyPlugin.onRegister()
+addonRegistry.register(
+  'products.above_price',
+  (context, {data, onEvent}) {
+    final id = data?['productId'] as String?;
+    return id != null ? LoyaltyBadge(productId: id) : null;
+  },
+  priority: 10,
+);
+```
+
+Addons are rendered in descending priority order. A builder returning `null` is silently skipped.
+
+---
+
+## Testing
+
+### Settings unit tests
+
+```dart
+test('getDefaultSettings returns all required keys with correct types', () {
+  final section = FeaturedProductsSection();
+  final defaults = section.getDefaultSettings();
+
+  expect(defaults['title'], isA<String>());
+  expect(defaults['titleFontSize'], isA<double>());
+  expect(defaults['perPage'], isA<int>());
+  expect(defaults['columns'], isA<int>());
+  expect(defaults['horizontalPadding'], isA<double>());
+});
+
+test('constructor settings override defaults', () {
+  final section = FeaturedProductsSection(
+    settings: {'title': 'Override', 'perPage': 5},
+  );
+
+  expect(section.getSetting<String>('title'), equals('Override'));
+  expect(section.getSetting<int>('perPage'), equals(5));
+  expect(section.getSetting<int>('columns'), equals(2)); // default unchanged
+});
+
+test('getSetting throws on missing key', () {
+  final section = FeaturedProductsSection();
+  expect(
+    () => section.getSetting<String>('nonExistent'),
+    throwsA(isA<Exception>()),
+  );
+});
+
+test('getSetting coerces int to double', () {
+  // Simulates JSON supplying 20 instead of 20.0
+  final section = FeaturedProductsSection(settings: {'horizontalPadding': 20});
+  expect(section.getSetting<double>('horizontalPadding'), equals(20.0));
+});
+```
+
+---
+
+## Rules Summary
+
+| Rule | Reason |
+|---|---|
+| Extend `FeatureSection`, not `StatelessWidget` | Enables `getSetting` and `adaptersOf` |
+| Every key used in `getSetting` must be in `getDefaultSettings` | Fail-fast throws if key is absent |
+| Call `adaptersOf(context)` inside `build()` only | Reads from widget tree — not safe at construction time |
+| Use BLoC for all state | Keeps business logic out of the widget layer |
+| Use `double` for layout dimensions | Prevents type errors when JSON supplies integers |
+| Register in `onRegister()`, not `onInit()` | Registration is synchronous; `onInit` is for async work |
+| Name sections as `<plugin>.<section>` | Avoids cross-plugin key collisions |
+| Never read `settings` map directly | Use `getSetting<T>` for merging and type safety |
+
+---
+
+## Related
+
+- [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — registering sections from within a plugin
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — overall layer structure and DI
+- [API.md](./API.md) — `WidgetRegistry`, `AddonRegistry`, and `MooseScope` API reference
