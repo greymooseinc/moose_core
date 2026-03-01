@@ -1,9 +1,9 @@
 {
-  "blueprintVersion": "2026.02",
+  "blueprintVersion": "2026.03",
   "metadata": {
     "project": "moose_extensions",
     "purpose": "Flutter e-commerce application composed of FeaturePlugins powered by moose_core.",
-    "sourceOfTruth": "ai-ready.json + ai-ready/docs/*"
+    "sourceOfTruth": "doc/ai-ready/README.md + doc/ai-ready/*"
   },
   "architecture": {
     "layers": [
@@ -36,7 +36,7 @@
         "name": "Repositories",
         "description": "Abstract data sources defined in moose_core, implemented by adapters.",
         "keyFiles": [
-          "../ecommerce_core/lib/repositories.dart",
+          "package:moose_core/repositories.dart",
           "lib/adapters/**"
         ]
       },
@@ -44,31 +44,36 @@
         "name": "Adapters",
         "description": "Backend-specific implementations (Shopify, WooCommerce, custom) that register repository factories via AdapterRegistry.",
         "keyFiles": [
-          "../ecommerce_core/lib/src/adapter",
           "lib/adapters/**/backend_adapter.dart",
           "lib/adapters/**/repositories/*_repository.dart"
         ],
         "notes": [
-          "Adapters must extend BackendAdapter and register repository factories.",
-          "Use AdapterRegistry to register/initialize adapters before plugins rely on repositories."
+          "Adapters must extend BackendAdapter and register repository factories inside initialize().",
+          "configSchema is abstract on BackendAdapter — compile error if omitted. Validated before initialize() is called.",
+          "MooseBootstrapper handles adapter registration order; adapters are registered before plugins."
         ]
       }
     ],
     "configurationFiles": [
-      "assets/config/environment.json",
-      "ai-ready.json"
+      "assets/config/environment.json"
     ],
     "docsHints": [
-      "ai-ready/docs/ARCHITECTURE.md",
-      "ai-ready/docs/PLUGIN_SYSTEM.md",
-      "ai-ready/docs/API.md"
+      "doc/ai-ready/README.md",
+      "doc/ai-ready/ARCHITECTURE.md",
+      "doc/ai-ready/PLUGIN_SYSTEM.md",
+      "doc/ai-ready/ADAPTER_SYSTEM.md",
+      "doc/ai-ready/REPOSITORIES.md",
+      "doc/ai-ready/FEATURE_SECTION.md",
+      "doc/ai-ready/REGISTRIES.md",
+      "doc/ai-ready/PLUGIN_ADAPTER_CONFIG_GUIDE.md",
+      "doc/ai-ready/API.md"
     ]
   },
   "pluginDevelopment": {
     "steps": [
       "Create folder lib/plugins/{plugin_name}/ with subfolders logic/, presentation/, data/ if needed.",
-      "Add {plugin_name}_plugin.dart extending FeaturePlugin; implement name, version, onRegister, initialize, getRoutes.",
-      "Register FeatureSections and addon/action handlers inside onRegister() (sync). Reserve initialize() for async I/O only.",
+      "Add {plugin_name}_plugin.dart extending FeaturePlugin; implement name, version, onRegister, onInit, getRoutes.",
+      "Register FeatureSections and addon/action handlers inside onRegister() (sync). Reserve onInit() for async I/O only.",
       "Each section extends FeatureSection, overrides getDefaultSettings(), uses getSetting<T>().",
       "To access AdapterRegistry inside a FeatureSection's build(), call adaptersOf(context).getRepository<T>() — never use AdapterRegistry() singleton.",
       "All business logic lives in Bloc classes under logic/bloc/** (events, states, blocs).",
@@ -83,19 +88,21 @@
         "Use repository interfaces from moose_core; never call http directly.",
         "Provide getDefaultSettings() for every FeatureSection.",
         "All numeric UI settings stored as double.",
-        "Add docs to ai-ready/docs/PLUGIN_SYSTEM.md when introducing new hooks.",
-        "All concrete CoreRepository subclasses must declare forwarding constructor: ClassName({required super.hookRegistry, required super.eventBus}).",
-        "Wrap the widget tree with MooseScope(appContext: ctx) so that context.moose and MooseScope.of() work in all descendant widgets."
+        "Add docs to doc/ai-ready/PLUGIN_SYSTEM.md when introducing new hooks.",
+        "Wrap the widget tree with MooseScope(appContext: ctx) so that context.moose and MooseScope.of() work in all descendant widgets.",
+        "Cancel all EventBus subscriptions in onStop() to prevent memory leaks."
       ],
       "mustNot": [
         "Do not mutate configuration maps in place; copy before editing.",
         "Do not access adapters directly from widgets; go through repositories.",
-        "Do not use singleton constructors for any registry (WidgetRegistry(), HookRegistry(), AddonRegistry(), ActionRegistry(), EventBus(), etc.); all registries are now owned by MooseAppContext.",
+        "Do not use singleton constructors for any registry (WidgetRegistry(), HookRegistry(), AddonRegistry(), ActionRegistry(), EventBus(), etc.); all registries are owned by MooseAppContext.",
         "Do not call AdapterRegistry() — use context.moose.adapterRegistry or adaptersOf(context) in FeatureSection.build().",
         "Do not throw exceptions from AddonRegistry builders; return null to skip rendering gracefully.",
         "Do not use AddonRegistry to own a full screen area; use WidgetRegistry for that.",
-        "Do not call ConfigManager() directly — use appContext.configManager or MooseScope.configManagerOf(context).",
-        "Do not register sections inside initialize() — use onRegister() for all synchronous registration."
+        "Do not call ConfigManager() directly — use appContext.configManager or context.moose.configManager.",
+        "Do not register sections inside onInit() — use onRegister() for all synchronous registration.",
+        "Do not call CacheManager.initPersistentCache() manually — MooseBootstrapper.run() handles this.",
+        "Do not add hookRegistry or eventBus constructor parameters to CoreRepository subclasses — CoreRepository has no fields; only pass what your concrete class actually needs."
       ]
     }
   },
@@ -106,8 +113,8 @@
       "Keep files ASCII unless localization requires otherwise."
     ],
     "aiSpecific": [
-      "Always cite ai-ready/docs reference when deviating from defaults.",
-      "When unsure, fall back to instructions inside ai-ready.json quickStart.criticalRules."
+      "Always cite doc/ai-ready/* reference when deviating from defaults.",
+      "When unsure, fall back to doc/ai-ready/ANTI_PATTERNS.md and doc/ai-ready/README.md."
     ]
   },
   "filesystem": {
@@ -122,57 +129,117 @@
     "testPattern": "test/** Matches plugin-specific blocs/widgets."
   },
   "templates": {
-    "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override Map<String, dynamic> getDefaultSettings() => {}; @override void onRegister() { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } @override Future<void> initialize() async { /* async I/O only */ } @override Map<String, WidgetBuilder>? getRoutes() => null; }",
+    "featurePlugin": "class {ClassName} extends FeaturePlugin { @override String get name => '{plugin}'; @override String get version => '1.0.0'; @override Map<String, dynamic> getDefaultSettings() => {}; @override void onRegister() { widgetRegistry.register('{plugin}.section', (context, {data, onEvent}) => {SectionWidget}(settings: data?['settings'] as Map<String, dynamic>? ?? {})); } @override Future<void> onInit() async { /* async I/O only */ } @override Map<String, WidgetBuilder>? getRoutes() => null; }",
     "featureSection": "class {SectionWidget} extends FeatureSection { const {SectionWidget}({super.key, super.settings}); @override Map<String, dynamic> getDefaultSettings() => {'title': 'Section Title'}; @override Widget build(BuildContext context) { final title = getSetting<String>('title'); final repo = adaptersOf(context).getRepository<{RepositoryType}>(); return Text(title); } }",
     "addonRegistration": "@override void onRegister() { addonRegistry.register('{component}.{widget}:{slot}', (context, {data, onEvent}) { final item = data?['{dataKey}'] as {Type}?; if (item == null || !{condition}) return null; return {AddonWidget}(); }, priority: 10); }",
     "addonSlotRender": "final addons = context.moose.addonRegistry.build('{component}.{widget}:{slot}', context, data: {'{dataKey}': item}); if (addons.isNotEmpty) Column(children: addons)",
-    "appBootstrap": "void main() async { WidgetsFlutterBinding.ensureInitialized(); await CacheManager.initPersistentCache(); final ctx = MooseAppContext(); runApp(MooseScope(appContext: ctx, child: MaterialApp(home: _BootstrapScreen(appContext: ctx)))); }",
-    "bloc": "class {Feature}Event extends Equatable { const {Feature}Event(); @override List<Object?> get props => []; } class {Feature}State extends Equatable { const {Feature}State(); @override List<Object?> get props => []; } class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> { {Feature}Bloc() : super(const {Feature}State()) { on<{Feature}Event>(_onEvent); } Future<void> _onEvent({Feature}Event event, Emitter<{Feature}State> emit) async {} }"
+    "appBootstrap": "void main() async { WidgetsFlutterBinding.ensureInitialized(); final ctx = MooseAppContext(); runApp(MooseScope(appContext: ctx, child: MaterialApp(home: _BootstrapScreen(appContext: ctx)))); } // In _BootstrapScreen.initState: await MooseBootstrapper(appContext: ctx).run(config: config, adapters: [...], plugins: [() => MyPlugin()]);",
+    "bloc": "class {Feature}Event extends Equatable { const {Feature}Event(); @override List<Object?> get props => []; } class {Feature}State extends Equatable { const {Feature}State(); @override List<Object?> get props => []; } class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> { {Feature}Bloc(this._repository) : super(const {Feature}State()) { on<{Feature}Event>(_onEvent); } final {Repository}Type _repository; Future<void> _onEvent({Feature}Event event, Emitter<{Feature}State> emit) async {} }"
   },
   "apiSurface": {
     "coreClasses": [
-      "MooseAppContext (moose_core/lib/src/app/moose_app_context.dart) — owns all registries; create one per app",
+      "MooseAppContext (moose_core/lib/src/app/moose_app_context.dart) — owns all registries; create one per app; all fields injectable for testing",
       "MooseScope (moose_core/lib/src/app/moose_scope.dart) — InheritedWidget providing MooseAppContext to widget tree; access via context.moose or MooseScope.of(context)",
-      "MooseBootstrapper (moose_core/lib/src/app/moose_bootstrapper.dart) — orchestrates config, adapter, and plugin initialization; returns BootstrapReport",
-      "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart) — receives injected appContext; convenience getters delegate to appContext (not singletons)",
-      "FeatureSection (moose_core/lib/src/widgets/feature_section.dart) — use adaptersOf(context) to access AdapterRegistry; NOT adapters getter (removed)",
-      "WidgetRegistry (moose_core/lib/src/widgets/widget_registry.dart) — registers full FeatureSections by name; register in onRegister()",
+      "MooseBootstrapper (moose_core/lib/src/app/moose_bootstrapper.dart) — orchestrates config, cache init, adapter, and plugin initialization; returns BootstrapReport with timings and failures map",
+      "FeaturePlugin (moose_core/lib/src/plugin/feature_plugin.dart) — receives injected appContext; convenience getters delegate to appContext; lifecycle: onRegister()[sync] → onInit()[async] → onStart()[async] → onAppLifecycle() → onStop()",
+      "FeatureSection (moose_core/lib/src/widgets/feature_section.dart) — use adaptersOf(context) to access AdapterRegistry inside build(); NOT a getter on the class",
+      "WidgetRegistry (moose_core/lib/src/widgets/widget_registry.dart) — registers full FeatureSections by name key; register in onRegister()",
       "AddonRegistry (moose_core/lib/src/widgets/addon_registry.dart) — slot-based supplementary widgets; register in onRegister(); builders may return null; multiple builders per slot in descending priority order",
-      "HookRegistry (moose_core/lib/src/events/hook_registry.dart) — synchronous data-transformation hooks",
-      "ActionRegistry (moose_core/lib/src/actions/action_registry.dart) — handles UserInteraction (navigate, openUrl, custom)",
-      "CoreRepository (moose_core/lib/src/repositories/repository.dart) — requires hookRegistry + eventBus constructor params; all subclasses must forward them",
-      "Repository interfaces (moose_core/lib/repositories.dart)"
+      "HookRegistry (moose_core/lib/src/events/hook_registry.dart) — synchronous data-transformation hooks; built-in hook: bottom_tabs:filter_tabs",
+      "ActionRegistry (moose_core/lib/src/actions/action_registry.dart) — handles UserInteraction dispatched by type (UserInteractionType: internal, external, custom, none); factory methods: UserInteraction.internal(), .external(), .custom(), .none()",
+      "CoreRepository (moose_core/lib/src/repositories/repository.dart) — base class with void initialize() {}; no constructor params; concrete subclasses declare only what they need",
+      "Repository interfaces (moose_core/lib/repositories.dart) — ProductsRepository, CartRepository, AuthRepository, SearchRepository, ReviewRepository, PostRepository, BannerRepository, PushNotificationRepository, ShortsRepository, StoreRepository, LocationRepository"
     ],
     "configurationKeys": [
+      "plugins.{plugin}.active",
       "plugins.{plugin}.settings.*",
-      "plugins.home.sections",
-      "adapters.*"
+      "plugins.{plugin}.sections.*",
+      "adapters.{adapter}.*"
+    ],
+    "configPathRules": [
+      "Plugin settings path includes 'settings' segment: plugins:{name}:settings:{key}",
+      "Adapter settings path has NO 'settings' segment: adapters:{name}:{key}",
+      "Both '.' and ':' work as path separators — they are interchangeable",
+      "Use getSetting<T>(key) inside FeaturePlugin — resolves plugins:{name}:settings:{key} automatically"
     ]
   },
   "cliCommands": [
     {
       "tool": "moose",
-      "command": "moose init <project>",
-      "description": "Runs flutter create, adds moose_core git dependency, copies README/docs.",
-      "notes": [
-        "Requires Flutter SDK. Set FLUTTER_ROOT or MOOSE_FLUTTER_BIN if not on PATH."
-      ]
+      "command": "dart pub global activate moose_cli",
+      "description": "Install moose_cli globally (one-time setup)."
     },
     {
       "tool": "moose",
       "command": "moose version",
-      "description": "Prints CLI version for telemetry/debug."
+      "description": "Print CLI version."
     },
     {
       "tool": "moose",
-      "command": "moose --metadata",
-      "description": "Outputs JSON metadata for AI orchestration."
+      "command": "moose init <name>",
+      "description": "Scaffold an empty Flutter project wired to moose_core.",
+      "flags": {
+        "--template <name>": "Scaffold from a built-in template (e.g. 'shopify'). Mutually exclusive with --manifest.",
+        "--manifest <path|url>": "Scaffold from a custom manifest file or HTTPS URL.",
+        "--configurations <path=value>": "Pre-fill environment.json values at scaffold time. Repeatable.",
+        "--verbose": "Stream git output during cloning."
+      },
+      "examples": [
+        "moose init my_app",
+        "moose init my_app --template shopify",
+        "moose init my_app --manifest https://example.com/template.json",
+        "moose init my_app --template shopify --configurations adapters.shopify.storeUrl=mystore.myshopify.com"
+      ]
+    },
+    {
+      "tool": "moose",
+      "command": "moose plugin add <name>",
+      "description": "Install a plugin into lib/plugins/<name>.",
+      "flags": {
+        "--git <repo>": "Install from a remote git repository.",
+        "--path <dir>": "Install from a local directory."
+      },
+      "examples": [
+        "moose plugin add loyalty --git https://github.com/greymooseinc/moose_extensions.git",
+        "moose plugin add reviews --path ./extensions/lib/plugins"
+      ]
+    },
+    {
+      "tool": "moose",
+      "command": "moose adapter add <name>",
+      "description": "Install an adapter into lib/adapters/<name>.",
+      "flags": {
+        "--git <repo>": "Install from a remote git repository.",
+        "--path <dir>": "Install from a local directory."
+      },
+      "examples": [
+        "moose adapter add stripe --path ./extensions/lib/adapters",
+        "moose adapter add shopify --git https://github.com/greymooseinc/moose_extensions.git"
+      ]
+    },
+    {
+      "tool": "moose",
+      "command": "moose locale add <localeCode>",
+      "description": "Create a new ARB localization file for the given locale code.",
+      "examples": [
+        "moose locale add si",
+        "moose locale add fr"
+      ]
+    },
+    {
+      "tool": "moose",
+      "command": "moose help <command>",
+      "description": "Show detailed usage for any moose_cli command.",
+      "examples": [
+        "moose help init",
+        "moose help plugin"
+      ]
     }
   ],
   "examples": {
     "addSection": [
       "1. Create lib/plugins/blog/presentation/sections/latest_posts_section.dart extending FeatureSection.",
-      "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.onRegister() (sync — not initialize()).",
+      "2. Register widgetRegistry.register('blog.latest_posts', ...) inside BlogPlugin.onRegister() (sync — not onInit()).",
       "3. Update assets/config/environment.json -> plugins.home.sections.main[]."
     ],
     "addAddon": [
@@ -183,9 +250,13 @@
       "5. Higher priority value = rendered first. Default priority is 1."
     ],
     "referenceDocs": [
-      "ai-ready/docs/ARCHITECTURE.md",
-      "ai-ready/docs/PLUGIN_SYSTEM.md",
-      "ai-ready/docs/API.md"
+      "doc/ai-ready/README.md",
+      "doc/ai-ready/ARCHITECTURE.md",
+      "doc/ai-ready/PLUGIN_SYSTEM.md",
+      "doc/ai-ready/ADAPTER_SYSTEM.md",
+      "doc/ai-ready/REPOSITORIES.md",
+      "doc/ai-ready/REGISTRIES.md",
+      "doc/ai-ready/API.md"
     ]
   }
 }
