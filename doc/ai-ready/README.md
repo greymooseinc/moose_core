@@ -18,63 +18,36 @@
 
 ## Quick Start
 
-### 1. Install moose_cli
+A fresh moose_core app can be initialized in two ways: using the official `moose_cli` tool (recommended — scaffolds the full project structure, wires dependencies, and can install plugins and adapters in one command), or by manually adding the package and writing the bootstrap code yourself.
 
-`moose_cli` is the official scaffolding tool. Activate it globally once:
+### 1. Using moose_cli
+
+`moose_cli` is the official command-line scaffolding tool for moose_core projects. It handles Flutter project creation, adds the `moose_core` git dependency, generates the `environment.json` configuration file, and can install plugins and adapters directly from git repositories or local paths. For AI agents generating new projects or extending existing ones, `moose_cli` is the fastest and least error-prone path.
+
+Activate it globally once with:
 
 ```bash
 dart pub global activate moose_cli
 ```
 
-Verify installation:
-
 ```bash
-moose version
-```
+# activate moose_cli tool globally once
+dart pub global activate moose_cli
 
-### 2. Scaffold a new app
-
-```bash
-# Empty app
+# initialize an empty app with core dependencies
 moose init my_app
-
-# From a built-in template (e.g. shopify)
-moose init my_app --template shopify
-
-# From a custom manifest file or HTTPS URL
-moose init my_app --manifest ./moose.manifest.json
-moose init my_app --manifest https://example.com/my-template.json
-
-# Pre-fill environment.json values at scaffold time
-moose init my_app --template shopify --configurations adapters.shopify.storeUrl=mystore.myshopify.com
 ```
 
-### 3. Add plugins and adapters
-
-```bash
-# Install a plugin from a git repository
-moose plugin add loyalty --git https://github.com/greymooseinc/moose_extensions.git
-
-# Install an adapter from a local path
-moose adapter add stripe --path ./extensions/lib/adapters
-
-# Add a localization file
-moose locale add si
-```
-
-### 4. Wire up manually (without moose_cli)
+### 2. Wire up manually 
 
 Add to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  moose_core:
-    git:
-      url: https://github.com/greymooseinc/moose_core.git
-      ref: main
+  moose_core: 'latest'
 ```
 
-Bootstrap in `main.dart`:
+Bootstrap the framework in `main.dart`:
 
 ```dart
 import 'package:moose_core/app.dart';
