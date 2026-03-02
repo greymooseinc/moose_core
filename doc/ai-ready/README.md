@@ -18,14 +18,9 @@ A fresh moose_core app can be initialized in two ways: using the official `moose
 
 `moose_cli` is the official command-line scaffolding tool for moose_core projects. It handles Flutter project creation, adds the `moose_core` git dependency, generates the `environment.json` configuration file, and can install plugins and adapters directly from git repositories or local paths. For AI agents generating new projects or extending existing ones, `moose_cli` is the fastest and least error-prone path.
 
-Activate it globally once with:
+Activate it globally once, then scaffold a new app:
 
 ```bash
-dart pub global activate moose_cli
-```
-
-```bash
-# activate moose_cli tool globally once
 dart pub global activate moose_cli
 
 # initialize an empty app with core dependencies
