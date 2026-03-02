@@ -8,12 +8,6 @@
 
 `moose_core` is a modular, backend-agnostic Flutter framework for e-commerce and content applications. It provides the architectural skeleton — registries, lifecycle, configuration, caching, events — so that features (plugins) and backends (adapters) can be developed independently and composed at runtime.
 
-**Core guarantees:**
-- No singletons — every registry is owned by a `MooseAppContext` instance
-- Backend-agnostic — all data access goes through repository interfaces, never directly to an API
-- Plugin-isolated — plugins communicate via `EventBus` and `HookRegistry`, not direct calls
-- Configuration-driven — section layouts, plugin settings, and adapter credentials all flow through `ConfigManager` from a single `environment.json`
-
 ---
 
 ## Quick Start
@@ -104,23 +98,23 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│              Presentation Layer                      │
-│    Screens · FeatureSection · Widgets                │
+│              Presentation Layer                     │
+│    Screens · FeatureSection · Widgets               │
 └──────────────────────┬──────────────────────────────┘
                        │ events / states
 ┌──────────────────────▼──────────────────────────────┐
-│           Business Logic Layer (BLoC)                │
-│    Blocs receive repositories via constructor        │
+│           Business Logic Layer (BLoC)               │
+│    Blocs receive repositories via constructor       │
 └──────────────────────┬──────────────────────────────┘
                        │ repository calls
 ┌──────────────────────▼──────────────────────────────┐
-│           Repository Layer (abstract)                │
-│    ProductsRepository, CartRepository, ...           │
+│           Repository Layer (abstract)               │
+│    ProductsRepository, CartRepository, ...          │
 └──────────────────────┬──────────────────────────────┘
                        │ concrete implementation
 ┌──────────────────────▼──────────────────────────────┐
-│           Adapter Layer (BackendAdapter)             │
-│    WooCommerceAdapter, ShopifyAdapter, ...           │
+│           Adapter Layer (BackendAdapter)            │
+│    WooCommerceAdapter, ShopifyAdapter, ...          │
 └─────────────────────────────────────────────────────┘
 ```
 
