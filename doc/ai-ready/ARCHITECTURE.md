@@ -55,8 +55,25 @@ class MooseAppContext {
   final AppLogger       logger;
   final CacheManager    cache;          // field is 'cache', not 'cacheManager'
 
-  // Shortcut: delegates to adapterRegistry.getRepository<T>()
+  /// Currently authenticated user, or null when unauthenticated.
+  /// Updated automatically when an AuthRepository is wired up via getRepository<AuthRepository>().
+  /// Also restored from PersistentCache on cold start by MooseBootstrapper.
+  final ValueNotifier<User?> currentUser;
+
+  // Shortcut: delegates to adapterRegistry.getRepository<T>().
+  // If T is AuthRepository, wireAuthRepository() is called automatically on first access.
   T getRepository<T extends CoreRepository>();
+
+  // Subscribes currentUser to repo.authStateChanges. Called automatically by getRepository<AuthRepository>().
+  // Safe to call multiple times — cancels previous subscription first.
+  void wireAuthRepository(AuthRepository repo);
+
+  // Restores last-known authenticated user from PersistentCache.
+  // Called automatically by MooseBootstrapper (step 2b).
+  Future<void> restoreAuthState();
+
+  // Releases auth subscription and currentUser notifier.
+  void dispose();
 }
 ```
 
@@ -103,6 +120,11 @@ Step 1  configManager.initialize(config)
 
 Step 2  cache.initPersistent()
         ↓ initializes SharedPreferences layer
+
+Step 2b appContext.restoreAuthState()
+        ↓ reads 'moose:auth:current_user' from PersistentCache
+        ↓ → if found: currentUser.value = User.fromJson(cached)  (instant UI on first frame)
+        ↓ → authStateChanges stream will confirm/correct once adapter wires up
 
 Step 3  AppNavigator.setEventBus(eventBus)
         ↓ wires navigation to scoped event bus
@@ -715,6 +737,38 @@ order.placed          payment.completed     user.signed_in
 notification.received products.refreshed
 ```
 
+### currentUser — Cross-Plugin Auth State
+
+`MooseAppContext.currentUser` is a `ValueNotifier<User?>` that tracks the currently authenticated user. It is available to every plugin and widget without requiring a direct import of the auth plugin.
+
+```dart
+// Sync read from anywhere
+final user = appContext.currentUser.value;
+
+// Reactive in widgets
+ValueListenableBuilder<User?>(
+  valueListenable: context.moose.currentUser,
+  builder: (context, user, _) => user != null
+    ? Text('Hello, ${user.displayName}')
+    : const LoginButton(),
+);
+```
+
+**How it is populated:**
+
+| Trigger | Effect |
+|---------|--------|
+| `MooseBootstrapper` step 2b — `restoreAuthState()` | Populated from `PersistentCache` on cold start — instant UI, no adapter needed |
+| First `getRepository<AuthRepository>()` call | `wireAuthRepository()` subscribes to `authStateChanges`; updates `currentUser` and PersistentCache on every emission |
+| `authStateChanges` emits a `User` | `currentUser.value = user`; user persisted to cache |
+| `authStateChanges` emits `null` (sign-out) | `currentUser.value = null`; cache entry removed |
+
+The `User` entity carries the session token fields: `accessToken` and `refreshToken`. These are persisted to cache automatically alongside the rest of the user data and can be read from `currentUser.value?.accessToken`.
+
+**Reserved cache key:** `moose:auth:current_user` — do not write to this key from other plugins.
+
+---
+
 ### CacheManager
 
 Owned by `MooseAppContext`. Field name is `cache` (not `cacheManager`). `BackendAdapter` exposes both `cache` and `cacheManager` as an alias.
@@ -982,6 +1036,8 @@ final report = await MooseBootstrapper(appContext: ctx).run(
 | Repositories return **domain entities** only — never DTOs | Architecture breaks; BLoCs would depend on backend types |
 | Sections extend `FeatureSection` and use BLoC — no direct repo calls | Breaks layer separation; business logic leaks into UI |
 | No singletons — every registry is per-`MooseAppContext` | Shared state across app instances; breaks test isolation |
+| Do not write to `moose:auth:current_user` in `PersistentCache` | Key reserved for `MooseAppContext.wireAuthRepository()` — conflicts cause corrupted auth state on cold start |
+| Auth BLoC must be scoped per-screen (`BlocProvider(create:...)`) | Shared plugin-level BLoC prevents lazy loading and leaks stale state between navigations |
 
 ---
 

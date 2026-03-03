@@ -117,9 +117,9 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
 | Class | Role |
 |---|---|
-| `MooseAppContext` | Owns all registries and services for one app instance |
+| `MooseAppContext` | Owns all registries, services, and `currentUser` auth state for one app instance |
 | `MooseScope` | `InheritedWidget` serving `MooseAppContext` to the widget tree |
-| `MooseBootstrapper` | Orchestrates the 7-step startup sequence |
+| `MooseBootstrapper` | Orchestrates the 7-step startup sequence (includes step 2b: `restoreAuthState`) |
 | `FeaturePlugin` | Base class for feature modules |
 | `BackendAdapter` | Base class for backend implementations |
 | `FeatureSection` | Base class for configurable UI sections |
@@ -145,9 +145,26 @@ ctx.configManager     // ConfigManager
 ctx.eventBus          // EventBus
 ctx.cache             // CacheManager (memory + persistent)
 ctx.logger            // AppLogger
+ctx.currentUser       // ValueNotifier<User?> — currently authenticated user, null if unauthenticated
 
-// Shortcut for repository access
+// Shortcut for repository access.
+// If T is AuthRepository, wireAuthRepository() is called automatically on first access.
 ctx.getRepository<ProductsRepository>()
+```
+
+Read the current user or react to auth state changes from anywhere in the widget tree:
+
+```dart
+// Sync read
+final user = context.moose.currentUser.value;
+
+// Reactive widget
+ValueListenableBuilder<User?>(
+  valueListenable: context.moose.currentUser,
+  builder: (context, user, _) => user != null
+    ? Text('Hello, ${user.displayName}')
+    : const LoginButton(),
+);
 ```
 
 In widgets, access via `context.moose`:
@@ -174,6 +191,7 @@ final ctx = MooseAppContext(
 
 1. `ConfigManager.initialize(config)` — loads `environment.json` map
 2. `CacheManager.initPersistent()` — opens persistent cache
+2b. `appContext.restoreAuthState()` — populates `currentUser` from `PersistentCache` (instant UI on first frame before any adapter wires up)
 3. `AppNavigator.setEventBus(eventBus)` — wires navigation to scoped event bus
 4. Register each adapter — `AdapterRegistry.registerAdapter()` → validates config schema → calls `adapter.initialize(config)`
 5. Register each plugin (sync) — injects `MooseAppContext`, calls `plugin.onRegister()`

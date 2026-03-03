@@ -21,6 +21,8 @@ class User extends CoreEntity {
   final Map<String, Map<String, dynamic>>? providerData;
   final DateTime? createdAt;
   final DateTime? lastLoginAt;
+  final String? accessToken;
+  final String? refreshToken;
 
   const User({
     required this.id,
@@ -36,6 +38,8 @@ class User extends CoreEntity {
     this.providerData,
     this.createdAt,
     this.lastLoginAt,
+    this.accessToken,
+    this.refreshToken,
     super.extensions,
   });
 
@@ -53,6 +57,8 @@ class User extends CoreEntity {
     Map<String, Map<String, dynamic>>? providerData,
     DateTime? createdAt,
     DateTime? lastLoginAt,
+    String? accessToken,
+    String? refreshToken,
     Map<String, dynamic>? extensions,
   }) {
     return User(
@@ -69,6 +75,8 @@ class User extends CoreEntity {
       providerData: providerData ?? this.providerData,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
       extensions: extensions ?? this.extensions,
     );
   }
@@ -88,6 +96,8 @@ class User extends CoreEntity {
       'providerData': providerData,
       'createdAt': createdAt?.toIso8601String(),
       'lastLoginAt': lastLoginAt?.toIso8601String(),
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
       'extensions': extensions,
     };
   }
@@ -115,6 +125,8 @@ class User extends CoreEntity {
       lastLoginAt: json['lastLoginAt'] != null
           ? DateTime.parse(json['lastLoginAt'] as String)
           : null,
+      accessToken: json['accessToken'] as String?,
+      refreshToken: json['refreshToken'] as String?,
       extensions: json['extensions'] as Map<String, dynamic>?,
     );
   }
@@ -130,6 +142,8 @@ class User extends CoreEntity {
         phoneVerified,
         isActive,
         isAdmin,
+        accessToken,
+        refreshToken,
         extensions,
       ];
 }

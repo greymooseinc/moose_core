@@ -221,6 +221,12 @@ User authentication, profile management, token lifecycle, and account linking.
 | `getCurrentUser()` | `Future<User?>` | Get authenticated user, null if none |
 | `authStateChanges` | `Stream<User?>` | Stream of auth state — emits User or null |
 
+**`authStateChanges` integration with `MooseAppContext`:**
+
+When `AuthRepository` is first accessed via `appContext.getRepository<AuthRepository>()` or `context.moose.getRepository<AuthRepository>()`, `MooseAppContext.wireAuthRepository()` is called automatically. This subscribes `MooseAppContext.currentUser` to the `authStateChanges` stream and persists the emitted user to `PersistentCache` (key: `moose:auth:current_user`) on every emission. No additional wiring is needed in the plugin or adapter.
+
+Adapters should emit a `User` with `accessToken` populated from `authStateChanges` so that token reads from `currentUser.value?.accessToken` work correctly.
+
 **Password management:**
 
 | Method | Returns | Description |
@@ -270,6 +276,25 @@ User authentication, profile management, token lifecycle, and account linking.
 **Credential types** (defined in `auth_credentials.dart`): `EmailPasswordCredentials`, `PhoneCredentials`, `OAuthCredentials`, `CustomTokenCredentials`, `AnonymousCredentials`.
 
 **Result types** (defined in `auth_result.dart`): `AuthResult` (extends `CoreEntity`), `PasswordResetResult`, `EmailVerificationResult`.
+
+**`User` entity token fields** (defined in `lib/src/entities/user.dart`):
+
+| Field | Type | Description |
+|---|---|---|
+| `accessToken` | `String?` | OAuth access token or Firebase id token for the current session |
+| `refreshToken` | `String?` | Refresh token used to obtain new access tokens |
+
+Adapters should populate these fields on the `User` emitted by `authStateChanges`. The token is then automatically persisted alongside the user in `PersistentCache` and is accessible synchronously via `appContext.currentUser.value?.accessToken`.
+
+`AuthResult.token` and `AuthResult.refreshToken` carry the tokens from the immediate operation response. Fold them into the `User` before emitting from `authStateChanges`:
+
+```dart
+// In adapter's authStateChanges implementation, e.g. after sign-in:
+yield user.copyWith(
+  accessToken: idToken,
+  refreshToken: refreshToken,
+);
+```
 
 **Note:** Not all methods need to be implemented — throw `UnimplementedError` for unsupported features.
 

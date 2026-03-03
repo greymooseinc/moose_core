@@ -3,21 +3,50 @@ import '../plugin/feature_plugin.dart';
 import '../services/app_navigator.dart';
 import 'moose_app_context.dart';
 
-/// Summary of a [MooseBootstrapper.run] call.
+/// Structured result returned by [MooseBootstrapper.run].
+///
+/// Inspect [succeeded] for a quick pass/fail check, [failures] for details on
+/// any adapter or plugin that failed to initialise, and [pluginTimings] /
+/// [pluginStartTimings] for performance diagnostics.
+///
+/// ```dart
+/// final report = await MooseBootstrapper(appContext: ctx).run(...);
+///
+/// if (!report.succeeded) {
+///   for (final entry in report.failures.entries) {
+///     logger.error('${entry.key}: ${entry.value}');
+///   }
+/// }
+/// ```
 class BootstrapReport {
   /// Wall-clock time for the entire bootstrap sequence.
   final Duration totalTime;
 
-  /// Per-plugin initialization timings (plugin name → elapsed time).
+  /// Per-plugin initialisation timings, keyed by plugin name.
+  ///
+  /// Populated from [PluginRegistry.initAll]; absent when a plugin's `onInit`
+  /// throws (the error is recorded in [failures] instead).
   final Map<String, Duration> pluginTimings;
+
+  /// Per-plugin start timings, keyed by plugin name.
+  ///
+  /// Populated from [PluginRegistry.startAll]; absent when a plugin's `onStart`
+  /// throws.
   final Map<String, Duration> pluginStartTimings;
 
-  /// Failures that occurred (key = `"adapter:<name>"` or `"plugin:<name>"`).
+  /// Failures that occurred during bootstrap, keyed by `"adapter:<name>"` or
+  /// `"plugin:<name>"`.
+  ///
+  /// The value is the caught error object. A non-empty map causes [succeeded]
+  /// to return `false`.
   final Map<String, Object> failures;
 
-  /// True when no failures occurred.
+  /// Returns `true` when no failures occurred during bootstrap.
   bool get succeeded => failures.isEmpty;
 
+  /// Creates a bootstrap report with explicit field values.
+  ///
+  /// All fields are required; the bootstrapper is the only caller.
   const BootstrapReport({
     required this.totalTime,
     required this.pluginTimings,
@@ -35,37 +64,82 @@ class BootstrapReport {
 
 /// Orchestrates the moose_core startup sequence against a [MooseAppContext].
 ///
-/// Typical usage inside a splash/bootstrap screen:
+/// Create one bootstrapper per app context, then call [run] once — typically
+/// inside the `initState` of your root bootstrap screen:
 ///
 /// ```dart
 /// final report = await MooseBootstrapper(appContext: appContext).run(
-///   config: {
-///     'plugins': {
-///       'products': {'active': true, 'settings': {...}},
-///     },
-///   },
+///   config: await loadEnvironmentJson(),
 ///   adapters: [WooCommerceAdapter()],
-///   plugins: [() => ProductsPlugin()],
+///   plugins: [() => ProductsPlugin(), () => CartPlugin()],
 /// );
 ///
 /// if (!report.succeeded) {
-///   // handle failures
+///   // Surface failures to an error screen or analytics.
 /// }
 /// ```
 ///
-/// The bootstrap sequence:
-/// 1. Initialize [ConfigManager] with the provided config map.
-/// 2. Initialize the scoped [CacheManager] persistent layer.
-/// 3. Wire [AppNavigator] to the scoped [EventBus].
-/// 4. Register each adapter via [AdapterRegistry].
-/// 5. Register each plugin via [PluginRegistry] (sync, injects [MooseAppContext]).
-/// 6. Initialize all registered plugins via [PluginRegistry.initAll] (async).
-/// 7. Start all registered plugins via [PluginRegistry.startAll] (async).
+/// ## Bootstrap sequence
+///
+/// The sequence is strictly ordered. A failure in one step is recorded in
+/// [BootstrapReport.failures] but does not abort subsequent steps, so partial
+/// initialisation is always reported rather than silently swallowed.
+///
+/// 1. **Config** — [ConfigManager.initialize] loads the provided config map.
+/// 2. **Persistent cache** — [CacheManager.initPersistent] opens the
+///    SharedPreferences-backed store.
+/// 2b. **Auth restore** — [MooseAppContext.restoreAuthState] reads the last
+///    persisted user from the persistent cache so the UI can render
+///    user-specific content on the very first frame.
+/// 3. **Navigator wiring** — [AppNavigator.setEventBus] connects navigation
+///    helpers to this context's scoped [EventBus].
+/// 4. **Adapter registration** — each [BackendAdapter] is registered via
+///    [AdapterRegistry.registerAdapter]; adapter factories are evaluated lazily.
+/// 5. **Plugin registration** — each plugin factory is called, the resulting
+///    [FeaturePlugin] is registered via [PluginRegistry.register], which
+///    injects [MooseAppContext] and calls [FeaturePlugin.onRegister] (sync).
+/// 6. **Plugin init** — [PluginRegistry.initAll] calls each plugin's
+///    [FeaturePlugin.onInit] concurrently and records per-plugin timing.
+/// 7. **Plugin start** — [PluginRegistry.startAll] calls each plugin's
+///    [FeaturePlugin.onStart] and records per-plugin timing.
+///
+/// See also:
+///
+///  * [MooseAppContext], the DI container consumed by this bootstrapper.
+///  * [BootstrapReport], the structured result of [run].
+///  * [MooseScope], which must wrap your widget tree to expose the context.
 class MooseBootstrapper {
+  /// The application context this bootstrapper will initialise.
   final MooseAppContext appContext;
 
+  /// Creates a bootstrapper bound to [appContext].
   MooseBootstrapper({required this.appContext});
 
+  /// Executes the full startup sequence and returns a [BootstrapReport].
+  ///
+  /// Provide [config] as the raw configuration map (typically parsed from
+  /// `environment.json`). Pass [adapters] and [plugins] in the order they
+  /// should be registered — registration order determines hook priority
+  /// tie-breaking and plugin dependency resolution.
+  ///
+  /// The returned [BootstrapReport] is safe to inspect immediately after
+  /// `await`; it is never null and always contains timing data for every step
+  /// that completed, even if later steps failed.
+  ///
+  /// ```dart
+  /// // Inside AppBootstrap.initState
+  /// final report = await MooseBootstrapper(appContext: ctx).run(
+  ///   config: {'plugins': {'products': {'active': true}}},
+  ///   adapters: [WooCommerceAdapter()],
+  ///   plugins: [() => ProductsPlugin()],
+  /// );
+  /// setState(() => _bootstrapReport = report);
+  /// ```
+  ///
+  /// See also:
+  ///
+  ///  * [BootstrapReport.succeeded], for a quick pass/fail check.
+  ///  * [BootstrapReport.failures], for per-adapter and per-plugin error details.
   Future<BootstrapReport> run({
     required Map<String, dynamic> config,
     List<BackendAdapter> adapters = const [],
@@ -81,6 +155,11 @@ class MooseBootstrapper {
 
     // Step 2: Initialize the scoped persistent cache layer.
     await appContext.cache.initPersistent();
+
+    // Step 2b: Restore last-known auth state from persistent cache so the UI
+    //          can show user-specific content on the first frame, before any
+    //          adapter's authStateChanges stream confirms the session.
+    await appContext.restoreAuthState();
 
     // Step 3: Wire AppNavigator to the scoped EventBus so that navigation
     //         events flow through this context's bus (not a global singleton).

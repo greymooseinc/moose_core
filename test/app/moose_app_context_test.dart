@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/app.dart';
 import 'package:moose_core/cache.dart';
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
+
 // ---------------------------------------------------------------------------
 // Test doubles
 // ---------------------------------------------------------------------------
@@ -262,5 +266,209 @@ void main() {
         );
       });
     });
+
+    group('currentUser', () {
+      // Minimal stub satisfying AuthRepository's abstract interface.
+      // Only authStateChanges is exercised; everything else throws.
+      late StreamController<User?> authController;
+      late _StubAuthRepository stubRepo;
+      // Use a mock persistent cache for all tests in this group to avoid
+      // triggering SharedPreferences (which requires a Flutter binding).
+      late CacheManager mockCacheManager;
+
+      const testUser = User(
+        id: 'u1',
+        email: 'test@example.com',
+        displayName: 'Test User',
+        accessToken: 'tok_abc',
+        refreshToken: 'ref_xyz',
+      );
+
+      setUp(() {
+        authController = StreamController<User?>.broadcast();
+        stubRepo = _StubAuthRepository(authController.stream);
+        mockCacheManager = CacheManager(persistent: _MockPersistentCache(null));
+      });
+
+      tearDown(() async {
+        await authController.close();
+      });
+
+      test('starts as null on a fresh context', () {
+        final ctx = MooseAppContext(cache: mockCacheManager);
+        expect(ctx.currentUser.value, isNull);
+      });
+
+      test('updates currentUser when authStateChanges emits a user', () async {
+        final ctx = MooseAppContext(cache: mockCacheManager);
+        ctx.wireAuthRepository(stubRepo);
+
+        authController.add(testUser);
+        await Future.microtask(() {});
+
+        expect(ctx.currentUser.value, equals(testUser));
+      });
+
+      test('resets currentUser to null on sign-out', () async {
+        final ctx = MooseAppContext(cache: mockCacheManager);
+        ctx.wireAuthRepository(stubRepo);
+
+        authController.add(testUser);
+        await Future.microtask(() {});
+        expect(ctx.currentUser.value, isNotNull);
+
+        authController.add(null);
+        await Future.microtask(() {});
+        expect(ctx.currentUser.value, isNull);
+      });
+
+      test('two contexts have independent currentUser notifiers', () async {
+        final ctx1 = MooseAppContext(cache: mockCacheManager);
+        final ctx2 = MooseAppContext(
+          cache: CacheManager(persistent: _MockPersistentCache(null)),
+        );
+
+        final ctrl2 = StreamController<User?>.broadcast();
+        ctx1.wireAuthRepository(stubRepo);
+        ctx2.wireAuthRepository(_StubAuthRepository(ctrl2.stream));
+
+        authController.add(testUser);
+        await Future.microtask(() {});
+
+        expect(ctx1.currentUser.value, equals(testUser));
+        expect(ctx2.currentUser.value, isNull);
+
+        await ctrl2.close();
+      });
+
+      test('restoreAuthState populates currentUser from persistent cache',
+          () async {
+        final ctx = MooseAppContext(
+          cache: CacheManager(persistent: _MockPersistentCache(testUser.toJson())),
+        );
+
+        await ctx.restoreAuthState();
+
+        expect(ctx.currentUser.value?.id, equals(testUser.id));
+        expect(ctx.currentUser.value?.email, equals(testUser.email));
+        expect(ctx.currentUser.value?.accessToken, equals(testUser.accessToken));
+      });
+
+      test('restoreAuthState is a no-op when cache is empty', () async {
+        final ctx = MooseAppContext(
+          cache: CacheManager(persistent: _MockPersistentCache(null)),
+        );
+
+        await ctx.restoreAuthState();
+
+        expect(ctx.currentUser.value, isNull);
+      });
+
+      test('wireAuthRepository replaces previous subscription', () async {
+        final ctx = MooseAppContext(cache: mockCacheManager);
+        ctx.wireAuthRepository(stubRepo);
+
+        final ctrl2 = StreamController<User?>.broadcast();
+        const user2 = User(id: 'u2', email: 'other@example.com');
+        ctx.wireAuthRepository(_StubAuthRepository(ctrl2.stream));
+
+        // Old stream should no longer update currentUser.
+        authController.add(testUser);
+        await Future.microtask(() {});
+        expect(ctx.currentUser.value, isNull);
+
+        // New stream should.
+        ctrl2.add(user2);
+        await Future.microtask(() {});
+        expect(ctx.currentUser.value, equals(user2));
+
+        await ctrl2.close();
+      });
+    });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stubs for currentUser tests
+// ---------------------------------------------------------------------------
+
+class _StubAuthRepository extends AuthRepository {
+  final Stream<User?> _stream;
+  _StubAuthRepository(this._stream);
+
+  @override
+  Stream<User?> get authStateChanges => _stream;
+
+  @override
+  void initialize() {}
+
+  @override
+  Future<AuthResult> signIn(AuthCredentials credentials) => throw UnimplementedError();
+  @override
+  Future<AuthResult> signUp(AuthCredentials credentials,
+      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata}) =>
+      throw UnimplementedError();
+  @override
+  Future<void> signOut() => throw UnimplementedError();
+  @override
+  Future<User?> getCurrentUser() => throw UnimplementedError();
+  @override
+  Future<PasswordResetResult> sendPasswordResetEmail(String email) => throw UnimplementedError();
+  @override
+  Future<PasswordResetResult> confirmPasswordReset(
+      {required String code, required String newPassword}) =>
+      throw UnimplementedError();
+  @override
+  Future<PasswordResetResult> changePassword(
+      {required String currentPassword, required String newPassword}) =>
+      throw UnimplementedError();
+  @override
+  Future<void> sendEmailVerification() => throw UnimplementedError();
+  @override
+  Future<EmailVerificationResult> verifyEmail(String code) => throw UnimplementedError();
+  @override
+  Future<void> sendPhoneVerificationCode(String phoneNumber) => throw UnimplementedError();
+  @override
+  Future<EmailVerificationResult> verifyPhoneNumber(
+      {required String phoneNumber, required String verificationCode}) =>
+      throw UnimplementedError();
+  @override
+  Future<User> updateProfile(
+      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata}) =>
+      throw UnimplementedError();
+  @override
+  Future<User> updateEmail(String newEmail) => throw UnimplementedError();
+  @override
+  Future<void> deleteAccount() => throw UnimplementedError();
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) => throw UnimplementedError();
+  @override
+  Future<AuthResult> refreshToken(String refreshToken) => throw UnimplementedError();
+  @override
+  Future<AuthResult> linkCredential(AuthCredentials credentials) => throw UnimplementedError();
+  @override
+  Future<User> unlinkProvider(String providerId) => throw UnimplementedError();
+  @override
+  Future<void> enrollMFA({required String phoneNumber}) => throw UnimplementedError();
+  @override
+  Future<void> unenrollMFA() => throw UnimplementedError();
+}
+
+class _MockPersistentCache extends PersistentCache {
+  final Map<String, dynamic>? _storedUser;
+  _MockPersistentCache(this._storedUser);
+
+  @override
+  Future<T?> getJson<T>(String key) async {
+    if (key == 'moose:auth:current_user' && _storedUser is T?) {
+      return _storedUser as T?;
+    }
+    return null;
+  }
+
+  @override
+  Future<bool> setJson(String key, dynamic value) async => true;
+
+  @override
+  Future<bool> remove(String key) async => true;
 }
