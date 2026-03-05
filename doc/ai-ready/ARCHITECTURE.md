@@ -92,10 +92,13 @@ final testCtx = MooseAppContext(hookRegistry: MockHookRegistry());
 `MooseScope` is a `StatefulWidget` that wraps an `InheritedWidget` to provide `MooseAppContext` to every descendant widget. Wrap your `MaterialApp` with it.
 
 ```dart
+// MooseApp handles MooseScope + bootstrap automatically:
 runApp(
-  MooseScope(
-    appContext: ctx,
-    child: MaterialApp(home: _BootstrapScreen(appContext: ctx)),
+  MooseApp(
+    config: config,
+    adapters: [WooCommerceAdapter()],
+    plugins: [() => ProductsPlugin()],
+    builder: (context, appContext) => MyApp(appContext: appContext),
   ),
 );
 
@@ -1004,20 +1007,17 @@ class ProductsPlugin extends FeaturePlugin {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final ctx = MooseAppContext();
+  final config = await loadConfig(); // Map<String, dynamic>
 
-  runApp(MooseScope(
-    appContext: ctx,
-    child: MaterialApp(home: _BootstrapScreen(appContext: ctx)),
-  ));
+  runApp(
+    MooseApp(
+      config: config,
+      adapters: [WooCommerceAdapter()],
+      plugins: [() => ProductsPlugin()],
+      builder: (context, appContext) => MyApp(appContext: appContext),
+    ),
+  );
 }
-
-// In _BootstrapScreen.initState:
-final report = await MooseBootstrapper(appContext: ctx).run(
-  config: await loadConfig(),
-  adapters: [WooCommerceAdapter()],
-  plugins: [() => ProductsPlugin()],
-);
 ```
 
 ---

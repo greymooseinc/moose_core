@@ -3,142 +3,177 @@
 [![pub package](https://img.shields.io/pub/v/moose_core.svg)](https://pub.dev/packages/moose_core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive, production-ready core architecture package for building modular Flutter e-commerce applications.
+**Flutter e-commerce framework for AI-assisted development.**
 
-## Features
+`moose_core` gives you the architectural scaffolding to kick-start production-ready Flutter e-commerce apps — with clean architecture, a plugin system, swappable backends, and documentation structured for AI agents to generate correct code from day one.
 
-- **Plugin-Based Architecture**: Modular feature plugins with clean boundaries
-- **Repository Pattern**: Abstract data layer with swappable backend adapters
-- **BLoC State Management**: Built-in support for predictable state management
-- **FeatureSection Pattern**: Configurable, reusable UI sections
-- **Registry Systems**: Widget, Adapter, Action, Hook, and Addon registries
-- **Cache Management**: Multi-layer caching with TTL support
-- **Configuration System**: JSON-based external configuration
-- **Modular Imports**: Import entire package or specific modules for optimized builds
-- **Type-Safe APIs**: Generic methods with compile-time type checking
-- **AI-Ready Documentation**: Comprehensive documentation for AI-assisted development
+---
 
-## Quick Start
+## What you get
 
-### Installation
+| Capability | How |
+|---|---|
+| **Clean architecture** | Presentation → BLoC → Repository → BackendAdapter, enforced by the framework |
+| **Swappable backends** | WooCommerce, Shopify, or custom — swap without touching UI code |
+| **Plugin-based features** | Every feature is an isolated `FeaturePlugin` with its own routes, widgets, and hooks |
+| **AI-agent-ready** | 18 structured docs in `doc/ai-ready/` so AI agents generate correct code first time |
+| **Dynamic UI composition** | `WidgetRegistry` lets adapters and plugins inject UI sections at runtime |
+| **Event-driven communication** | `EventBus` + `HookRegistry` for decoupled cross-plugin messaging |
+| **Multi-layer caching** | Memory + persistent cache with TTL, managed by `CacheManager` |
+| **Type-safe DI** | `MooseAppContext` wires everything; `context.moose` serves it anywhere in the widget tree |
 
-Add to your `pubspec.yaml`:
+---
+
+## Project folder structure
+
+Below is the recommended structure for a Flutter app built with `moose_core`. Each feature lives in its own plugin and is registered at boot time.
+
+```
+my_store/
+├── lib/
+│   ├── main.dart                        # Bootstrap: MooseAppContext → MooseBootstrapper
+│   │
+│   ├── plugins/
+│   │   ├── products/
+│   │   │   ├── products_plugin.dart     # FeaturePlugin — registers routes & widgets
+│   │   │   ├── bloc/
+│   │   │   │   ├── products_bloc.dart
+│   │   │   │   ├── products_event.dart
+│   │   │   │   └── products_state.dart
+│   │   │   ├── sections/
+│   │   │   │   └── featured_products_section.dart  # FeatureSection
+│   │   │   └── screens/
+│   │   │       └── products_list_screen.dart
+│   │   │
+│   │   ├── cart/
+│   │   │   ├── cart_plugin.dart
+│   │   │   ├── bloc/
+│   │   │   └── sections/
+│   │   │
+│   │   └── ...
+│   │
+│   └── adapters/
+│       └── woocommerce/
+│           ├── woo_adapter.dart         # BackendAdapter — wires repositories
+│           ├── woo_products_repository.dart
+│           ├── woo_cart_repository.dart
+│           └── woo_auth_repository.dart
+│
+├── pubspec.yaml
+└── ...
+
+# moose_core provides (you implement these interfaces):
+#   ProductsRepository, CartRepository, AuthRepository, OrderRepository ...
+#   BackendAdapter, FeaturePlugin, FeatureSection
+```
+
+---
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────┐
+│  Presentation  (Screens, FeatureSections)          │
+│  → reads from BLoC, calls actionRegistry           │
+└──────────────────────┬─────────────────────────────┘
+                       │ events / states
+┌──────────────────────▼─────────────────────────────┐
+│  BLoC  (feature-scoped state machines)             │
+│  → calls Repository interfaces                     │
+└──────────────────────┬─────────────────────────────┘
+                       │ abstract calls
+┌──────────────────────▼─────────────────────────────┐
+│  Repository interfaces  (defined in moose_core)    │
+│  ProductsRepository, CartRepository, Auth...       │
+└──────────────────────┬─────────────────────────────┘
+                       │ concrete implementation
+┌──────────────────────▼─────────────────────────────┐
+│  BackendAdapter  (you write this per backend)      │
+│  WooCommerce / Shopify / custom REST / GraphQL     │
+└────────────────────────────────────────────────────┘
+
+  MooseAppContext  ──  owns all registries
+  MooseScope       ──  InheritedWidget; serves context.moose
+  MooseBootstrapper ─  wires adapters + plugins at startup
+```
+
+---
+
+## Quick start
 
 ```yaml
+# pubspec.yaml
 dependencies:
-  moose_core: ^1.0.0
+  moose_core: ^1.3.1
 ```
 
-### Import Options
-
 ```dart
-// Option 1: Import everything (recommended for most cases)
-import 'package:moose_core/moose_core.dart';
+// main.dart
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:moose_core/app.dart';
 
-// Option 2: Import specific modules (for optimized builds)
-import 'package:moose_core/app.dart';            // MooseAppContext, MooseScope, MooseBootstrapper
-import 'package:moose_core/entities.dart';       // Domain entities
-import 'package:moose_core/repositories.dart';   // Repository interfaces
-import 'package:moose_core/plugin.dart';         // Plugin system
-import 'package:moose_core/widgets.dart';        // UI components
-import 'package:moose_core/adapters.dart';       // Adapter pattern
-import 'package:moose_core/cache.dart';          // Caching system
-import 'package:moose_core/services.dart';       // Utilities & helpers
-```
-
-### Basic Usage
-
-```dart
-import 'package:moose_core/moose_core.dart';
-
-// 1. Bootstrap the app with MooseAppContext + MooseScope
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheManager.initPersistentCache();
-  final appContext = MooseAppContext();
-  runApp(MooseScope(
-    appContext: appContext,
-    child: AppBootstrap(appContext: appContext),
-  ));
-}
 
-class AppBootstrap extends StatefulWidget {
-  final MooseAppContext appContext;
-  const AppBootstrap({super.key, required this.appContext});
-  @override State<AppBootstrap> createState() => _AppBootstrapState();
-}
+  final config = json.decode(
+    await rootBundle.loadString('config/environment.json'),
+  ) as Map<String, dynamic>;
 
-class _AppBootstrapState extends State<AppBootstrap> {
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    MooseBootstrapper(appContext: widget.appContext).run(
-      config: {'adapters': {'woocommerce': {'baseUrl': 'https://mystore.com'}}},
+  runApp(
+    MooseApp(
+      config: config,
       adapters: [WooCommerceAdapter()],
-      plugins: [() => ProductsPlugin()],
-    ).then((_) { if (mounted) setState(() => _ready = true); });
-  }
-
-  @override
-  Widget build(BuildContext context) => _ready
-      ? const MyApp()
-      : const Scaffold(body: Center(child: CircularProgressIndicator()));
+      plugins: [() => ProductsPlugin(), () => CartPlugin()],
+      builder: (context, appContext) => MyApp(appContext: appContext),
+    ),
+  );
 }
+```
 
-// 2. Create a plugin — use inherited registry getters (hookRegistry, widgetRegistry, etc.)
+`MooseApp` creates `MooseAppContext`, runs `MooseBootstrapper`, wraps the tree in `MooseScope`, and shows a spinner until bootstrap completes — no boilerplate required.
+
+Supply `loadingWidget` for a custom splash screen:
+
+```dart
+MooseApp(
+  config: config,
+  adapters: [...],
+  plugins: [...],
+  builder: (context, appContext) => MyApp(appContext: appContext),
+  loadingWidget: const SplashScreen(),
+)
+```
+
+---
+
+## Core building blocks
+
+### FeaturePlugin
+```dart
 class ProductsPlugin extends FeaturePlugin {
   @override String get name => 'products';
   @override String get version => '1.0.0';
 
   @override
   void onRegister() {
-    // widgetRegistry, hookRegistry, addonRegistry, etc. delegate to injected appContext
     widgetRegistry.register(
       'products.featured',
-      (context, {data, onEvent}) => FeaturedProductsSection(
-        settings: data?['settings'] as Map<String, dynamic>?,
-      ),
+      (ctx, {data, onEvent}) => FeaturedProductsSection(settings: data?['settings']),
     );
+    actionRegistry.register('products.refresh', (ctx, _) async { /* ... */ });
   }
-
-  @override Future<void> onInit() async {}
 
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
     '/products': (_) => ProductsListScreen(),
   };
 }
+```
 
-// 3. Create a FeatureSection — use adaptersOf(context) inside build()
-class FeaturedProductsSection extends FeatureSection {
-  const FeaturedProductsSection({super.key, super.settings});
-
-  @override
-  Map<String, dynamic> getDefaultSettings() => {
-    'title': 'FEATURED PRODUCTS',
-    'itemCount': 10,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final repository = adaptersOf(context).getRepository<ProductsRepository>();
-    return BlocProvider(
-      create: (_) => FeaturedProductsBloc(repository)
-        ..add(const LoadFeaturedProducts()),
-      child: BlocBuilder<FeaturedProductsBloc, FeaturedProductsState>(
-        builder: (context, state) {
-          if (state is FeaturedProductsLoaded) return _buildProducts(state.products);
-          if (state is FeaturedProductsError) return Text(state.message);
-          return const CircularProgressIndicator();
-        },
-      ),
-    );
-  }
-}
-
-// 4. Create a backend adapter — hookRegistry and eventBus are set before initializeFromConfig
+### BackendAdapter
+```dart
 class WooCommerceAdapter extends BackendAdapter {
   @override String get name => 'woocommerce';
   @override String get version => '1.0.0';
@@ -155,264 +190,77 @@ class WooCommerceAdapter extends BackendAdapter {
 }
 ```
 
-## Core Concepts
-
-### Plugin System
-
-Every feature is a self-contained plugin:
-
+### FeatureSection
 ```dart
-class MyPlugin extends FeaturePlugin {
-  @override
-  String get name => 'my_plugin';
+class FeaturedProductsSection extends FeatureSection {
+  const FeaturedProductsSection({super.key, super.settings});
 
   @override
-  void onRegister() {
-    // widgetRegistry, hookRegistry, actionRegistry, etc. are available as
-    // inherited getters backed by the injected MooseAppContext
-    widgetRegistry.register('my.section', (ctx, {data, onEvent}) => MySection());
-    hookRegistry.register('my:hook', (data) => processData(data));
-    actionRegistry.register('my.action', (ctx, payload) async { /* ... */ });
-  }
-
-  @override
-  Future<void> onInit() async {
-    // Async initialization (called after all plugins are registered)
-  }
-
-  @override
-  Map<String, WidgetBuilder>? getRoutes() => {
-    '/my-route': (_) => MyScreen(),
-  };
-}
-```
-
-### Repository Pattern
-
-Abstract interfaces with backend-specific implementations:
-
-```dart
-// Core repository interface (abstract, defined in moose_core)
-abstract class ProductsRepository extends CoreRepository {
-  Future<ProductListResult> getProducts({ProductFilters? filters});
-  Future<Product> getProductById(String id);
-}
-
-// Backend implementation — forward hookRegistry and eventBus to super
-class WooProductsRepository extends ProductsRepository {
-  final ApiClient _apiClient;
-
-  WooProductsRepository(this._apiClient, {
-    required super.hookRegistry,
-    required super.eventBus,
-  });
-
-  @override
-  Future<ProductListResult> getProducts({ProductFilters? filters}) async {
-    // WooCommerce-specific implementation
-  }
-}
-```
-
-### FeatureSection Pattern
-
-Configurable UI sections:
-
-```dart
-class MySection extends FeatureSection {
-  const MySection({super.key, super.settings});
-
-  @override
-  Map<String, dynamic> getDefaultSettings() {
-    return {
-      'title': 'Default Title',
-      'itemCount': 5,
-    };
-  }
+  Map<String, dynamic> getDefaultSettings() => {'title': 'Featured', 'itemCount': 10};
 
   @override
   Widget build(BuildContext context) {
-    final title = getSetting<String>('title');
-    final count = getSetting<int>('itemCount');
-    // Build UI...
+    final repo = adaptersOf(context).getRepository<ProductsRepository>();
+    return BlocProvider(
+      create: (_) => FeaturedProductsBloc(repo)..add(LoadFeaturedProducts()),
+      child: BlocBuilder<FeaturedProductsBloc, FeaturedProductsState>(
+        builder: (ctx, state) => switch (state) {
+          FeaturedProductsLoaded() => _buildGrid(state.products),
+          FeaturedProductsError() => Text(state.message),
+          _ => const CircularProgressIndicator(),
+        },
+      ),
+    );
   }
 }
 ```
 
-### Registry Systems
+---
 
-#### WidgetRegistry
-Dynamic widget composition. In plugins use the inherited getter; in widgets use `context.moose`:
+## Package modules
+
 ```dart
-// In a plugin's onRegister():
-widgetRegistry.register('my.widget', (context, {data, onEvent}) => MyWidget());
+import 'package:moose_core/moose_core.dart';   // everything
 
-// In any widget's build(context):
-final widget = context.moose.widgetRegistry.build('my.widget', context);
+// or selectively:
+import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, MooseBootstrapper
+import 'package:moose_core/entities.dart';     // Product, Cart, Order, Category, User ...
+import 'package:moose_core/repositories.dart'; // ProductsRepository, CartRepository ...
+import 'package:moose_core/plugin.dart';       // FeaturePlugin, PluginRegistry
+import 'package:moose_core/widgets.dart';      // FeatureSection, WidgetRegistry, AddonRegistry
+import 'package:moose_core/adapters.dart';     // BackendAdapter, AdapterRegistry
+import 'package:moose_core/cache.dart';        // CacheManager, MemoryCache, PersistentCache
+import 'package:moose_core/services.dart';     // EventBus, HookRegistry, ActionRegistry, ApiClient
 ```
 
-#### AdapterRegistry
-Backend adapter management. In `FeatureSection.build()` use `adaptersOf(context)`:
-```dart
-// In a FeatureSection's build(context):
-final repo = adaptersOf(context).getRepository<ProductsRepository>();
+---
 
-// In any other widget's build(context):
-final repo = context.moose.adapterRegistry.getRepository<ProductsRepository>();
-```
+## AI-assisted development
 
-#### ActionRegistry
-Custom action handling:
-```dart
-// In a plugin's onRegister():
-actionRegistry.register('custom_action', (context, payload) async {
-  // Handle action
-});
+The `doc/ai-ready/` directory contains 18 structured documents written for AI agents and developers:
 
-// In any widget's build(context):
-context.moose.actionRegistry.execute('custom_action', context, payload);
-```
+- [Architecture Guide](doc/ai-ready/ARCHITECTURE.md)
+- [Plugin System](doc/ai-ready/PLUGIN_SYSTEM.md)
+- [Adapter Pattern](doc/ai-ready/ADAPTER_PATTERN.md)
+- [FeatureSection Guide](doc/ai-ready/FEATURE_SECTION.md)
+- [Event System](doc/ai-ready/EVENT_SYSTEM_GUIDE.md)
+- [Registries](doc/ai-ready/REGISTRIES.md)
+- [Anti-Patterns](doc/ai-ready/ANTI_PATTERNS.md)
+- [API Reference](doc/ai-ready/API.md)
 
-#### EventBus
-Asynchronous event-driven communication between plugins:
-```dart
-// In a plugin — fire events using the inherited getter:
-eventBus.fire(
-  'cart.item.added',
-  data: {'productId': 'prod-123', 'quantity': 2},
-  metadata: {'cartTotal': 99.99},
-);
-
-// In a plugin — subscribe to events:
-final subscription = eventBus.on('cart.item.added', (event) {
-  final productId = event.data['productId'];
-});
-
-// Async event handlers:
-eventBus.onAsync('order.placed', (event) async {
-  await sendConfirmationEmail(event.data['orderId']);
-});
-
-// In a widget — use context.moose:
-context.moose.eventBus.fire('my.event', data: {});
-
-// Clean up
-await subscription.cancel();
-```
-
-#### HookRegistry
-Synchronous data transformation and service hooks:
-```dart
-// In a plugin's onRegister() — expose hooks using inherited getter:
-hookRegistry.register('cart:get_cart_item_count', (data) {
-  if (state is CartLoaded) return state.cart.itemCount;
-  return 0;
-});
-
-hookRegistry.register('cart:item_count_stream', (data) {
-  return cartBloc.stream.map((state) => state.totalItems).distinct();
-});
-
-// In a widget — consume hooks via context.moose:
-final count = context.moose.hookRegistry.execute<int>('cart:get_cart_item_count', 0);
-final stream = context.moose.hookRegistry.execute<Stream<int>>(
-  'cart:item_count_stream',
-  const Stream<int>.empty(),
-);
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│         Presentation Layer                  │
-│         (Screens, Sections)                 │
-└──────────────────┬──────────────────────────┘
-                   │ Events/States
-┌──────────────────▼──────────────────────────┐
-│         Business Logic (BLoC)               │
-└──────────────────┬──────────────────────────┘
-                   │ Repository Calls
-┌──────────────────▼──────────────────────────┐
-│         Repository Interfaces               │
-└──────────────────┬──────────────────────────┘
-                   │ Implementation
-┌──────────────────▼──────────────────────────┐
-│         Backend Adapters                    │
-│         (WooCommerce, Shopify, etc.)        │
-└─────────────────────────────────────────────┘
-```
-
-## Package Modules
-
-The package is organized into focused modules for better maintainability and selective imports:
-
-| Module | Description | Key Exports |
-|--------|-------------|-------------|
-| **app.dart** | Scoped architecture | MooseAppContext, MooseScope, MooseBootstrapper |
-| **entities.dart** | Domain entities | Product, Cart, Order, Category, etc. |
-| **repositories.dart** | Repository interfaces | ProductsRepository, CartRepository, etc. |
-| **plugin.dart** | Plugin system | FeaturePlugin, PluginRegistry |
-| **widgets.dart** | UI components | FeatureSection, WidgetRegistry, AddonRegistry |
-| **adapters.dart** | Adapter pattern | BackendAdapter, AdapterRegistry |
-| **cache.dart** | Caching system | CacheManager, MemoryCache, PersistentCache |
-| **services.dart** | Utilities & helpers | EventBus, HookRegistry, ActionRegistry, ApiClient, Logger |
-
-## Documentation
-
-- [Architecture Guide](doc/ai-ready/ARCHITECTURE.md) - Complete architectural patterns
-- [Plugin System](doc/ai-ready/PLUGIN_SYSTEM.md) - Creating and using plugins
-- [FeatureSection Guide](doc/ai-ready/FEATURE_SECTION.md) - Building configurable sections
-- [Adapter Pattern](doc/ai-ready/ADAPTER_PATTERN.md) - Backend adapter implementation
-- [Event System Guide](doc/ai-ready/EVENT_SYSTEM_GUIDE.md) - EventBus and HookRegistry usage
-- [Registries](doc/ai-ready/REGISTRIES.md) - Using registry systems
-- [Anti-Patterns](doc/ai-ready/ANTI_PATTERNS.md) - What to avoid
-- [API Reference](doc/ai-ready/API.md) - Complete API documentation
-- [Migration Guide](doc/MIGRATION_MODULAR_STRUCTURE.md) - Modular structure migration
-
-## Example Projects
-
-See the [example](example/) directory for complete working examples:
-- Basic plugin implementation
-- Custom adapter creation
-- FeatureSection usage
-- Full app integration
-
-## AI-Assisted Development
-
-This package is designed for AI-assisted development with comprehensive AI-ready documentation. See [doc/ai-ready/README.md](doc/ai-ready/README.md) for:
-- Architectural patterns for AI agents
-- Code generation guidelines
-- Anti-patterns to avoid
-- Best practices
+---
 
 ## Requirements
 
-- Dart SDK: `>=3.0.0 <4.0.0`
-- Flutter: `>=3.0.0`
+- Dart SDK `>=3.0.0 <4.0.0`
+- Flutter `>=3.0.0`
 
-## Dependencies
+**Dependencies:** `flutter_bloc`, `equatable`, `dio`, `shared_preferences`, `intl`
 
-- `flutter_bloc` - State management
-- `equatable` - Value equality
-- `dio` - HTTP client
-- `shared_preferences` - Local storage
-- `intl` - Internationalization
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
-## Support
-
-- [Documentation](https://github.com/greymooseinc/moose_core)
-- [Issue Tracker](https://github.com/greymooseinc/moose_core/issues)
-- [Discussions](https://github.com/greymooseinc/moose_core/discussions)
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+[pub.dev](https://pub.dev/packages/moose_core) · [Issues](https://github.com/greymooseinc/moose_core/issues) · [Changelog](CHANGELOG.md)

@@ -39,53 +39,36 @@ dependencies:
 Bootstrap the framework in `main.dart`:
 
 ```dart
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:moose_core/app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final appContext = MooseAppContext();
+  final config = json.decode(
+    await rootBundle.loadString('config/environment.json'),
+  ) as Map<String, dynamic>;
 
-  runApp(MooseScope(
-    appContext: appContext,
-    child: AppBootstrap(appContext: appContext),
-  ));
-}
-
-class AppBootstrap extends StatefulWidget {
-  final MooseAppContext appContext;
-  const AppBootstrap({super.key, required this.appContext});
-
-  @override
-  State<AppBootstrap> createState() => _AppBootstrapState();
-}
-
-class _AppBootstrapState extends State<AppBootstrap> {
-  @override
-  void initState() {
-    super.initState();
-    _bootstrap();
-  }
-
-  Future<void> _bootstrap() async {
-    final config = await loadEnvironmentJson(); // Map<String, dynamic>
-
-    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+  runApp(
+    MooseApp(
       config: config,
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin(), () => CartPlugin()],
-    );
-
-    if (!report.succeeded) {
-      // report.failures: Map<String, Object>
-      // keys are 'adapter:<name>' or 'plugin:<name>'
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+      builder: (context, appContext) => MyApp(appContext: appContext),
+    ),
+  );
 }
 ```
+
+`MooseApp` internally:
+- Creates `MooseAppContext`
+- Wraps the tree in `MooseScope`
+- Runs `MooseBootstrapper.run()`
+- Shows a default spinner while bootstrapping; replace with `loadingWidget`
+
+To inspect the `BootstrapReport` (e.g. surface failures), use `MooseBootstrapper` directly inside a `StatefulWidget.initState` instead.
 
 ---
 

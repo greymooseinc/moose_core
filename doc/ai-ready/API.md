@@ -176,42 +176,16 @@ class MooseBootstrapper {
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final ctx = MooseAppContext();
+  final config = await loadConfig(); // Map<String, dynamic>
 
   runApp(
-    MooseScope(
-      appContext: ctx,
-      child: MaterialApp(home: _BootstrapScreen(appContext: ctx)),
-    ),
-  );
-}
-
-class _BootstrapScreenState extends State<_BootstrapScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _bootstrap();
-  }
-
-  Future<void> _bootstrap() async {
-    final config = await loadConfig(); // load from assets/config/environment.json
-
-    final report = await MooseBootstrapper(appContext: widget.appContext).run(
+    MooseApp(
       config: config,
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin(), () => CartPlugin()],
-    );
-
-    if (mounted && report.succeeded) {
-      Navigator.pushReplacement(context, MaterialPageRoute(
-        builder: (_) => const MainScreen(),
-      ));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+      builder: (context, appContext) => MyApp(appContext: appContext),
+    ),
+  );
 }
 ```
 

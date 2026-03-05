@@ -1,4 +1,4 @@
-/// App-scoped architecture: MooseAppContext, MooseScope, and MooseBootstrapper.
+/// App-scoped architecture: MooseApp, MooseAppContext, MooseScope, and MooseBootstrapper.
 ///
 /// Import this to access the new scoped registry system:
 /// ```dart
@@ -15,3 +15,4 @@ export 'src/app/moose_app_context.dart';
 export 'src/app/moose_scope.dart';
 export 'src/app/moose_bootstrapper.dart';
 export 'src/app/moose_lifecycle_observer.dart';
+export 'src/app/moose_app.dart';
