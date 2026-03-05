@@ -5,6 +5,37 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-04
+
+### Added
+
+- **`MooseApp`** (`package:moose_core/app.dart`): A self-contained root widget that
+  handles the full bootstrap lifecycle. Pass `config`, `adapters`, `plugins`, and a
+  `builder` callback — `MooseApp` creates `MooseAppContext`, wraps the tree in
+  `MooseScope`, runs `MooseBootstrapper`, and shows a loading indicator until bootstrap
+  completes. Supply `loadingWidget` to replace the default spinner.
+
+  ```dart
+  runApp(
+    MooseApp(
+      config: config,
+      adapters: [WooCommerceAdapter()],
+      plugins: [() => ProductsPlugin(), () => CartPlugin()],
+      builder: (context, appContext) => MyApp(appContext: appContext),
+    ),
+  );
+  ```
+
+  This eliminates the boilerplate `_AppBootstrap` StatefulWidget previously required in
+  every app's `main.dart`.
+
+## [1.3.1] - 2026-03-04
+
+### Changed
+
+- Documentation-only release. Rewrote all `lib/src/app/` doc comments to Flutter SDK
+  standard. No API changes.
+
 ## [1.2.0] - 2026-02-27
 
 ### Breaking Changes
