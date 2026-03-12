@@ -1041,6 +1041,91 @@ void main() async {
 
 ---
 
+## Authentication Architecture
+
+### Session Lifecycle
+
+```
+MooseBootstrapper.run()
+  → PersistentCache init
+  → restoreAuthState()         ← populates currentUser from cache (fast, no network)
+  → adapters initialized
+  → getRepository<AuthRepository>() (first call)
+      → wireAuthRepository(repo) ← subscribes currentUser to authStateChanges stream
+  → plugins initialized
+  → UI renders with currentUser already set
+```
+
+### wireAuthRepository
+
+`wireAuthRepository(AuthRepository repo)` is called **automatically** by `AdapterRegistry` on the first `getRepository<AuthRepository>()` call. It subscribes `currentUser` to `repo.authStateChanges` and persists/removes the user from cache on every emission.
+
+**One subscription rule:** If multiple adapters register an `AuthRepository`, only the last `wireAuthRepository` call is active. To support both email/password and OAuth on the same adapter without breaking the subscription, register the **same instance** under both the unnamed and named factories:
+
+```dart
+final authRepo = MyAuthRepository(...);
+registerRepositoryFactory<AuthRepository>(() => authRepo);           // unnamed
+registerNamedRepositoryFactory<AuthRepository>('provider', () => authRepo); // named
+```
+
+### Named Repository Lookup
+
+`AdapterRegistry` and `MooseAppContext` support named repository lookup for multi-provider scenarios:
+
+```dart
+// Retrieve the auth repo for a specific provider by name
+final shopifyAuth = appContext.getRepository<AuthRepository>('shopify');
+final googleAuth  = appContext.getRepository<AuthRepository>('google_sign_in');
+
+// Unnamed lookup — returns the last registered unnamed factory
+final defaultAuth = appContext.getRepository<AuthRepository>();
+```
+
+Named registrations are independent from the unnamed slot. An adapter can register both:
+
+```dart
+registerRepositoryFactory<AuthRepository>(() => authRepo);               // unnamed default
+registerNamedRepositoryFactory<AuthRepository>('shopify', () => authRepo); // named
+```
+
+### OAuth 2.0 SSO Architecture
+
+The full OAuth PKCE flow is split across three layers:
+
+| Layer | Responsibility |
+|-------|----------------|
+| `AuthRepository` (adapter) | PKCE generation, CSRF state, token exchange, `getOAuthRedirectUri()` |
+| `AuthBloc` (plugin) | Orchestration — `StartOAuthSignIn` → `AuthOAuthRequired` → `CompleteOAuthSignIn` |
+| `OAuthLoginScreen` (plugin) | WebView or external browser; intercepts redirect; dispatches `CompleteOAuthSignIn` |
+| `AuthPlugin.onInit()` | `app_links` listener — fires `auth:oauth:callback` on EventBus as external-browser fallback |
+
+**In-app WebView** (when `AuthRepository.getOAuthRedirectUri()` returns non-empty):
+- `OAuthLoginScreen` loads the auth URL in `InAppWebView`
+- `shouldOverrideUrlLoading` intercepts navigation to the redirect URI
+- `CompleteOAuthSignIn` dispatched directly — no deep link needed
+
+**External browser** (when `getOAuthRedirectUri()` returns `''`):
+- System browser launched via `url_launcher`
+- OS delivers deep link to `app_links` stream
+- `AuthPlugin._startDeepLinkListener` fires `auth:oauth:callback` on EventBus
+- `AuthBloc` (subscribed to EventBus at construction) dispatches `CompleteOAuthSignIn`
+
+### auth:provider:oauth2 Hook Contract
+
+Adapters register OAuth providers via this hook. The `AuthPlugin` collects all providers and renders one button per non-hidden entry:
+
+```dart
+// Hook data shape — each entry in the returned list:
+{
+  'id': String,           // unique provider id; used as providerId in all events
+  'label': String,        // button label
+  'redirectScheme': String, // URI scheme for app_links matching
+  'redirectUri': String,    // full redirect URI; non-empty activates WebView mode
+}
+```
+
+---
+
 ## Related Documentation
 
 - [API.md](API.md) — Complete class and method reference

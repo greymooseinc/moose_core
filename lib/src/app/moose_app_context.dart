@@ -76,10 +76,10 @@ import '../widgets/widget_registry.dart';
 /// - **Cold start** — [MooseBootstrapper] calls [restoreAuthState] after
 ///   initialising the persistent cache, so the UI has a user object on the
 ///   very first frame even before any adapter has connected.
-/// - **Live stream** — the first call to [getRepository] for an
-///   [AuthRepository] automatically calls [wireAuthRepository], which
-///   subscribes to `authStateChanges` and keeps [currentUser] in sync for
-///   the lifetime of the app.
+/// - **Live stream** — the first call to [AdapterRegistry.getRepository] for
+///   an [AuthRepository] (via any access path) automatically calls
+///   [wireAuthRepository], which subscribes to `authStateChanges` and keeps
+///   [currentUser] in sync for the lifetime of the app.
 ///
 /// ```dart
 /// // Synchronous read — safe anywhere
@@ -329,10 +329,11 @@ class MooseAppContext {
   /// lazily from the registered factory and cached permanently — subsequent
   /// calls return the same object.
   ///
-  /// When [T] is [AuthRepository], [wireAuthRepository] is called
-  /// automatically on the first access. This subscribes [currentUser] to the
-  /// repository's `authStateChanges` stream and keeps it in sync for the
-  /// lifetime of the app.
+  /// When [T] is [AuthRepository], [wireAuthRepository] is called automatically
+  /// inside [AdapterRegistry.getRepository] on the first access, regardless of
+  /// whether the repository is accessed via this shortcut or directly through
+  /// [adapterRegistry]. This subscribes [currentUser] to the repository's
+  /// `authStateChanges` stream and keeps it in sync for the lifetime of the app.
   ///
   /// ```dart
   /// final products = appContext.getRepository<ProductsRepository>();
@@ -343,12 +344,8 @@ class MooseAppContext {
   ///
   ///  * [AdapterRegistry.getRepository], the underlying implementation.
   ///  * [AdapterRegistry.hasRepository], to guard against unregistered types.
-  T getRepository<T extends CoreRepository>() {
-    final instance = adapterRegistry.getRepository<T>();
-    if (instance is AuthRepository) {
-      wireAuthRepository(instance);
-    }
-    return instance;
+  T getRepository<T extends CoreRepository>([String? name]) {
+    return adapterRegistry.getRepository<T>(name);
   }
 
   /// Subscribes [currentUser] to [repo]'s `authStateChanges` stream.

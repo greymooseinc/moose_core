@@ -654,6 +654,63 @@ Future<void> initialize(Map<String, dynamic> config) async {
 
 ---
 
+## AuthRepository — OAuth 2.0 Extension Methods
+
+In addition to the standard `signIn`, `signOut`, `getCurrentUser`, etc., `AuthRepository` has three OAuth-specific methods used by the `AuthPlugin` SSO flow:
+
+```dart
+/// Generate the provider's authorization URL (with PKCE code_challenge embedded).
+/// Persists code_verifier + CSRF state to PersistentCache for validation on callback.
+Future<String> getOAuthAuthorizationUrl() async =>
+    throw UnsupportedError('OAuth not supported by this auth backend');
+
+/// Exchange the authorization code for access/refresh tokens.
+/// Must validate CSRF state against the value stored by getOAuthAuthorizationUrl().
+Future<AuthResult> exchangeOAuthCode({
+  required String code,
+  required String state,
+}) async =>
+    throw UnsupportedError('OAuth not supported by this auth backend');
+
+/// Returns the full redirect URI registered for this provider.
+/// Used by OAuthLoginScreen to know which URL to intercept in the WebView.
+/// Return '' to use the external browser flow instead of WebView.
+String getOAuthRedirectUri() => '';
+```
+
+**Rule:** Override all three in any OAuth-capable `AuthRepository`. Return a non-empty string from `getOAuthRedirectUri()` to activate the in-app WebView flow; return `''` for the external browser + `app_links` fallback.
+
+---
+
+## Provider-Tagged Repository Registration
+
+Every `registerRepositoryFactory<T>` call inside a `BackendAdapter` is automatically tagged with the adapter's `name` as the provider. No separate named registration step is needed.
+
+```dart
+// Inside BackendAdapter.initialize() — single call is enough:
+registerRepositoryFactory<AuthRepository>(
+  () => ShopifyAuthRepository(_apiClient, config: _config, ...),
+);
+```
+
+Retrieve by provider name (matches `BackendAdapter.name`):
+
+```dart
+// From AdapterRegistry / MooseAppContext:
+final shopifyAuth = appContext.getRepository<AuthRepository>('shopify');
+final googleAuth  = appContext.getRepository<AuthRepository>('google_sign_in');
+```
+
+When no provider is specified, the last-registered adapter's factory wins:
+
+```dart
+final auth = appContext.getRepository<AuthRepository>(); // last adapter wins
+```
+
+The `wireAuthRepository` wiring is performed exactly once — on the first `getRepository<AuthRepository>()` call — regardless of whether the lookup is unnamed or provider-scoped.
+
+---
+
 ## Related
 
 - [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — Full adapter implementation guide including `initialize()` and `registerRepositoryFactory`

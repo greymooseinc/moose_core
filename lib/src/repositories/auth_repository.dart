@@ -375,4 +375,53 @@ abstract class AuthRepository extends CoreRepository {
   ///
   /// Disables MFA for the current user account.
   Future<void> unenrollMFA();
+
+  // ============================================================================
+  // OAUTH 2.0 PKCE (OPTIONAL)
+  // ============================================================================
+
+  /// Returns an OAuth 2.0 authorization URL for browser-mediated sign-in.
+  ///
+  /// Generates PKCE parameters (`code_verifier`, `code_challenge`, `state`),
+  /// stores them temporarily, and returns the constructed authorization URL
+  /// to be opened in an in-app WebView.
+  ///
+  /// Throws [UnsupportedError] by default — override in OAuth-capable adapters.
+  ///
+  /// Example:
+  /// ```dart
+  /// final url = await authRepo.getOAuthAuthorizationUrl();
+  /// // Open url in an InAppWebView, then call exchangeOAuthCode() on redirect
+  /// ```
+  Future<String> getOAuthAuthorizationUrl() async =>
+      throw UnsupportedError('OAuth not supported by this auth backend');
+
+  /// Returns the redirect URI registered for this OAuth provider.
+  ///
+  /// Used by `OAuthLoginScreen` to know which URL to intercept in the
+  /// in-app WebView. Override in OAuth-capable adapters.
+  String getOAuthRedirectUri() => '';
+
+  /// Exchanges an OAuth authorization code for access and refresh tokens.
+  ///
+  /// Called after the browser redirects back to the app's registered
+  /// redirect URI with a `code` and `state` query parameter.
+  ///
+  /// Validates the `state` against the stored value, exchanges the code
+  /// for tokens, and returns an [AuthResult] with the authenticated user.
+  ///
+  /// Throws [UnsupportedError] by default — override in OAuth-capable adapters.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = await authRepo.exchangeOAuthCode(
+  ///   code: 'auth_code_from_redirect',
+  ///   state: 'state_from_redirect',
+  /// );
+  /// ```
+  Future<AuthResult> exchangeOAuthCode({
+    required String code,
+    required String state,
+  }) async =>
+      throw UnsupportedError('OAuth not supported by this auth backend');
 }

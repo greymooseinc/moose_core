@@ -62,20 +62,11 @@ class AdapterRegistry {
   /// Value: Initialized BackendAdapter instance
   final Map<String, BackendAdapter> _adapters = {};
 
-  /// Lazy repository factory registry
+  /// Resolved repository instance cache.
   ///
-  /// Key: Repository type (e.g., ProductsRepository)
-  /// Value: Zero-argument factory that delegates to the owning adapter's
-  ///        internal cache — the adapter only creates the repo on first call.
-  ///
-  /// Note: If multiple adapters provide the same repository type,
-  /// the last registered adapter wins (overwrites previous factory).
-  final Map<Type, CoreRepository Function()> _factories = {};
-
-  /// Resolved repository instance cache
-  ///
-  /// Populated on first [getRepository] call for a given type.
-  final Map<Type, CoreRepository> _instances = {};
+  /// Key: `'$T'` for unnamed lookups, `'$T:$provider'` for named lookups.
+  /// Populated on first [getRepository] call for a given key.
+  final Map<String, CoreRepository> _instances = {};
 
   /// Flag to track if at least one adapter has been registered.
   bool _initialized = false;
@@ -198,11 +189,15 @@ class AdapterRegistry {
     }
   }
 
-  /// Retrieves a repository by type.
+  /// Retrieves a repository by type, with an optional [provider] for named lookup.
   ///
   /// The repository is created from its factory on the **first call** for that
   /// type and cached for all subsequent calls. No repository is created until
   /// this method is invoked.
+  ///
+  /// When [provider] is omitted the last-registered factory is used,
+  /// preserving existing behaviour. When [provider] is provided, the factory
+  /// registered by that adapter (identified by `BackendAdapter.name`) is used.
   ///
   /// **Type Parameters:**
   /// - [T]: The repository type (must extend [CoreRepository]).
@@ -216,9 +211,13 @@ class AdapterRegistry {
   ///
   /// **Example:**
   /// ```dart
-  /// final products = appContext.adapterRegistry.getRepository<ProductsRepository>();
+  /// // Unnamed — last registered AuthRepository (e.g. email/password)
+  /// final auth = registry.getRepository<AuthRepository>();
+  ///
+  /// // Named — Shopify's OAuth AuthRepository
+  /// final shopifyAuth = registry.getRepository<AuthRepository>('shopify');
   /// ```
-  T getRepository<T extends CoreRepository>() {
+  T getRepository<T extends CoreRepository>([String? provider]) {
     if (!_initialized) {
       throw StateError(
         'AdapterRegistry not initialized. '
@@ -226,39 +225,52 @@ class AdapterRegistry {
       );
     }
 
-    // Return cached instance if available.
-    if (_instances.containsKey(T)) {
-      return _instances[T] as T;
+    // Check registry-level instance cache first
+    final cacheKey = provider != null ? '$T:$provider' : '$T';
+    if (_instances.containsKey(cacheKey)) {
+      return _instances[cacheKey] as T;
     }
 
-    if (!_factories.containsKey(T)) {
+    // Find an adapter that has this repository registered
+    BackendAdapter? found;
+    for (final adapter in _adapters.values) {
+      if (adapter.hasRepository<T>(provider: provider)) {
+        found = adapter;
+      }
+    }
+    if (found == null) {
       throw RepositoryNotRegisteredException(
-        'No adapter provides repository type: $T\n'
-        'Available repositories: ${_factories.keys.join(", ")}\n'
-        'Did you forget to register an adapter that provides $T?',
+        'No adapter provides repository type: $T'
+        '${provider != null ? ' with provider "$provider"' : ''}\n'
+        'Available repositories: ${getAvailableRepositories().join(", ")}',
       );
     }
 
-    // Create and cache the repository instance (lazy instantiation).
-    final instance = _factories[T]!() as T;
-    _instances[T] = instance;
-    _logger.debug('Created repository: $T (first request)');
+    final instance = found.getRepository<T>(provider: provider);
+
+    // Wire AuthRepository on first access
+    if (instance is AuthRepository) {
+      _appContext?.wireAuthRepository(instance);
+    }
+
+    _instances[cacheKey] = instance;
+    _logger.debug('Created repository: $T${provider != null ? ' ($provider)' : ''} (first request)');
     return instance;
   }
 
   /// Checks if a repository type is available.
   ///
-  /// Returns `true` if a factory for [T] has been registered, regardless of
-  /// whether an instance has been created yet.
+  /// When [provider] is provided, checks whether any adapter has a registration
+  /// for that specific provider name.
   ///
   /// **Example:**
   /// ```dart
-  /// if (registry.hasRepository<PushNotificationRepository>()) {
-  ///   final repo = registry.getRepository<PushNotificationRepository>();
+  /// if (registry.hasRepository<AuthRepository>('shopify')) {
+  ///   final repo = registry.getRepository<AuthRepository>('shopify');
   /// }
   /// ```
-  bool hasRepository<T extends CoreRepository>() {
-    return _factories.containsKey(T);
+  bool hasRepository<T extends CoreRepository>([String? provider]) {
+    return _adapters.values.any((a) => a.hasRepository<T>(provider: provider));
   }
 
   /// Returns list of all available repository types.
@@ -266,7 +278,11 @@ class AdapterRegistry {
   /// **Returns:**
   /// - [List<Type>]: Repository types that can be retrieved via [getRepository].
   List<Type> getAvailableRepositories() {
-    return _factories.keys.toList();
+    final types = <Type>{};
+    for (final adapter in _adapters.values) {
+      types.addAll(adapter.registeredRepositoryTypes);
+    }
+    return types.toList();
   }
 
   /// Returns list of all registered adapter names.
@@ -301,7 +317,7 @@ class AdapterRegistry {
   bool get isInitialized => _initialized;
 
   /// Total number of registered repository types (not instances created).
-  int get repositoryCount => _factories.length;
+  int get repositoryCount => getAvailableRepositories().length;
 
   /// Total number of registered adapters.
   int get adapterCount => _adapters.length;
@@ -310,26 +326,25 @@ class AdapterRegistry {
   // PRIVATE HELPER METHODS
   // =========================================================================
 
-  /// Registers a lazy factory in [_factories] for each repository type the
-  /// adapter declares, without instantiating any repository.
-  ///
-  /// The factory closure captures [adapter] and delegates to
-  /// [BackendAdapter.getRepositoryByType], which handles its own lazy
-  /// instantiation and per-adapter caching.
+  /// No-op — [getRepository] now delegates directly to adapters.
+  /// Repository-level [_instances] map is invalidated when a new adapter
+  /// overrides a type (handled here for the unnamed cache key).
   void _registerLazyFactories(BackendAdapter adapter) {
+    // No-op — getRepository now delegates directly to adapters.
+    // Registry-level _factories map is no longer needed.
+    // However, we do need to invalidate any previously cached unnamed instances
+    // for repository types this adapter overrides (last-wins semantics).
     for (final repoType in adapter.registeredRepositoryTypes) {
-      if (_factories.containsKey(repoType)) {
+      final cacheKey = repoType.toString();
+      if (_instances.containsKey(cacheKey)) {
         _logger.warning(
-          'Overwriting factory for ${repoType.toString()} '
+          'Overwriting cached instance for $cacheKey '
           '(previously registered by another adapter)',
         );
-        // Remove any previously resolved instance so the new factory is used.
-        _instances.remove(repoType);
+        _instances.remove(cacheKey);
       }
-
-      _factories[repoType] = () => adapter.getRepositoryByType(repoType);
-      _logger.debug('Registered lazy factory for ${repoType.toString()}');
     }
+    _logger.debug('Registered adapter: ${adapter.name} (repositories resolved lazily)');
   }
 
   /// Clears all adapters, factories, and instances (for testing).
@@ -337,7 +352,6 @@ class AdapterRegistry {
   /// **Warning:** Use only in tests — removes all state.
   void clearAll() {
     _adapters.clear();
-    _factories.clear();
     _instances.clear();
     _initialized = false;
   }

@@ -5,6 +5,13 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-10
+
+### Added
+- Named repository lookup: `getRepository<T>(name)` on `AdapterRegistry` and `MooseAppContext`
+- `BackendAdapter.registerNamedRepositoryFactory<T>(name, factory)` — register a repository under a provider name (e.g. `'shopify'`, `'google'`) so multiple adapters can each provide the same interface without last-wins collision
+- `AdapterRegistry.hasRepository<T>(name)` optional name parameter
+
 ## [1.4.0] - 2026-03-04
 
 ### Added

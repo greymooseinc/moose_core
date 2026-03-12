@@ -1012,10 +1012,104 @@ void main() {
 
 ---
 
-**Last Updated:** 2026-03-01
-**Version:** 5.0.0
+## OAuth 2.0 PKCE Adapter Pattern
+
+Adapters that support OAuth SSO must follow this pattern:
+
+### 1. Override three methods on AuthRepository
+
+```dart
+class MyAuthRepository extends AuthRepository {
+  @override
+  String getOAuthRedirectUri() => _config.redirectUri;
+  // Return '' to use external browser; non-empty activates in-app WebView.
+
+  @override
+  Future<String> getOAuthAuthorizationUrl() async {
+    // 1. Generate PKCE code_verifier (128 random chars)
+    // 2. Compute code_challenge = base64url(SHA-256(verifier))
+    // 3. Generate CSRF state (32 random chars)
+    // 4. Persist verifier + state to PersistentCache (single-use)
+    // 5. Return authorization URL with: client_id, redirect_uri, scope,
+    //    response_type=code, state, code_challenge, code_challenge_method=S256
+  }
+
+  @override
+  Future<AuthResult> exchangeOAuthCode({
+    required String code,
+    required String state,
+  }) async {
+    // 1. Read + validate stored CSRF state — return failure on mismatch
+    // 2. Read stored code_verifier
+    // 3. DELETE both from cache (single-use)
+    // 4. POST to token endpoint with grant_type=authorization_code,
+    //    client_id, redirect_uri, code, code_verifier
+    // 5. Store access_token + refresh_token to PersistentCache
+    // 6. Fetch user info, emit on authStateChanges
+  }
+}
+```
+
+### 2. Register the auth:provider:oauth2 hook
+
+```dart
+// Inside BackendAdapter.initialize():
+hookRegistry.register('auth:provider:oauth2', (data) {
+  final list = List<Map<String, dynamic>>.from(data as List? ?? []);
+  list.add({
+    'id': 'my_provider',          // must be unique; used as providerId everywhere
+    'label': 'CONTINUE WITH X',
+    'redirectScheme': 'myapp',    // URI scheme for app_links (external browser fallback)
+    'redirectUri': _config.redirectUri,  // full URI for WebView interception
+  });
+  return list;
+});
+```
+
+The `AuthPlugin` reads this hook to render SSO buttons. The `id` field is passed as `providerId` to `StartOAuthSignIn` and `CompleteOAuthSignIn`.
+
+### 3. Register the AuthRepository factory once
+
+```dart
+registerRepositoryFactory<AuthRepository>(
+  () => MyAuthRepository(...),
+);
+```
+
+The factory is automatically tagged with the adapter's `name` as the provider.
+Callers can retrieve it by provider: `appContext.getRepository<AuthRepository>('my_provider')`.
+No separate named registration is needed — `registerNamedRepositoryFactory` has been removed.
+
+### 4. Add to configSchema
+
+```dart
+'additionalProperties': false,
+'properties': {
+  'clientId':    { 'type': 'string', 'description': '...' },
+  'redirectUri': { 'type': 'string', 'description': '...' },
+  // ...
+}
+```
+
+### 5. Add to moose.manifest.json configurations
+
+```json
+{
+  "configurations": {
+    "clientId": "$REPLACE_THIS|OAuth client ID$",
+    "redirectUri": "$REPLACE_THIS|Reverse client-ID scheme: com.googleusercontent.apps.ID:/oauth2redirect$"
+  }
+}
+```
+
+---
+
+**Last Updated:** 2026-03-12
+**Version:** 7.0.0
 
 **Changelog:**
+- **v7.0.0 (2026-03-12)**: Repository factory system redesigned. Replaced `registerNamedRepositoryFactory` + dual-registration pattern with a single `registerRepositoryFactory` call. Each call is automatically tagged with the adapter's `name` as the provider. Retrieve by provider: `appContext.getRepository<AuthRepository>('shopify')`. `NamedRepositoryEntry` and `namedRepositoryEntries` removed from `BackendAdapter`.
+- **v6.0.0 (2026-03-11)**: OAuth 2.0 PKCE adapter pattern documented. Named repository registration (`registerNamedRepositoryFactory`) explained with shared-instance rule. `getOAuthRedirectUri()` method added to `AuthRepository` base. `auth:provider:oauth2` hook contract defined.
 - **v5.0.0 (2026-03-01)**: Full rewrite against actual source. `CoreRepository` is now a pure no-arg lifecycle base — no `hookRegistry`/`eventBus` fields. `BackendAdapter` convenience getters documented (`hookRegistry`, `eventBus`, `cache`, `configManager`, `logger`, `actionRegistry`). `AdapterRegistry` API documented (`getAdapter`, `getAvailableRepositories`, `getInitializedAdapters`, `clearAll`). Repository interface catalog expanded with real method signatures. Mock testing patterns corrected. Anti-patterns and bootstrap sequence updated.
 - **v4.0.0 (2026-02-26)**: `initializeFromConfig()` requires `configManager:` named param. `AdapterRegistry` lazy factory design documented. `MooseAppContext.getRepository<T>()` shortcut added.
 - **v3.0.0 (2026-02-22)**: `CoreRepository` required `hookRegistry`/`eventBus` constructor params (now removed).
