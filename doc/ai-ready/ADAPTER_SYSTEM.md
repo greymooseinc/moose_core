@@ -85,21 +85,23 @@ abstract class BackendAdapter {
   CacheManager    get cacheManager   => appContext.cache; // backward-compat alias
 
   // --- Factory registration ---
+  // Each call auto-tags the entry with this adapter's name as provider.
   void registerRepositoryFactory<T extends CoreRepository>(T Function() factory);
   void registerAsyncRepositoryFactory<T extends CoreRepository>(Future<T> Function() factory);
 
-  // --- Repository retrieval (used internally by AdapterRegistry) ---
-  T getRepository<T extends CoreRepository>();
-  Future<T> getRepositoryAsync<T extends CoreRepository>();
-  CoreRepository getRepositoryByType(Type type);
+  // --- Repository retrieval ---
+  // provider: null  → last-registered adapter's entry wins (default)
+  // provider: 'xyz' → entry registered by the adapter whose name == 'xyz'
+  T getRepository<T extends CoreRepository>({String? provider});
+  Future<T> getRepositoryAsync<T extends CoreRepository>({String? provider});
 
   // --- Introspection ---
-  bool hasRepository<T extends CoreRepository>();
-  bool isRepositoryCached<T extends CoreRepository>();
+  bool hasRepository<T extends CoreRepository>({String? provider});
+  bool isRepositoryCached<T extends CoreRepository>({String? provider});
   List<Type> get registeredRepositoryTypes;
 
   // --- Cache management ---
-  void clearRepositoryCache<T extends CoreRepository>();
+  void clearRepositoryCache<T extends CoreRepository>({String? provider});
   void clearAllRepositoryCaches();
 
   // --- Lifecycle ---
@@ -404,30 +406,40 @@ The framework validates `adapters.woocommerce` against `WooCommerceAdapter.confi
 Repository instances are only created on the **first** `getRepository<T>()` call. Until that moment only the factory closure is stored.
 
 ```
-registerRepositoryFactory() → stores factory (no instance created)
+registerRepositoryFactory<T>() → stores _RepoEntry(provider: name, factory)
          |
-         | (first getRepository<T>() call)
+         | (first getRepository<T>() or getRepository<T>(provider: 'xyz') call)
          ↓
 factory() → creates instance
          ↓
 instance.initialize() → synchronous setup
          ↓
-instance cached in _cache[T]
+entry.instance = instance (cached on the _RepoEntry itself)
          |
-         | (all subsequent getRepository<T>() calls)
+         | (all subsequent calls for the same entry)
          ↓
 returns cached instance (factory never called again)
 ```
 
+Every `registerRepositoryFactory` call is automatically tagged with the adapter's `name` as provider. There is no separate named registration step.
+
 ### Synchronous factory (most common)
 
 ```dart
+// Inside BackendAdapter.initialize():
 registerRepositoryFactory<ProductsRepository>(
   () => WooProductsRepository(_client, cache: cache, eventBus: eventBus, hooks: hookRegistry),
 );
+// Tagged as provider: 'woocommerce' (this adapter's name)
+```
 
-// Retrieval (synchronous)
-final repo = adapter.getRepository<ProductsRepository>();
+Retrieval:
+```dart
+// Default — last-registered adapter wins
+final repo = appContext.getRepository<ProductsRepository>();
+
+// Provider-scoped — get specifically from woocommerce
+final repo = appContext.getRepository<ProductsRepository>(provider: 'woocommerce');
 ```
 
 ### Asynchronous factory
@@ -443,25 +455,31 @@ registerAsyncRepositoryFactory<ReviewRepository>(
 );
 
 // Must be retrieved asynchronously
-final repo = await adapter.getRepositoryAsync<ReviewRepository>();
+final repo = await appContext.getRepositoryAsync<ReviewRepository>();
+final repo = await appContext.getRepositoryAsync<ReviewRepository>(provider: 'woocommerce');
 ```
 
 > Calling `getRepository<T>()` (sync) on an async factory throws `RepositoryNotRegisteredException`. Always use `getRepositoryAsync<T>()` for async factories.
 
-### Cache management
+### Introspection and cache management
 
 ```dart
-// Inspect state
-adapter.hasRepository<ProductsRepository>();    // factory registered?
-adapter.isRepositoryCached<ProductsRepository>(); // instance exists?
+// Factory registered?
+adapter.hasRepository<ProductsRepository>();
+adapter.hasRepository<AuthRepository>(provider: 'shopify');
+
+// Instance already created?
+adapter.isRepositoryCached<ProductsRepository>();
+adapter.isRepositoryCached<AuthRepository>(provider: 'shopify');
 
 // Invalidate (forces re-creation on next access)
 adapter.clearRepositoryCache<ProductsRepository>();
+adapter.clearRepositoryCache<AuthRepository>(provider: 'shopify');
 
 // Invalidate all
 adapter.clearAllRepositoryCaches();
 
-// Enumerate
+// Enumerate registered types
 List<Type> types = adapter.registeredRepositoryTypes;
 ```
 
@@ -473,22 +491,32 @@ List<Type> types = adapter.registeredRepositoryTypes;
 
 ### How it works
 
-- **Last registration wins.** If two adapters register `ProductsRepository`, the last one provides the instance.
-- **Double lazy.** The registry stores a closure that delegates to `adapter.getRepositoryByType(T)`. The adapter also lazily creates the instance. Both layers cache, so the repository is created exactly once.
+- **Last registration wins** (default). If two adapters register `ProductsRepository`, `getRepository<T>()` with no provider returns the last-registered entry.
+- **Provider-scoped lookup.** `getRepository<T>(provider: 'shopify')` returns the entry registered by the adapter whose `name == 'shopify'`.
 - **No active-adapter concept.** There is no "the" adapter. Each repository type is resolved independently — you can mix adapters (WooCommerce for products, FCM for push notifications).
+- **Single instance per entry.** Each `_RepoEntry` caches its own instance. The same entry is returned for both the default lookup and the provider-scoped lookup, so one `registerRepositoryFactory` call is sufficient even when both paths are needed.
 
 ### Key API
 
 ```dart
-// Typical: via MooseAppContext convenience shortcut
+// Default — last-registered adapter wins
 final repo = appContext.getRepository<ProductsRepository>();
 
-// Direct registry access
-final repo = appContext.adapterRegistry.getRepository<ProductsRepository>();
+// Provider-scoped — get from a specific adapter
+final repo = appContext.getRepository<AuthRepository>(provider: 'shopify');
+final repo = appContext.getRepository<AuthRepository>(provider: 'google_sign_in');
+
+// Async retrieval (for async factories)
+final repo = await appContext.getRepositoryAsync<ReviewRepository>(provider: 'woocommerce');
 
 // Guard before accessing
 if (appContext.adapterRegistry.hasRepository<PushNotificationRepository>()) {
   final repo = appContext.adapterRegistry.getRepository<PushNotificationRepository>();
+}
+
+// Guard with provider
+if (appContext.adapterRegistry.hasRepository<AuthRepository>(provider: 'shopify')) {
+  final repo = appContext.adapterRegistry.getRepository<AuthRepository>(provider: 'shopify');
 }
 
 // Introspection

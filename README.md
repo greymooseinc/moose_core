@@ -179,7 +179,8 @@ class WooCommerceAdapter extends BackendAdapter {
   @override String get version => '1.0.0';
 
   @override
-  Future<void> initializeFromConfig({ConfigManager? configManager}) async {
+  Future<void> initialize(Map<String, dynamic> config) async {
+    // Each factory is auto-tagged with this adapter's name ('woocommerce') as provider.
     registerRepositoryFactory<ProductsRepository>(
       () => WooProductsRepository(apiClient, hookRegistry: hookRegistry, eventBus: eventBus),
     );
@@ -187,6 +188,21 @@ class WooCommerceAdapter extends BackendAdapter {
       () => WooCartRepository(apiClient, hookRegistry: hookRegistry, eventBus: eventBus),
     );
   }
+}
+```
+
+Retrieve repositories:
+```dart
+// Default — last-registered adapter wins
+appContext.getRepository<ProductsRepository>();
+
+// Provider-scoped — specific adapter by its name
+appContext.getRepository<AuthRepository>(provider: 'shopify');
+appContext.getRepository<AuthRepository>(provider: 'google_sign_in');
+
+// Optional repositories — guard before accessing
+if (appContext.adapterRegistry.hasRepository<PushNotificationRepository>()) {
+  final push = appContext.getRepository<PushNotificationRepository>();
 }
 ```
 

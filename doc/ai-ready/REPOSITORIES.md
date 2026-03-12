@@ -58,8 +58,13 @@ registerAsyncRepositoryFactory<CartRepository>(
 ```dart
 @override
 Future<void> onInit() async {
+  // Default — last-registered adapter wins
   final products = adapterRegistry.getRepository<ProductsRepository>();
-  // or async:
+
+  // Provider-scoped — get from a specific adapter by its name
+  final shopifyAuth = adapterRegistry.getRepository<AuthRepository>(provider: 'shopify');
+
+  // Async factory
   final cart = await adapterRegistry.getRepositoryAsync<CartRepository>();
 }
 ```
@@ -82,8 +87,12 @@ Widget build(BuildContext context) {
 ### Shortcut via MooseAppContext
 
 ```dart
+// Default
 final products = appContext.getRepository<ProductsRepository>();
-// Equivalent to: appContext.adapterRegistry.getRepository<ProductsRepository>()
+
+// Provider-scoped
+final shopifyAuth = appContext.getRepository<AuthRepository>(provider: 'shopify');
+final googleAuth  = appContext.getRepository<AuthRepository>(provider: 'google_sign_in');
 ```
 
 ### Guard for optional repositories
@@ -91,6 +100,11 @@ final products = appContext.getRepository<ProductsRepository>();
 ```dart
 if (adapterRegistry.hasRepository<PushNotificationRepository>()) {
   final pushRepo = adapterRegistry.getRepository<PushNotificationRepository>();
+}
+
+// Guard with provider
+if (adapterRegistry.hasRepository<AuthRepository>(provider: 'shopify')) {
+  final repo = adapterRegistry.getRepository<AuthRepository>(provider: 'shopify');
 }
 ```
 
