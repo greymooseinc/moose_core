@@ -5,12 +5,28 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2026-03-10
+## [2.0.0] - 2026-03-12
+
+### Breaking Changes
+
+- **`BackendAdapter` repository storage redesigned.** The four separate maps (`_factories`, `_cache`, `_namedEntries`, `_namedCache`) are replaced by a single `Map<Type, List<_RepoEntry>>` structure. Each `registerRepositoryFactory` call is now automatically tagged with the adapter's own `name` as provider — no separate named-registration step is needed.
+- **`registerNamedRepositoryFactory<T>()` removed.** Use `registerRepositoryFactory<T>()` — the entry is auto-tagged with the adapter's `name`.
+- **`NamedRepositoryEntry` class removed.**
+- **`getRepositoryByType(Type)` removed from `BackendAdapter`.** Use `getRepository<T>()` instead.
+- **`getNamedRepositoryByType(Type, String)` removed.** Use `getRepository<T>(provider: name)`.
+- **`namedRepositoryEntries` getter removed.**
+- **`getRepository<T>()` and `getRepositoryAsync<T>()` now take an optional named `provider` parameter** instead of a positional one. Call sites using `getRepository<T>('shopify')` must be updated to `getRepository<T>(provider: 'shopify')`.
+- **`hasRepository<T>()`, `isRepositoryCached<T>()`, and `clearRepositoryCache<T>()`** now take `{String? provider}` instead of no parameter.
+- **`AdapterRegistry` internal maps simplified.** `_namedFactories` and `_namedInstances` removed; delegation now goes directly to each adapter.
 
 ### Added
-- Named repository lookup: `getRepository<T>(name)` on `AdapterRegistry` and `MooseAppContext`
-- `BackendAdapter.registerNamedRepositoryFactory<T>(name, factory)` — register a repository under a provider name (e.g. `'shopify'`, `'google'`) so multiple adapters can each provide the same interface without last-wins collision
-- `AdapterRegistry.hasRepository<T>(name)` optional name parameter
+
+- **`AuthRepository.getOAuthRedirectUri()`** — default implementation returns `''`; override in OAuth-capable adapters to return the full redirect URI (non-empty activates in-app WebView mode in `OAuthLoginScreen`).
+- **`AuthRepository.getOAuthAuthorizationUrl()`** and **`AuthRepository.exchangeOAuthCode()`** — OAuth 2.0 PKCE base methods with `UnsupportedError` defaults.
+- Provider-scoped repository retrieval: `appContext.getRepository<AuthRepository>(provider: 'shopify')` returns the entry registered by the adapter whose `name == 'shopify'`.
+- All repositories registered via `registerRepositoryFactory` are now automatically reachable by provider name (e.g. `getRepository<ProductsRepository>(provider: 'shopify')`).
+
+## [1.4.0] - 2026-03-04
 
 ## [1.4.0] - 2026-03-04
 
