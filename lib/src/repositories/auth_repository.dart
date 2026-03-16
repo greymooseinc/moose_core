@@ -1,3 +1,4 @@
+import '../cache/cache_manager.dart';
 import '../entities/auth_credentials.dart';
 import '../entities/auth_result.dart';
 import '../entities/user.dart';
@@ -45,6 +46,63 @@ import 'repository.dart';
 /// }
 /// ```
 abstract class AuthRepository extends CoreRepository {
+  CacheManager? _sessionStorage;
+  String _sessionKeyPrefix = 'auth';
+
+  // ============================================================================
+  // SESSION TOKEN STORAGE
+  // ============================================================================
+
+  /// Injected by [BackendAdapter] before [initialize] using the adapter's name
+  /// as [keyPrefix], so keys are automatically namespaced per-provider.
+  void initTokenStorage(CacheManager cache, {String keyPrefix = 'auth'}) {
+    _sessionStorage = cache;
+    _sessionKeyPrefix = keyPrefix;
+  }
+
+  /// Exposes the injected [CacheManager] for subclasses that need it for
+  /// provider-specific storage (e.g. PKCE verifier, OIDC discovery cache).
+  CacheManager? get sessionStorage => _sessionStorage;
+
+  /// Persists OAuth session tokens to the app-level persistent cache.
+  Future<void> saveSession({
+    required String accessToken,
+    String? refreshToken,
+    DateTime? expiresAt,
+  }) async {
+    final store = _sessionStorage;
+    if (store == null) return;
+    await store.persistent.setString('${_sessionKeyPrefix}_access_token', accessToken);
+    if (refreshToken != null) {
+      await store.persistent.setString('${_sessionKeyPrefix}_refresh_token', refreshToken);
+    }
+    if (expiresAt != null) {
+      await store.persistent.setString('${_sessionKeyPrefix}_expires_at', expiresAt.toIso8601String());
+    }
+  }
+
+  /// Loads previously persisted session tokens from the persistent cache.
+  Future<({String? accessToken, String? refreshToken, DateTime? expiresAt})> loadSession() async {
+    final store = _sessionStorage;
+    if (store == null) return (accessToken: null, refreshToken: null, expiresAt: null);
+    final accessToken = await store.persistent.getString('${_sessionKeyPrefix}_access_token');
+    final refreshToken = await store.persistent.getString('${_sessionKeyPrefix}_refresh_token');
+    final expiresAtStr = await store.persistent.getString('${_sessionKeyPrefix}_expires_at');
+    return (
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: expiresAtStr != null ? DateTime.tryParse(expiresAtStr) : null,
+    );
+  }
+
+  /// Removes all persisted session tokens from the persistent cache.
+  Future<void> clearSession() async {
+    final store = _sessionStorage;
+    if (store == null) return;
+    await store.persistent.remove('${_sessionKeyPrefix}_access_token');
+    await store.persistent.remove('${_sessionKeyPrefix}_refresh_token');
+    await store.persistent.remove('${_sessionKeyPrefix}_expires_at');
+  }
 
   // ============================================================================
   // AUTHENTICATION METHODS

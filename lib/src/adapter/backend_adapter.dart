@@ -257,6 +257,9 @@ abstract class BackendAdapter {
       );
     }
     final instance = (factory as T Function())();
+    if (instance is AuthRepository) {
+      instance.initTokenStorage(appContext.cache, keyPrefix: name);
+    }
     instance.initialize();
     entry.instance = instance;
     return instance;

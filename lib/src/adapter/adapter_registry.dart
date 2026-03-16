@@ -23,7 +23,6 @@ import 'package:moose_core/services.dart';
 import '../app/moose_app_context.dart';
 import 'backend_adapter.dart';
 
-
 /// Instance-based registry for managing backend adapters and repository implementations.
 ///
 /// [AdapterRegistry] is owned by [MooseAppContext] — each context gets its own
@@ -76,6 +75,11 @@ class AdapterRegistry {
 
   // Scoped context set by MooseAppContext after construction.
   MooseAppContext? _appContext;
+
+  // The last AuthRepository instance passed to wireAuthRepository.
+  // Used to avoid redundant re-wiring when the same instance is returned
+  // by multiple cache keys (e.g. unnamed and named lookups for a single adapter).
+  AuthRepository? _wiredAuthRepo;
 
   // =========================================================================
   // PUBLIC METHODS
@@ -138,10 +142,8 @@ class AdapterRegistry {
       } else if (result is BackendAdapter) {
         adapter = result;
       } else {
-        throw Exception(
-          'Factory must return BackendAdapter or Future<BackendAdapter>, '
-          'got ${result.runtimeType}'
-        );
+        throw Exception('Factory must return BackendAdapter or Future<BackendAdapter>, '
+            'got ${result.runtimeType}');
       }
 
       // Inject scoped app context before initialization.
@@ -248,9 +250,13 @@ class AdapterRegistry {
 
     final instance = found.getRepository<T>(provider: provider);
 
-    // Wire AuthRepository on first access
-    if (instance is AuthRepository) {
+    // Wire AuthRepository whenever the instance differs from the currently
+    // wired one. This handles the case where sign-out goes through a different
+    // provider's repo (e.g. unnamed → Google), which would cancel the Shopify
+    // subscription. Re-wiring on StartOAuthSignIn restores the correct stream.
+    if (instance is AuthRepository && instance != _wiredAuthRepo) {
       _appContext?.wireAuthRepository(instance);
+      _wiredAuthRepo = instance;
     }
 
     _instances[cacheKey] = instance;
@@ -347,12 +353,30 @@ class AdapterRegistry {
     _logger.debug('Registered adapter: ${adapter.name} (repositories resolved lazily)');
   }
 
+  /// Signs out from every cached [AuthRepository] instance.
+  ///
+  /// Multiple cache keys (unnamed + named) may point to the same instance, so
+  /// a [Set] is used to avoid calling [AuthRepository.signOut] twice on the
+  /// same object. Errors from individual repositories are swallowed so that
+  /// a failure in one provider does not block sign-out from others.
+  Future<void> signOutAll() async {
+    final seen = <AuthRepository>{};
+    for (final instance in _instances.values) {
+      if (instance is AuthRepository && seen.add(instance)) {
+        try {
+          await instance.signOut();
+        } catch (_) {}
+      }
+    }
+  }
+
   /// Clears all adapters, factories, and instances (for testing).
   ///
   /// **Warning:** Use only in tests — removes all state.
   void clearAll() {
     _adapters.clear();
     _instances.clear();
+    _wiredAuthRepo = null;
     _initialized = false;
   }
 }

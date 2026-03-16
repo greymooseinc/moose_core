@@ -401,6 +401,23 @@ class MooseAppContext {
     }
   }
 
+  /// Signs out from every registered auth provider and clears all local state.
+  ///
+  /// 1. Calls [AuthRepository.signOut] on every already-instantiated auth repo
+  ///    (deduplicated) to revoke server-side sessions and clear their internal state.
+  /// 2. Unconditionally clears [currentUser] and the persistent user cache —
+  ///    this handles the cold-start case where no auth repo has been instantiated
+  ///    yet but the user is still shown as signed in from [restoreAuthState].
+  ///
+  /// Use this instead of calling [getRepository<AuthRepository>().signOut()]
+  /// directly — the unnamed lookup may resolve to a different provider than the
+  /// one that was used to sign in.
+  Future<void> signOut() async {
+    await adapterRegistry.signOutAll();
+    currentUser.value = null;
+    await cache.persistent.remove(_kCurrentUserCacheKey);
+  }
+
   /// Releases all resources owned by this context.
   ///
   /// Cancels the active [AuthRepository] stream subscription and disposes
