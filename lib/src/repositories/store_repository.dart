@@ -203,4 +203,19 @@ abstract class StoreRepository extends CoreRepository {
   ///
   /// Returns a map of all available store settings
   Future<Map<String, dynamic>> getAllSettings();
+
+  // ==================== Locale ====================
+
+  /// Get the currently active store locale (language code, e.g. 'en', 'ja').
+  ///
+  /// Returns null if locale selection is not supported by this backend.
+  Future<String?> getStoreLocale();
+
+  /// Set the store locale — persists the preference on the backend if possible
+  /// (e.g. updates a customer's language preference in their account).
+  ///
+  /// [languageCode] — BCP-47 language code (e.g. 'en', 'ja', 'fr')
+  ///
+  /// Returns the locale code that was accepted, or null if not supported.
+  Future<String?> setStoreLocale(String languageCode);
 }
