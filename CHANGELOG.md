@@ -5,6 +5,18 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-17
+
+### Added
+
+- **`StoreRepository.getStoreLocale()`** — returns the currently active store locale (language code, e.g. `'en'`, `'ja'`); returns `null` if locale selection is not supported by the backend.
+- **`StoreRepository.setStoreLocale(String languageCode)`** — persists the locale preference on the backend if possible (e.g. updates a customer's language preference); returns the accepted locale code or `null` if not supported.
+- **`FeaturePlugin.onInit()`** now has a default empty body — plugins that don't need async initialisation no longer need to override it.
+
+### Changed
+
+- **`AuthRepository`** — `signOut()` is now implemented across all built-in adapters.
+
 ## [2.0.0] - 2026-03-12
 
 ### Breaking Changes
