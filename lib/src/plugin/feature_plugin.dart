@@ -156,7 +156,7 @@ abstract class FeaturePlugin {
   void onRegister();
 
   /// Called when plugin needs to be initialized.
-  Future<void> onInit();
+  Future<void> onInit() async {}
 
   /// Called after all plugins have finished [onInit].
   ///
