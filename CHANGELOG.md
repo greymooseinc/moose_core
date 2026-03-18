@@ -5,6 +5,15 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-18
+
+### Added
+
+- **`package:moose_core/ui.dart`** — new barrel export providing hook-calling style facades (`AppTextStyles`, `AppButtonStyles`, `AppInputStyles`). Plugins import this instead of app-level style files, keeping styles swappable via the hook registry.
+- **`AppTextStyles`** — facade class with 12 static methods (`appBarTitle`, `sectionHeader`, `formLabel`, `screenTitle`, `modalTitle`, `bodySecondary`, `hint`, `caption`, `sectionLabel`, `bodyMedium`, `bodyLarge`, `bodyXLarge`). Each delegates to the `styles:text` hook registered by the active palette plugin.
+- **`AppButtonStyles`** — facade class delegating `primary`, `primaryCompact`, `secondary`, `secondaryCompact` to the `styles:button` hook. `labelStyle()` is a context-free static.
+- **`AppInputStyles`** — facade class delegating `outlined` and `filled` to the `styles:input` hook.
+
 ## [2.1.0] - 2026-03-17
 
 ### Added

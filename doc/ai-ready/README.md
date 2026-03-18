@@ -554,6 +554,7 @@ moose locale add si
 | [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) | EventBus vs HookRegistry decision matrix, patterns, BLoC integration |
 | [CACHE_SYSTEM.md](./CACHE_SYSTEM.md) | CacheManager, MemoryCache, PersistentCache, TTL configuration |
 | [API.md](./API.md) | Public API reference — exported classes, type definitions |
+| [UI_STYLES.md](./UI_STYLES.md) | `package:moose_core/ui.dart` — AppTextStyles, AppButtonStyles, AppInputStyles, AppCustomStyles, palette plugins |
 
 ---
 
