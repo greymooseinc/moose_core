@@ -178,18 +178,26 @@ class WidgetRegistry {
     void Function(String event, dynamic payload)? onEvent,
   }) {
     final sectionConfigs = getSections(pluginName, groupName);
-    return sectionConfigs
-        .where((section) => section.active)
-        .map((section) {
-      return build(
-        section.name,
-        context,
-        data: {
-          'settings': {...section.settings},
-          ...?data,
-        },
-        onEvent: onEvent,
-      );
-    }).toList();
+    final results = <Widget>[];
+    for (final section in sectionConfigs.where((s) => s.active)) {
+      final mergedData = {
+        'settings': {...section.settings},
+        ...?data,
+      };
+      final entries = _registry[section.name];
+      if (entries == null || entries.isEmpty) continue;
+      for (final entry in entries) {
+        try {
+          final widget = entry.builder(context, data: mergedData, onEvent: onEvent);
+          if (widget != null) {
+            results.add(widget);
+            break; // one widget per section config entry (same as build())
+          }
+        } catch (e, stack) {
+          debugPrint('WidgetRegistry buildSectionGroup error for "${section.name}": $e\n$stack');
+        }
+      }
+    }
+    return results;
   }
 }
