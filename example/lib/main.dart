@@ -128,7 +128,7 @@ class DemoPlugin extends FeaturePlugin {
   @override
   void onRegister() {
     // Register a widget that can be rendered anywhere by name.
-    widgetRegistry.register(
+    widgetRegistry.registerWidget(
       'demo.greeting',
       (context, {data, onEvent}) => const GreetingSection(),
     );
