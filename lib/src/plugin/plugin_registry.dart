@@ -12,8 +12,8 @@ import 'feature_plugin.dart';
 ///
 /// ## Lifecycle:
 /// 1. [register] — sync: inject [MooseAppContext], call [FeaturePlugin.onRegister]
-/// 2. [initAll] — async: call [FeaturePlugin.onInit] on every active plugin
-/// 3. [startAll] — async: call [FeaturePlugin.onStart] on every active plugin
+/// 2. [initAll] — async: call [FeaturePlugin.onInit] on every active plugin **sequentially**
+/// 3. [startAll] — async: call [FeaturePlugin.onStart] on every active plugin **sequentially**
 class PluginRegistry {
   PluginRegistry();
 

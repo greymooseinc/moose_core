@@ -239,15 +239,15 @@ void main() {
     });
 
     // =========================================================================
-    // fireAndWait
+    // fireAndFlush
     // =========================================================================
 
-    group('fireAndWait', () {
+    group('fireAndFlush', () {
       test('should complete after firing event', () async {
         bool called = false;
         bus.on('wait.event', (event) => called = true);
 
-        await bus.fireAndWait('wait.event', data: {'x': 1});
+        await bus.fireAndFlush('wait.event', data: {'x': 1});
 
         expect(called, isTrue);
       });

@@ -1,5 +1,7 @@
 # Architecture
 
+> **Current version: 2.3.0**
+
 Complete architectural reference for AI agents building plugins, adapters, and sections with `moose_core`.
 
 ---
@@ -47,7 +49,6 @@ class MooseAppContext {
   final PluginRegistry  pluginRegistry;
   final WidgetRegistry  widgetRegistry;
   final HookRegistry    hookRegistry;
-  final AddonRegistry   addonRegistry;
   final ActionRegistry  actionRegistry;
   final AdapterRegistry adapterRegistry;
   final ConfigManager   configManager;
@@ -178,7 +179,7 @@ if (!report.succeeded) {
 
 | Step | Method | Caller | Sync/Async | Purpose |
 |------|--------|--------|-----------|---------|
-| 1 | `onRegister()` | `PluginRegistry.register()` | **sync** | Register hooks, widgets, addon slots, custom actions |
+| 1 | `onRegister()` | `PluginRegistry.register()` | **sync** | Register hooks, widgets, and custom actions |
 | 2 | `onInit()` | `PluginRegistry.initAll()` | **async** | Async setup — connect services, warm caches, register sections |
 | 3 | `onStart()` | `PluginRegistry.startAll()` | **async** | Post-init work; all other plugins have completed `onInit` |
 | 4 | `onAppLifecycle()` | `MooseLifecycleObserver` | **async** | React to Flutter foreground/background/detached states |
@@ -198,7 +199,6 @@ abstract class FeaturePlugin {
 
   // Convenience getters (delegate to appContext — NOT singletons)
   HookRegistry    get hookRegistry;
-  AddonRegistry   get addonRegistry;
   WidgetRegistry  get widgetRegistry;
   AdapterRegistry get adapterRegistry;
   ActionRegistry  get actionRegistry;
@@ -244,7 +244,7 @@ class ProductsPlugin extends FeaturePlugin {
   @override
   void onRegister() {
     // Register section builder
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.featured',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
@@ -642,7 +642,7 @@ Sections are composed at runtime from `environment.json`:
 
 ```dart
 // Plugin registers builder in onRegister()
-widgetRegistry.register(
+widgetRegistry.registerSection(
   'products.featured',
   (context, {data, onEvent}) => FeaturedProductsSection(
     settings: data?['settings'] as Map<String, dynamic>?,
@@ -663,19 +663,19 @@ Widget build(BuildContext context) {
 
 `buildSectionGroup` reads `plugins:home:sections:main` from `ConfigManager`, filters to `active: true` items, and invokes each registered builder with that section's `settings`.
 
-### AddonRegistry: UI Extension Points
+### WidgetRegistry: Multi-Slot Widget Injection
 
-`AddonRegistry` allows plugins to inject widgets into named zones owned by other plugins — with no direct import dependency.
+Beyond full section ownership, `WidgetRegistry` also supports slot-based widget injection — where multiple plugins contribute widgets to a named slot owned by another plugin.
 
 ```dart
-// Plugin B injects a wishlist button into Plugin A's product card zone
-addonRegistry.register('product_card.footer', (context, {data, onEvent}) {
+// Plugin B injects a wishlist button into Plugin A's product card slot
+widgetRegistry.registerWidget('product_card.footer', (context, {data, onEvent}) {
   final productId = data?['productId'] as String?;
   return WishlistButton(productId: productId);
 }, priority: 10);
 
-// Plugin A renders its zone (no knowledge of who provides addons)
-final addons = context.moose.addonRegistry.build<Widget>(
+// Plugin A renders its slot (no knowledge of who provides widgets)
+final addons = context.moose.widgetRegistry.buildAll(
   'product_card.footer',
   context,
   data: {'productId': product.id},
@@ -683,6 +683,7 @@ final addons = context.moose.addonRegistry.build<Widget>(
 ```
 
 Higher priority renders first. Builders returning `null` are filtered out.
+Use `build()` when only one widget is expected; `buildAll()` when multiple plugins may contribute.
 
 ---
 
@@ -989,7 +990,7 @@ class ProductsPlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.featured',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,

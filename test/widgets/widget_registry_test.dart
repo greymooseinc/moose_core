@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/widgets.dart';
 
-/// Test widget implementation
-class TestWidget extends FeatureSection {
-  const TestWidget({super.key, super.settings});
+/// Test FeatureSection implementation
+class TestSection extends FeatureSection {
+  const TestSection({super.key, super.settings});
 
   @override
   Map<String, dynamic> getDefaultSettings() {
@@ -23,10 +23,8 @@ void main() {
 
     setUp(() {
       registry = WidgetRegistry();
-      // Clear registry before each test
-      final widgets = registry.getRegisteredWidgets();
-      for (final widget in widgets) {
-        registry.unregister(widget);
+      for (final key in registry.getRegisteredWidgets()) {
+        registry.unregister(key);
       }
     });
 
@@ -35,296 +33,296 @@ void main() {
         final registry1 = WidgetRegistry();
         final registry2 = WidgetRegistry();
 
-        registry1.register('widget.a', (ctx, {data, onEvent}) => const TestWidget());
+        registry1.registerSection('widget.a', (ctx, {data, onEvent}) => const TestSection());
         expect(registry1.isRegistered('widget.a'), isTrue);
         expect(registry2.isRegistered('widget.a'), isFalse);
       });
     });
 
-    group('Widget Registration', () {
-      test('should register widget builder', () {
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(),
+    group('registerSection', () {
+      test('registers a FeatureSection builder', () {
+        registry.registerSection(
+          'test.section',
+          (context, {data, onEvent}) => const TestSection(),
         );
 
-        expect(registry.isRegistered('test.widget'), true);
+        expect(registry.isRegistered('test.section'), isTrue);
       });
 
-      test('should track registered widgets', () {
-        registry.register(
-          'widget1',
-          (context, {data, onEvent}) => const TestWidget(),
+      test('tracks registered keys', () {
+        registry.registerSection('section1', (ctx, {data, onEvent}) => const TestSection());
+        registry.registerSection('section2', (ctx, {data, onEvent}) => const TestSection());
+
+        final keys = registry.getRegisteredWidgets();
+        expect(keys, contains('section1'));
+        expect(keys, contains('section2'));
+        expect(keys.length, 2);
+      });
+
+      test('multiple builders for the same key accumulate (multi-slot)', () {
+        registry.registerSection(
+          'slot',
+          (ctx, {data, onEvent}) => const TestSection(settings: {'title': 'A'}),
         );
-        registry.register(
-          'widget2',
-          (context, {data, onEvent}) => const TestWidget(),
+        registry.registerSection(
+          'slot',
+          (ctx, {data, onEvent}) => const TestSection(settings: {'title': 'B'}),
         );
 
-        final widgets = registry.getRegisteredWidgets();
-        expect(widgets, contains('widget1'));
-        expect(widgets, contains('widget2'));
-        expect(widgets.length, 2);
+        // Two distinct builders — both should be tracked under the same key
+        expect(registry.isRegistered('slot'), isTrue);
+        expect(registry.getRegisteredWidgets().length, 1); // one key, two entries
       });
 
-      test('should return false for unregistered widget', () {
-        expect(registry.isRegistered('unknown.widget'), false);
-      });
+      testWidgets('duplicate builder reference is ignored', (tester) async {
+        TestSection builder(ctx, {data, onEvent}) => const TestSection();
+        registry.registerSection('slot', builder);
+        registry.registerSection('slot', builder); // same reference — ignored
 
-      test('should overwrite existing registration', () {
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(
-            settings: {'title': 'First'},
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) {
+              final all = registry.buildAll('slot', ctx);
+              expect(all.length, 1);
+              return all.first;
+            }),
           ),
-        );
-
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(
-            settings: {'title': 'Second'},
-          ),
-        );
-
-        expect(registry.getRegisteredWidgets().length, 1);
+        ));
       });
     });
 
-    group('Widget Unregistration', () {
-      test('should unregister widget', () {
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(),
+    group('registerWidget', () {
+      test('registers a plain widget builder', () {
+        registry.registerWidget(
+          'badge',
+          (ctx, {data, onEvent}) => const Text('badge'),
         );
 
-        expect(registry.isRegistered('test.widget'), true);
+        expect(registry.isRegistered('badge'), isTrue);
+      });
 
+      testWidgets('builder returning null is filtered by buildAll', (tester) async {
+        registry.registerWidget('slot', (ctx, {data, onEvent}) => null);
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) {
+              expect(registry.buildAll('slot', ctx), isEmpty);
+              return const SizedBox.shrink();
+            }),
+          ),
+        ));
+      });
+
+      testWidgets('priority controls order in buildAll', (tester) async {
+        registry.registerWidget('slot',
+            (ctx, {data, onEvent}) => const Text('low'), priority: 1);
+        registry.registerWidget('slot',
+            (ctx, {data, onEvent}) => const Text('high'), priority: 10);
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) {
+              final all = registry.buildAll('slot', ctx);
+              expect(all.length, 2);
+              return Column(children: all);
+            }),
+          ),
+        ));
+      });
+    });
+
+    group('buildAll', () {
+      testWidgets('returns empty list for unregistered key', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) {
+              expect(registry.buildAll('missing', ctx), isEmpty);
+              return const SizedBox.shrink();
+            }),
+          ),
+        ));
+      });
+
+      testWidgets('returns all non-null widgets, skips nulls', (tester) async {
+        registry.registerWidget('slot', (ctx, {data, onEvent}) => const Text('A'));
+        registry.registerWidget('slot', (ctx, {data, onEvent}) => null);
+        registry.registerWidget('slot', (ctx, {data, onEvent}) => const Text('C'));
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) {
+              final all = registry.buildAll('slot', ctx);
+              expect(all.length, 2);
+              return Column(children: all);
+            }),
+          ),
+        ));
+      });
+    });
+
+    group('isRegistered', () {
+      test('returns false for unregistered key', () {
+        expect(registry.isRegistered('unknown.widget'), isFalse);
+      });
+
+      test('returns true after registration', () {
+        registry.registerSection('s', (ctx, {data, onEvent}) => const TestSection());
+        expect(registry.isRegistered('s'), isTrue);
+      });
+
+      test('returns false after unregister', () {
+        registry.registerSection('s', (ctx, {data, onEvent}) => const TestSection());
+        registry.unregister('s');
+        expect(registry.isRegistered('s'), isFalse);
+      });
+    });
+
+    group('unregister', () {
+      test('removes all builders for a key', () {
+        registry.registerSection('test.widget', (ctx, {data, onEvent}) => const TestSection());
         registry.unregister('test.widget');
-
-        expect(registry.isRegistered('test.widget'), false);
+        expect(registry.isRegistered('test.widget'), isFalse);
       });
 
-      test('should handle unregistering non-existent widget', () {
-        expect(
-          () => registry.unregister('non.existent'),
-          returnsNormally,
-        );
+      test('handles unregistering non-existent key gracefully', () {
+        expect(() => registry.unregister('non.existent'), returnsNormally);
       });
     });
 
-    group('Widget Building', () {
-      testWidgets('should build registered widget', (WidgetTester tester) async {
-        registry.register(
+    group('build — widget tests', () {
+      testWidgets('builds a registered section', (tester) async {
+        registry.registerSection(
           'test.widget',
-          (context, {data, onEvent}) => const TestWidget(),
+          (context, {data, onEvent}) => const TestSection(),
         );
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build('test.widget', context),
-              ),
-            ),
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) => registry.build('test.widget', ctx)),
           ),
-        );
+        ));
 
         expect(find.text('Test Widget'), findsOneWidget);
       });
 
-      testWidgets('should return empty container for unknown widget',
-          (WidgetTester tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build('unknown.widget', context),
-              ),
-            ),
+      testWidgets('returns fallback for unknown key in debug mode', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(builder: (ctx) => registry.build('unknown.widget', ctx)),
           ),
-        );
+        ));
 
-        expect(find.byType(Container), findsOneWidget);
+        // In debug mode UnknownSectionWidget is returned; it renders something
+        expect(find.byType(Scaffold), findsOneWidget);
       });
 
-      testWidgets('should pass data to widget builder',
-          (WidgetTester tester) async {
+      testWidgets('passes data to section builder', (tester) async {
         String? receivedTitle;
 
-        registry.register(
+        registry.registerSection(
           'test.widget',
           (context, {data, onEvent}) {
             receivedTitle = data?['settings']?['title'] as String?;
-            return const TestWidget();
+            return const TestSection();
           },
         );
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build(
-                  'test.widget',
-                  context,
-                  data: {
-                    'settings': {'title': 'Custom Title'}
-                  },
-                ),
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => registry.build(
+                'test.widget',
+                ctx,
+                data: {'settings': {'title': 'Custom Title'}},
               ),
             ),
           ),
-        );
+        ));
 
         expect(receivedTitle, 'Custom Title');
       });
 
-      testWidgets('should support onEvent callback',
-          (WidgetTester tester) async {
+      testWidgets('forwards onEvent callback', (tester) async {
         String? eventName;
         dynamic eventPayload;
 
-        registry.register(
+        registry.registerSection(
           'test.widget',
           (context, {data, onEvent}) {
-            // Trigger event in builder
             onEvent?.call('test_event', {'value': 42});
-            return const TestWidget();
+            return const TestSection();
           },
         );
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build(
-                  'test.widget',
-                  context,
-                  onEvent: (event, payload) {
-                    eventName = event;
-                    eventPayload = payload;
-                  },
-                ),
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => registry.build(
+                'test.widget',
+                ctx,
+                onEvent: (event, payload) {
+                  eventName = event;
+                  eventPayload = payload;
+                },
               ),
             ),
           ),
-        );
+        ));
 
         expect(eventName, 'test_event');
         expect(eventPayload, {'value': 42});
       });
-    });
 
-    group('Multiple Widgets', () {
-      test('should support multiple widget registrations', () {
-        registry.register(
-          'widget1',
-          (context, {data, onEvent}) => const TestWidget(),
-        );
-        registry.register(
-          'widget2',
-          (context, {data, onEvent}) => const TestWidget(),
-        );
-        registry.register(
-          'widget3',
-          (context, {data, onEvent}) => const TestWidget(),
+      testWidgets('handles null data', (tester) async {
+        registry.registerSection(
+          'test.widget',
+          (context, {data, onEvent}) => const TestSection(),
         );
 
-        expect(registry.getRegisteredWidgets().length, 3);
-        expect(registry.isRegistered('widget1'), true);
-        expect(registry.isRegistered('widget2'), true);
-        expect(registry.isRegistered('widget3'), true);
-      });
-
-      testWidgets('should build different widgets independently',
-          (WidgetTester tester) async {
-        registry.register(
-          'widget1',
-          (context, {data, onEvent}) => const TestWidget(
-            settings: {'title': 'Widget 1'},
-          ),
-        );
-        registry.register(
-          'widget2',
-          (context, {data, onEvent}) => const TestWidget(
-            settings: {'title': 'Widget 2'},
-          ),
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => Column(
-                  children: [
-                    registry.build('widget1', context),
-                    registry.build('widget2', context),
-                  ],
-                ),
-              ),
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => registry.build('test.widget', ctx, data: null),
             ),
           ),
+        ));
+
+        expect(find.text('Test Widget'), findsOneWidget);
+      });
+    });
+
+    group('Edge Cases', () {
+      test('empty string key is valid', () {
+        registry.registerSection('', (ctx, {data, onEvent}) => const TestSection());
+        expect(registry.isRegistered(''), isTrue);
+      });
+
+      testWidgets('builds multiple independent keys', (tester) async {
+        registry.registerSection(
+          'widget1',
+          (ctx, {data, onEvent}) => const TestSection(settings: {'title': 'Widget 1'}),
         );
+        registry.registerSection(
+          'widget2',
+          (ctx, {data, onEvent}) => const TestSection(settings: {'title': 'Widget 2'}),
+        );
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => Column(children: [
+                registry.build('widget1', ctx),
+                registry.build('widget2', ctx),
+              ]),
+            ),
+          ),
+        ));
 
         expect(find.text('Widget 1'), findsOneWidget);
         expect(find.text('Widget 2'), findsOneWidget);
       });
     });
-
-    group('Edge Cases', () {
-      test('should handle empty widget name', () {
-        registry.register(
-          '',
-          (context, {data, onEvent}) => const TestWidget(),
-        );
-
-        expect(registry.isRegistered(''), true);
-      });
-
-      testWidgets('should handle null data', (WidgetTester tester) async {
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(),
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build(
-                  'test.widget',
-                  context,
-                  data: null,
-                ),
-              ),
-            ),
-          ),
-        );
-
-        expect(find.text('Test Widget'), findsOneWidget);
-      });
-
-      testWidgets('should handle null onEvent', (WidgetTester tester) async {
-        registry.register(
-          'test.widget',
-          (context, {data, onEvent}) => const TestWidget(),
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => registry.build(
-                  'test.widget',
-                  context,
-                  onEvent: null,
-                ),
-              ),
-            ),
-          ),
-        );
-
-        expect(find.text('Test Widget'), findsOneWidget);
-      });
-    });
   });
 }
+

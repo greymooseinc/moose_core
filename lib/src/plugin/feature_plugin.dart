@@ -55,10 +55,15 @@ import '../app/moose_app_context.dart';
 ///
 ///   @override
 ///   void onRegister() {
-///     // Register widgets
-///     widgetRegistry.register('product.list', (context, {data, onEvent}) {
-///       return ProductListWidget(data: data);
+///     // Register a FeatureSection
+///     widgetRegistry.registerSection('product.list', (context, {data, onEvent}) {
+///       return ProductListSection(data: data);
 ///     });
+///
+///     // Register a plain widget (overlay, button, loader, etc.)
+///     widgetRegistry.registerWidget('product.card.badge', (context, {data, onEvent}) {
+///       return SaleBadge(productId: data?['productId'] as String?);
+///     }, priority: 10);
 ///
 ///     // Register adapters
 ///     adapterRegistry.registerProductsAdapter(WooProductsAdapter());
@@ -89,7 +94,6 @@ abstract class FeaturePlugin {
 
   // Convenience getters — delegate to the injected appContext.
   HookRegistry get hookRegistry => appContext.hookRegistry;
-  AddonRegistry get addonRegistry => appContext.addonRegistry;
   WidgetRegistry get widgetRegistry => appContext.widgetRegistry;
   AdapterRegistry get adapterRegistry => appContext.adapterRegistry;
   ActionRegistry get actionRegistry => appContext.actionRegistry;
@@ -187,7 +191,16 @@ abstract class FeaturePlugin {
   /// individual plugins do not have to interact with `bottom_tabs:filter_tabs`.
   List<BottomTab> get bottomTabs => const [];
 
-  T getSetting<T>(String key) {
-    return appContext.configManager.get('plugins:$name:settings:$key');
+  /// Returns a plugin setting value cast to [T].
+  ///
+  /// Looks up `plugins:<name>:settings:<key>` in the [ConfigManager].
+  /// If the key is absent (returns `null`) and [defaultValue] is provided,
+  /// [defaultValue] is returned. If neither the key nor a default exist, this
+  /// throws a [TypeError] at the cast site — prefer always supplying a
+  /// [defaultValue] or declaring a setting in [getDefaultSettings].
+  T getSetting<T>(String key, {T? defaultValue}) {
+    final value = appContext.configManager.get('plugins:$name:settings:$key');
+    if (value == null && defaultValue != null) return defaultValue;
+    return value as T;
   }
 }

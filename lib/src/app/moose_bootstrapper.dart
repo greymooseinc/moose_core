@@ -99,7 +99,8 @@ class BootstrapReport {
 ///    [FeaturePlugin] is registered via [PluginRegistry.register], which
 ///    injects [MooseAppContext] and calls [FeaturePlugin.onRegister] (sync).
 /// 6. **Plugin init** — [PluginRegistry.initAll] calls each plugin's
-///    [FeaturePlugin.onInit] concurrently and records per-plugin timing.
+///    [FeaturePlugin.onInit] sequentially (in registration order) and records
+///    per-plugin timing. Each plugin must complete before the next starts.
 /// 7. **Plugin start** — [PluginRegistry.startAll] calls each plugin's
 ///    [FeaturePlugin.onStart] and records per-plugin timing.
 ///

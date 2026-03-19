@@ -9,7 +9,6 @@ import '../config/config_manager.dart';
 import '../events/event_bus.dart';
 import '../events/hook_registry.dart';
 import '../plugin/plugin_registry.dart';
-import '../widgets/addon_registry.dart';
 import '../widgets/widget_registry.dart';
 import 'moose_app_context.dart';
 import 'moose_lifecycle_observer.dart';
@@ -120,10 +119,6 @@ class MooseScope extends StatefulWidget {
 
   /// Returns the [HookRegistry] from the nearest [MooseScope].
   static HookRegistry hookRegistryOf(BuildContext ctx) => of(ctx).hookRegistry;
-
-  /// Returns the [AddonRegistry] from the nearest [MooseScope].
-  static AddonRegistry addonRegistryOf(BuildContext ctx) =>
-      of(ctx).addonRegistry;
 
   /// Returns the [ActionRegistry] from the nearest [MooseScope].
   static ActionRegistry actionRegistryOf(BuildContext ctx) =>

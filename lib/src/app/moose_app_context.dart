@@ -13,7 +13,6 @@ import '../plugin/plugin_registry.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/repository.dart';
 import '../utils/logger.dart';
-import '../widgets/addon_registry.dart';
 import '../widgets/widget_registry.dart';
 
 /// The dependency-injection container for a running moose_core application.
@@ -113,9 +112,13 @@ class MooseAppContext {
 
   /// Registry mapping string keys to [FeatureSection] builders.
   ///
-  /// Plugins call `widgetRegistry.register(key, builder)` inside
-  /// [FeaturePlugin.onRegister] to contribute UI sections. Screens render
-  /// named groups with `widgetRegistry.buildSectionGroup(context, ...)`.
+  /// Unified registry mapping string keys to widget builders.
+  ///
+  /// Plugins call `widgetRegistry.registerSection(key, builder)` for
+  /// [FeatureSection]-based builders or `widgetRegistry.registerWidget(key, builder)`
+  /// for plain widget builders. Multiple registrations per key are supported —
+  /// use `widgetRegistry.build(key, context)` to get the first result or
+  /// `widgetRegistry.buildAll(key, context)` to get all results.
   final WidgetRegistry widgetRegistry;
 
   /// Synchronous filter-and-transform pipeline shared across plugins.
@@ -138,18 +141,6 @@ class MooseAppContext {
   /// );
   /// ```
   final HookRegistry hookRegistry;
-
-  /// Priority-ordered UI extension slots shared across plugins.
-  ///
-  /// Plugin B can inject widgets into a zone declared by Plugin A without
-  /// any direct import dependency:
-  ///
-  /// ```dart
-  /// addonRegistry.register('product_card.footer', (context, {data, onEvent}) {
-  ///   return WishlistButton(productId: data?['productId'] as String?);
-  /// }, priority: 10);
-  /// ```
-  final AddonRegistry addonRegistry;
 
   /// Registry for named [UserInteraction] handlers.
   ///
@@ -298,7 +289,6 @@ class MooseAppContext {
     PluginRegistry? pluginRegistry,
     WidgetRegistry? widgetRegistry,
     HookRegistry? hookRegistry,
-    AddonRegistry? addonRegistry,
     ActionRegistry? actionRegistry,
     AdapterRegistry? adapterRegistry,
     ConfigManager? configManager,
@@ -307,7 +297,6 @@ class MooseAppContext {
     CacheManager? cache,
   })  : configManager = configManager ?? ConfigManager(),
         hookRegistry = hookRegistry ?? HookRegistry(),
-        addonRegistry = addonRegistry ?? AddonRegistry(),
         actionRegistry = actionRegistry ?? ActionRegistry(),
         adapterRegistry = adapterRegistry ?? AdapterRegistry(),
         eventBus = eventBus ?? EventBus(),

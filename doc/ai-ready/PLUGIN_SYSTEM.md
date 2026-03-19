@@ -1,5 +1,7 @@
 # Plugin System Guide
 
+> **Current version: 2.3.0**
+
 > Complete guide to creating and managing plugins in moose_core
 
 ## Table of Contents
@@ -47,7 +49,6 @@ abstract class FeaturePlugin {
 
   // Convenience getters — all delegate to appContext:
   HookRegistry    get hookRegistry   => appContext.hookRegistry;
-  AddonRegistry   get addonRegistry  => appContext.addonRegistry;
   WidgetRegistry  get widgetRegistry => appContext.widgetRegistry;
   AdapterRegistry get adapterRegistry => appContext.adapterRegistry;
   ActionRegistry  get actionRegistry => appContext.actionRegistry;
@@ -66,7 +67,7 @@ abstract class FeaturePlugin {
   Map<String, dynamic> getDefaultSettings() => {};
 
   /// SYNC. Called immediately after appContext is injected.
-  /// Register widgets, hooks, addons, and action handlers here.
+  /// Register sections, widgets, hooks, and action handlers here.
   /// Do NOT do async I/O here.
   void onRegister();
 
@@ -141,7 +142,7 @@ MooseBootstrapper.run()
 
 | Method | Thread | When to use |
 |---|---|---|
-| `onRegister()` | Sync | Register widgets, hooks, addons, action handlers. No I/O. |
+| `onRegister()` | Sync | Register sections, widgets, hooks, action handlers. No I/O. |
 | `onInit()` | Async | Fetch initial data, open connections, warm caches. |
 | `onStart()` | Async | Work that requires other plugins to be initialized first. |
 | `onAppLifecycle()` | Async | Pause/resume background tasks on foreground/background transitions. |
@@ -196,14 +197,14 @@ class ProductsPlugin extends FeaturePlugin {
   @override
   void onRegister() {
     // Register UI sections
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.featured_section',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>? ?? {},
       ),
     );
 
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.grid_section',
       (context, {data, onEvent}) => ProductsGridSection(
         settings: data?['settings'] as Map<String, dynamic>? ?? {},
@@ -402,7 +403,7 @@ Future<void> onInit() async {
 }
 
 // ✅ Widget receives data via section settings map — not ConfigManager
-widgetRegistry.register('products.grid_section', (ctx, {data, onEvent}) {
+widgetRegistry.registerSection('products.grid_section', (ctx, {data, onEvent}) {
   return ProductsGridSection(settings: data?['settings'] ?? {});
 });
 ```
@@ -540,7 +541,6 @@ final repo = context.moose.getRepository<ProductsRepository>();
 // Static convenience accessors (same as context.moose.<registry>):
 final hookReg  = MooseScope.hookRegistryOf(context);
 final widgetReg = MooseScope.widgetRegistryOf(context);
-final addonReg  = MooseScope.addonRegistryOf(context);
 final actionReg = MooseScope.actionRegistryOf(context);
 final adapterReg = MooseScope.adapterRegistryOf(context);
 final configMgr  = MooseScope.configManagerOf(context);
@@ -602,10 +602,10 @@ final cart = hookRegistry.execute('cart:get_current_cart', null);
 ## Best Practices
 
 ```dart
-// ✅ Register widgets and hooks synchronously in onRegister()
+// ✅ Register sections, widgets and hooks synchronously in onRegister()
 @override
 void onRegister() {
-  widgetRegistry.register('products.grid', (ctx, {data, onEvent}) => ProductGrid());
+  widgetRegistry.registerSection('products.grid', (ctx, {data, onEvent}) => ProductGrid());
   hookRegistry.register('products:transform', (p) => p);
 }
 

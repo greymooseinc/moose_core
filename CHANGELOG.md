@@ -5,6 +5,39 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-19
+
+### Changed
+
+- **`WidgetRegistry` — unified registry (breaking):** `AddonRegistry` has been merged into `WidgetRegistry`. There is now a single registry for all dynamic UI composition.
+  - `registerSection(name, SectionBuilderFn, {int priority = 0})` — registers a `FeatureSection` builder (renamed from `register`)
+  - `registerWidget(name, WidgetBuilderFn, {int priority = 0})` — registers a plain `Widget?` builder (replaces `AddonRegistry.register`)
+  - `buildAll(name, context, {data, onEvent})` → `List<Widget>` — builds all registered builders for a key, filtered and priority-ordered (replaces `AddonRegistry.build`)
+  - `build(name, context, {data, onEvent})` — unchanged; returns first non-null widget
+  - Both registration methods write to the same internal `Map<String, List<_Entry>>`, so `build` and `buildAll` work across both `registerSection` and `registerWidget` registrations
+  - Priority controls ordering in both methods: higher priority = earlier in result
+
+### Removed
+
+- **`AddonRegistry`** — deleted. Use `WidgetRegistry.registerWidget` and `WidgetRegistry.buildAll` instead.
+- **`MooseAppContext.addonRegistry`** field — removed. `widgetRegistry` is now the unified registry.
+- **`MooseScope.addonRegistryOf()`** static accessor — removed.
+- **`FeaturePlugin.addonRegistry`** convenience getter — removed.
+
+### Migration
+
+```dart
+// Before
+addonRegistry.register('slot', builder, priority: 10);
+addonRegistry.build('slot', context, data: {...});
+widgetRegistry.register('key', sectionBuilder);
+
+// After
+widgetRegistry.registerWidget('slot', builder, priority: 10);
+widgetRegistry.buildAll('slot', context, data: {...});
+widgetRegistry.registerSection('key', sectionBuilder);
+```
+
 ## [2.2.0] - 2026-03-18
 
 ### Added

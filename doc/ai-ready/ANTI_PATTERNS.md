@@ -1,5 +1,7 @@
 # Anti-Patterns Reference
 
+> **Current version: 2.3.0**
+
 > **Critical:** These patterns will break the architecture. NEVER use them.
 
 ## Table of Contents

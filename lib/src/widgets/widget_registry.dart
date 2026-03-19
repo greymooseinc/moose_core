@@ -13,10 +13,22 @@ typedef SectionBuilderFn = FeatureSection Function(
   void Function(String event, dynamic payload)? onEvent,
 });
 
+typedef WidgetBuilderFn = Widget? Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String event, dynamic payload)? onEvent,
+});
+
+class _Entry {
+  final int priority;
+  final WidgetBuilderFn builder;
+  _Entry(this.priority, this.builder);
+}
+
 class WidgetRegistry {
   WidgetRegistry();
 
-  final Map<String, SectionBuilderFn> _registry = {};
+  final Map<String, List<_Entry>> _registry = {};
   ConfigManager _configManager = ConfigManager();
   final _logger = AppLogger('WidgetRegistry');
 
@@ -24,13 +36,47 @@ class WidgetRegistry {
   /// [ConfigManager] in place of the default instance.
   void setConfigManager(ConfigManager cm) => _configManager = cm;
 
-  void register(String name, SectionBuilderFn builder) {
-    _registry[name] = builder;
+  /// Registers a [FeatureSection] builder for [name].
+  ///
+  /// Use this when the builder returns a [FeatureSection] and you want the
+  /// settings abstraction (`getSetting`, `getDefaultSettings`) enforced.
+  ///
+  /// Multiple registrations for the same [name] are allowed. When [build] or
+  /// [buildAll] is called, entries are invoked in descending [priority] order
+  /// (highest priority first). Duplicate builder references are ignored.
+  void registerSection(String name, SectionBuilderFn builder,
+      {int priority = 0}) {
+    _add(name, (ctx, {data, onEvent}) => builder(ctx, data: data, onEvent: onEvent), priority);
+    _logger.debug('\'$name\' section registered');
+  }
+
+  /// Registers a plain [WidgetBuilderFn] for [name].
+  ///
+  /// Use this for lightweight builders — overlays, action buttons, loading
+  /// indicators — that do not need the [FeatureSection] settings abstraction.
+  ///
+  /// Multiple registrations for the same [name] are allowed and all are called
+  /// by [buildAll]. Duplicate builder references are ignored.
+  void registerWidget(String name, WidgetBuilderFn builder,
+      {int priority = 0}) {
+    _add(name, builder, priority);
     _logger.debug('\'$name\' widget registered');
   }
 
+  void _add(String name, WidgetBuilderFn builder, int priority) {
+    final entries = _registry.putIfAbsent(name, () => []);
+    final alreadyRegistered = entries.any((e) => e.builder == builder);
+    if (alreadyRegistered) {
+      debugPrint('WidgetRegistry: Duplicate builder ignored for "$name".');
+      return;
+    }
+    entries.add(_Entry(priority, builder));
+    entries.sort((a, b) => b.priority.compareTo(a.priority));
+  }
+
   bool isRegistered(String name) {
-    return _registry.containsKey(name);
+    final entries = _registry[name];
+    return entries != null && entries.isNotEmpty;
   }
 
   List<String> getRegisteredWidgets() {
@@ -41,14 +87,22 @@ class WidgetRegistry {
     _registry.remove(name);
   }
 
+  /// Returns the first non-null widget produced by the builders registered
+  /// under [name], evaluated in descending priority order.
+  ///
+  /// If [fallback] is provided it is returned when no builder is registered or
+  /// all builders return null — in both debug and release mode. When [fallback]
+  /// is omitted the default behaviour applies: [UnknownSectionWidget] in debug
+  /// mode, [SizedBox.shrink] in release mode.
   Widget build(
     String name,
     BuildContext context, {
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
+    Widget? fallback,
   }) {
-    final builder = _registry[name];
-    if (builder == null) {
+    Widget resolveFallback() {
+      if (fallback != null) return fallback;
       if (kDebugMode) {
         return UnknownSectionWidget(
           requestedName: name,
@@ -57,7 +111,52 @@ class WidgetRegistry {
       }
       return const SizedBox.shrink();
     }
-    return builder(context, data: data, onEvent: onEvent);
+
+    final entries = _registry[name];
+    if (entries == null || entries.isEmpty) return resolveFallback();
+
+    for (final entry in entries) {
+      try {
+        final widget = entry.builder(context, data: data, onEvent: onEvent);
+        if (widget != null) return widget;
+      } catch (e, stack) {
+        debugPrint('WidgetRegistry build error for "$name": $e\n$stack');
+      }
+    }
+    return resolveFallback();
+  }
+
+  /// Returns all non-null widgets produced by every builder registered under
+  /// [name], evaluated in descending priority order.
+  ///
+  /// If [fallback] is provided it is returned as a single-element list when no
+  /// builder is registered or all builders return null. When [fallback] is
+  /// omitted an empty list is returned in that case.
+  ///
+  /// Errors in individual builders are caught and logged; other builders
+  /// continue executing.
+  List<Widget> buildAll(
+    String name,
+    BuildContext context, {
+    Map<String, dynamic>? data,
+    void Function(String event, dynamic payload)? onEvent,
+    Widget? fallback,
+  }) {
+    final entries = _registry[name];
+    if (entries == null || entries.isEmpty) {
+      return fallback != null ? [fallback] : [];
+    }
+    final results = <Widget>[];
+    for (final entry in entries) {
+      try {
+        final widget = entry.builder(context, data: data, onEvent: onEvent);
+        if (widget != null) results.add(widget);
+      } catch (e, stack) {
+        debugPrint('WidgetRegistry buildAll error for "$name": $e\n$stack');
+      }
+    }
+    if (results.isEmpty && fallback != null) return [fallback];
+    return results;
   }
 
   List<SectionConfig> getSections(String pluginName, String groupName) {

@@ -243,7 +243,7 @@ import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, M
 import 'package:moose_core/entities.dart';     // Product, Cart, Order, Category, User ...
 import 'package:moose_core/repositories.dart'; // ProductsRepository, CartRepository ...
 import 'package:moose_core/plugin.dart';       // FeaturePlugin, PluginRegistry
-import 'package:moose_core/widgets.dart';      // FeatureSection, WidgetRegistry, AddonRegistry
+import 'package:moose_core/widgets.dart';      // FeatureSection, WidgetRegistry, UnknownSectionWidget
 import 'package:moose_core/adapters.dart';     // BackendAdapter, AdapterRegistry
 import 'package:moose_core/cache.dart';        // CacheManager, MemoryCache, PersistentCache
 import 'package:moose_core/services.dart';     // EventBus, HookRegistry, ActionRegistry, ApiClient

@@ -1,6 +1,7 @@
 # moose_core — AI-Ready Documentation
 
 > Reference documentation for AI agents building plugins, adapters, and sections on the `moose_core` Flutter framework.
+> **Current version: 2.3.0**
 
 ---
 
@@ -120,7 +121,6 @@ final ctx = MooseAppContext();
 // All registries are independent instances — no global state
 ctx.pluginRegistry    // PluginRegistry
 ctx.widgetRegistry    // WidgetRegistry
-ctx.addonRegistry     // AddonRegistry
 ctx.hookRegistry      // HookRegistry
 ctx.actionRegistry    // ActionRegistry
 ctx.adapterRegistry   // AdapterRegistry
@@ -192,7 +192,7 @@ import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, M
 import 'package:moose_core/entities.dart';      // Domain entities (Product, Cart, Order, ...)
 import 'package:moose_core/repositories.dart';  // Repository interfaces
 import 'package:moose_core/plugin.dart';        // FeaturePlugin, PluginRegistry
-import 'package:moose_core/widgets.dart';       // FeatureSection, WidgetRegistry, AddonRegistry
+import 'package:moose_core/widgets.dart';       // FeatureSection, WidgetRegistry, UnknownSectionWidget
 import 'package:moose_core/adapters.dart';      // BackendAdapter, AdapterRegistry
 import 'package:moose_core/cache.dart';         // CacheManager, MemoryCache, PersistentCache
 import 'package:moose_core/services.dart';      // EventBus, HookRegistry, ActionRegistry, AppLogger, ApiClient
@@ -236,8 +236,8 @@ class ProductsPlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    // Sync: register widgets, routes, addons, hooks
-    widgetRegistry.register(
+    // Sync: register sections, widgets, hooks
+    widgetRegistry.registerSection(
       'products.featured_section',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
@@ -424,8 +424,7 @@ class FeaturedProductsSection extends FeatureSection {
 
 | Registry | Purpose |
 |---|---|
-| `WidgetRegistry` | Maps string keys → `FeatureSection` builders; `buildSectionGroup()` renders a group |
-| `AddonRegistry` | Priority-ordered widget slots; multiple builders per slot; null = skip |
+| `WidgetRegistry` | Maps string keys to builders; `registerSection` for FeatureSections, `registerWidget` for plain widgets; `build()` returns first, `buildAll()` returns all |
 | `HookRegistry` | Synchronous filter pipelines; descending priority; errors skipped |
 | `ActionRegistry` | `UserInteraction` dispatch by type (`internal`, `external`, `custom`, `none`) |
 | `AdapterRegistry` | Lazy repository factory management; last registered adapter wins |
@@ -533,7 +532,7 @@ moose locale add si
 | Document | What it covers |
 |---|---|
 | [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) | Full plugin lifecycle, config, routes, bottom tabs |
-| [FEATURE_SECTION.md](./FEATURE_SECTION.md) | FeatureSection pattern, getSetting coercions, AddonRegistry slots |
+| [FEATURE_SECTION.md](./FEATURE_SECTION.md) | FeatureSection pattern, getSetting coercions, widget slots |
 | [REPOSITORIES.md](./REPOSITORIES.md) | All 11 repository interfaces and their full method signatures |
 | [ENTITY_EXTENSIONS.md](./ENTITY_EXTENSIONS.md) | CoreEntity extensions map, copyWith vs copyWithExtensions |
 
@@ -550,7 +549,7 @@ moose locale add si
 
 | Document | What it covers |
 |---|---|
-| [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, AddonRegistry, HookRegistry, ActionRegistry, EventBus |
+| [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, HookRegistry, ActionRegistry, EventBus |
 | [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) | EventBus vs HookRegistry decision matrix, patterns, BLoC integration |
 | [CACHE_SYSTEM.md](./CACHE_SYSTEM.md) | CacheManager, MemoryCache, PersistentCache, TTL configuration |
 | [API.md](./API.md) | Public API reference — exported classes, type definitions |
@@ -560,7 +559,7 @@ moose locale add si
 
 ## Key Rules for AI Agents
 
-1. **Register in `onRegister()`, not `onInit()`** — widget, route, hook, and addon registration is synchronous and must happen in `onRegister()`. `onInit()` is for async work only.
+1. **Register in `onRegister()`, not `onInit()`** — widget and section registration, route, and hook registration is synchronous and must happen in `onRegister()`. `onInit()` is for async work only.
 
 2. **Never call APIs from BLoCs or sections** — sections create BLoCs. BLoCs call repository methods. Repositories call the API client.
 

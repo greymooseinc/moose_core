@@ -241,12 +241,12 @@ class MemoryCache {
     // Mark as accessed (for LRU/LFU)
     entry.markAccessed();
 
-    // Move to end for LRU (LinkedHashMap maintains insertion order)
+    // Move to end for LRU (LinkedHashMap maintains insertion order).
+    // Re-use the same entry object to preserve accessCount — creating a new
+    // _CacheEntry would reset it to 0 and corrupt LFU eviction ordering.
     if (_evictionPolicy == EvictionPolicy.lru) {
-      final value = entry.value;
-      final expiresAt = entry.expiresAt;
       _cache.remove(key);
-      _cache[key] = _CacheEntry(value, expiresAt: expiresAt);
+      _cache[key] = entry;
     }
 
     _hits++;

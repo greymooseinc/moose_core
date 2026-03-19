@@ -5,5 +5,5 @@
 /// (e.g., WooCommerce, Shopify).
 library adapters;
 
-export 'src/adapter/adapter_registry.dart' hide RepositoryNotRegisteredException;
+export 'src/adapter/adapter_registry.dart';
 export 'src/adapter/backend_adapter.dart';

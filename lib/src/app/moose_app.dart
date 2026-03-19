@@ -82,6 +82,23 @@ class MooseApp extends StatefulWidget {
   /// [CircularProgressIndicator] if not provided.
   final Widget? loadingWidget;
 
+  /// Optional callback invoked with the [BootstrapReport] once the bootstrap
+  /// sequence completes — whether it succeeded or not.
+  ///
+  /// Use this to surface partial failures to an error screen or crash reporter:
+  ///
+  /// ```dart
+  /// MooseApp(
+  ///   ...
+  ///   onBootstrapComplete: (report) {
+  ///     if (!report.succeeded) {
+  ///       FirebaseCrashlytics.instance.log('Bootstrap failures: ${report.failures}');
+  ///     }
+  ///   },
+  /// )
+  /// ```
+  final void Function(BootstrapReport report)? onBootstrapComplete;
+
   /// Creates a [MooseApp] that manages the full bootstrap lifecycle.
   const MooseApp({
     super.key,
@@ -90,6 +107,7 @@ class MooseApp extends StatefulWidget {
     required this.plugins,
     required this.builder,
     this.loadingWidget,
+    this.onBootstrapComplete,
   });
 
   @override
@@ -108,11 +126,12 @@ class _MooseAppState extends State<MooseApp> {
   }
 
   Future<void> _bootstrap() async {
-    await MooseBootstrapper(appContext: _appContext).run(
+    final report = await MooseBootstrapper(appContext: _appContext).run(
       config: widget.config,
       adapters: widget.adapters,
       plugins: widget.plugins,
     );
+    widget.onBootstrapComplete?.call(report);
     if (mounted) setState(() => _ready = true);
   }
 

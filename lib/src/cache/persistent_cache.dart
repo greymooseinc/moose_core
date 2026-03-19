@@ -62,14 +62,21 @@ class PersistentCache {
     }
   }
 
-  /// Get a value from cache
-  /// Returns null if key doesn't exist
+  /// Get a value from cache.
   ///
-  /// For complex objects, use getJson() instead
+  /// Returns `null` if the key does not exist or the stored value is not of
+  /// type [T]. For complex objects stored as JSON, use [getJson] instead.
+  ///
+  /// Throws [StateError] if [init] has not been called yet. Under normal
+  /// operation [MooseBootstrapper] calls `initPersistent()` before any plugin
+  /// runs, so this should never trigger in production. In unit tests, call
+  /// `await cache.init()` in your `setUp`.
   T? get<T>(String key) {
     if (_prefs == null) {
-      print('PersistentCache not initialized. Call init() first.');
-      return null;
+      throw StateError(
+        'PersistentCache has not been initialised. '
+        'Ensure MooseBootstrapper has run, or call init() in your test setUp.',
+      );
     }
 
     final value = _prefs!.get(key);

@@ -1,5 +1,7 @@
 # moose_core API Reference
 
+> **Current version: 2.3.0**
+
 Complete API reference for every class an AI agent needs to build plugins, adapters, sections, and repositories in `moose_core`.
 
 ---
@@ -17,10 +19,11 @@ import 'package:moose_core/app.dart';         // MooseAppContext, MooseScope, Mo
 import 'package:moose_core/entities.dart';    // Domain entities
 import 'package:moose_core/repositories.dart'; // Repository interfaces
 import 'package:moose_core/plugin.dart';      // FeaturePlugin, PluginRegistry
-import 'package:moose_core/widgets.dart';     // FeatureSection, WidgetRegistry, AddonRegistry
+import 'package:moose_core/widgets.dart';     // FeatureSection, WidgetRegistry, UnknownSectionWidget
 import 'package:moose_core/adapters.dart';    // BackendAdapter, AdapterRegistry
 import 'package:moose_core/cache.dart';       // CacheManager, MemoryCache, PersistentCache
 import 'package:moose_core/services.dart';    // HookRegistry, EventBus, ActionRegistry, ConfigManager, AppNavigator, AppLogger, ApiClient, etc.
+import 'package:moose_core/ui.dart';          // AppTextStyles, AppButtonStyles, AppInputStyles, AppBackgroundStyles, AppCustomStyles
 ```
 
 ### Module Contents
@@ -31,10 +34,11 @@ import 'package:moose_core/services.dart';    // HookRegistry, EventBus, ActionR
 | **entities.dart** | `Product`, `Cart`, `CartItem`, `Order`, `Category`, `ProductTag`, `Collection`, `ProductFilters`, `SearchFilters`, `Post`, `PromoBanner`, `ProductReview`, `ProductReviewStats`, `SearchResult`, `PaginatedResult`, `UserInteraction`, `BottomTab`, `SectionConfig`, `AuthCredentials`, `AuthResult`, `User`, `Address`, `Country`, and more |
 | **repositories.dart** | `CoreRepository`, `ProductsRepository`, `CartRepository`, `ReviewRepository`, `SearchRepository`, `PostRepository`, `AuthRepository`, `LocationRepository`, `PushNotificationRepository`, `ShortsRepository`, `StoreRepository`, `BannerRepository` |
 | **plugin.dart** | `FeaturePlugin`, `PluginRegistry` |
-| **widgets.dart** | `FeatureSection`, `WidgetRegistry`, `AddonRegistry`, `UnknownSectionWidget` |
+| **widgets.dart** | `FeatureSection`, `WidgetRegistry`, `UnknownSectionWidget` |
 | **adapters.dart** | `BackendAdapter`, `AdapterRegistry`, `AdapterConfigValidationException`, `RepositoryNotRegisteredException`, `RepositoryTypeMismatchException`, `RepositoryFactoryException` |
 | **cache.dart** | `CacheManager`, `MemoryCache`, `PersistentCache`, `CacheStats`, `EvictionPolicy` |
 | **services.dart** | `HookRegistry`, `EventBus`, `Event`, `EventSubscription`, `ActionRegistry`, `ConfigManager`, `AppNavigator`, `AppLogger`, `ApiClient`, `ColorHelper`, `TextStyleHelper`, `CurrencyFormatter`, `VariationSelectorService` |
+| **ui.dart** | `AppTextStyles`, `AppButtonStyles`, `AppInputStyles`, `AppBackgroundStyles`, `AppCustomStyles` |
 
 ---
 
@@ -49,7 +53,6 @@ class MooseAppContext {
   final PluginRegistry pluginRegistry;
   final WidgetRegistry widgetRegistry;
   final HookRegistry hookRegistry;
-  final AddonRegistry addonRegistry;
   final ActionRegistry actionRegistry;
   final AdapterRegistry adapterRegistry;
   final ConfigManager configManager;
@@ -63,7 +66,6 @@ class MooseAppContext {
     PluginRegistry? pluginRegistry,
     WidgetRegistry? widgetRegistry,
     HookRegistry? hookRegistry,
-    AddonRegistry? addonRegistry,
     ActionRegistry? actionRegistry,
     AdapterRegistry? adapterRegistry,
     ConfigManager? configManager,
@@ -118,7 +120,6 @@ class MooseScope extends StatefulWidget {
   static PluginRegistry  pluginRegistryOf(BuildContext ctx);
   static WidgetRegistry  widgetRegistryOf(BuildContext ctx);
   static HookRegistry    hookRegistryOf(BuildContext ctx);
-  static AddonRegistry   addonRegistryOf(BuildContext ctx);
   static ActionRegistry  actionRegistryOf(BuildContext ctx);
   static AdapterRegistry adapterRegistryOf(BuildContext ctx);
   static ConfigManager   configManagerOf(BuildContext ctx);
@@ -226,7 +227,6 @@ abstract class FeaturePlugin {
 
   // Convenience getters — all delegate to appContext (NOT singletons)
   HookRegistry    get hookRegistry;
-  AddonRegistry   get addonRegistry;
   WidgetRegistry  get widgetRegistry;
   AdapterRegistry get adapterRegistry;
   ActionRegistry  get actionRegistry;
@@ -285,7 +285,7 @@ class ProductsPlugin extends FeaturePlugin {
 
   @override
   void onRegister() {
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.featured',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
@@ -646,7 +646,7 @@ class FeaturedProductsSection extends FeatureSection {
 
 ### WidgetRegistry
 
-Manages dynamic section registration and builds.
+Manages dynamic section and widget registration and builds. Supports both `FeatureSection` builders (for full sections) and arbitrary `Widget?` builders (for injecting widgets into named zones).
 
 ```dart
 typedef SectionBuilderFn = FeatureSection Function(
@@ -655,16 +655,27 @@ typedef SectionBuilderFn = FeatureSection Function(
   void Function(String event, dynamic payload)? onEvent,
 });
 
+typedef WidgetBuilderFn = Widget? Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String event, dynamic payload)? onEvent,
+});
+
 class WidgetRegistry {
-  void register(String name, SectionBuilderFn builder);
+  void registerSection(String name, SectionBuilderFn builder, {int priority = 0});
+  void registerWidget(String name, WidgetBuilderFn builder, {int priority = 0});
   void unregister(String name);
 
-  // Build a single section by registered name
+  // Build first registered widget (first non-null in priority order)
   // Debug: renders UnknownSectionWidget if not registered
   // Release: renders SizedBox.shrink() if not registered
-  Widget build(
-    String name,
-    BuildContext context, {
+  Widget build(String name, BuildContext context, {
+    Map<String, dynamic>? data,
+    void Function(String event, dynamic payload)? onEvent,
+  });
+
+  // Build all registered widgets (all non-null in priority order)
+  List<Widget> buildAll(String name, BuildContext context, {
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
   });
@@ -672,32 +683,46 @@ class WidgetRegistry {
   // Build all active sections in a named group from environment.json
   // Reads 'plugins:<pluginName>:sections:<groupName>' from ConfigManager
   // Passes each section's settings under data['settings']
-  List<Widget> buildSectionGroup(
-    BuildContext context, {
+  List<Widget> buildSectionGroup(BuildContext context, {
     required String pluginName,
     required String groupName,
     Map<String, dynamic>? data,
     void Function(String event, dynamic payload)? onEvent,
   });
 
-  // Get section configs for a group
   List<SectionConfig> getSections(String pluginName, String groupName);
-
   bool isRegistered(String name);
   List<String> getRegisteredWidgets();
 }
 ```
 
-**Usage in a plugin:**
+**Registering a section in a plugin:**
 
 ```dart
 @override
 void onRegister() {
-  widgetRegistry.register(
+  widgetRegistry.registerSection(
     'products.featured',
     (context, {data, onEvent}) => FeaturedProductsSection(
       settings: data?['settings'] as Map<String, dynamic>?,
     ),
+  );
+}
+```
+
+**Registering a widget (badge injection) in a plugin:**
+
+```dart
+@override
+void onRegister() {
+  widgetRegistry.registerWidget(
+    'cart.icon.badge',
+    (context, {data, onEvent}) => BlocBuilder<CartBloc, CartState>(
+      builder: (ctx, state) => state.itemCount > 0
+        ? CartBadge(count: state.itemCount)
+        : null,
+    ),
+    priority: 10,
   );
 }
 ```
@@ -717,54 +742,11 @@ Widget build(BuildContext context) {
 }
 ```
 
----
-
-### AddonRegistry
-
-UI extension points — allows plugins to inject widgets into named zones defined by other plugins.
+**Building all widgets for a named zone:**
 
 ```dart
-typedef WidgetBuilderFn = Widget? Function(
-  BuildContext context, {
-  Map<String, dynamic>? data,
-  void Function(String event, dynamic payload)? onEvent,
-});
-
-class AddonRegistry {
-  // Register a widget builder for a zone (higher priority renders first)
-  void register(String name, WidgetBuilderFn builder, {int priority = 1});
-  void removeAddon(String name, WidgetBuilderFn builder);
-  void clearAddons(String name);
-  void clearAllAddons();
-
-  // Build all registered addons for a zone; null return values are filtered out
-  List<Widget> build<T>(
-    String name,
-    BuildContext context, {
-    Map<String, dynamic>? data,
-    void Function(String event, dynamic payload)? onEvent,
-  });
-
-  bool hasAddon(String name);
-  int getAddonCount(String name);
-  List<String> getRegisteredAddons();
-}
-```
-
-**Usage:**
-
-```dart
-// Plugin A registers a badge addon for the cart icon zone
-addonRegistry.register('cart.icon.badge', (context, {data, onEvent}) {
-  return BlocBuilder<CartBloc, CartState>(
-    builder: (ctx, state) => state.itemCount > 0
-      ? CartBadge(count: state.itemCount)
-      : null,
-  );
-}, priority: 10);
-
 // In a widget that owns the cart icon zone
-final badges = context.moose.addonRegistry.build<Widget>('cart.icon.badge', context);
+final badges = context.moose.widgetRegistry.buildAll('cart.icon.badge', context);
 ```
 
 ---
@@ -784,9 +766,11 @@ class HookRegistry {
     {int priority = 1},
   );
 
-  // Execute all registered callbacks in priority order
-  // Each callback receives the output of the previous one (pipeline)
+  // Execute all callbacks synchronously — asserts in debug mode if any callback returns a Future
   T execute<T>(String hookName, T data);
+
+  // Execute all callbacks asynchronously — awaits each; safe for mixed sync/async callbacks
+  Future<T> executeAsync<T>(String hookName, T data);
 
   void removeHook(String hookName, dynamic Function(dynamic) callback);
   void clearHooks(String hookName);
@@ -852,8 +836,8 @@ class EventBus {
   // Publish (fire-and-forget)
   void fire(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
 
-  // Publish and wait one microtask for handlers to complete
-  Future<void> fireAndWait(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
+  // Fire and yield once to the microtask queue (sync handlers complete; async I/O handlers may still be in flight)
+  Future<void> fireAndFlush(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
 
   // Get raw stream for stream operators
   Stream<Event> stream(String eventName);
@@ -1101,6 +1085,189 @@ All implement `Exception`. `toString()` includes the class name and a descriptiv
 
 ---
 
+## UI Style Facades
+
+`package:moose_core/ui.dart` provides five hook-calling facades that delegate to whichever palette plugin is active. Always import from `ui.dart` — never use concrete style classes directly.
+
+All methods require a `BuildContext` (except `AppButtonStyles.labelStyle()` and `AppCustomStyles.get<T>`). They execute the corresponding `styles:*` hook via `HookRegistry`. If no plugin has registered the hook, a built-in theme-derived fallback is used.
+
+### AppTextStyles
+
+Returns `TextStyle` for common typographic roles. Executes the `styles:text` hook.
+
+```dart
+import 'package:moose_core/ui.dart';
+
+Text('Title',    style: AppTextStyles.appBarTitle(context))
+Text('Section',  style: AppTextStyles.sectionHeader(context))
+Text('Screen',   style: AppTextStyles.screenTitle(context))
+Text('Modal',    style: AppTextStyles.modalTitle(context))
+Text('Label',    style: AppTextStyles.formLabel(context))
+Text('Body',     style: AppTextStyles.bodyMedium(context))
+Text('Body L',   style: AppTextStyles.bodyLarge(context))
+Text('Body XL',  style: AppTextStyles.bodyXLarge(context))
+Text('Sub',      style: AppTextStyles.bodySecondary(context))
+Text('Hint',     style: AppTextStyles.hint(context))
+Text('Caption',  style: AppTextStyles.caption(context))
+Text('Tag',      style: AppTextStyles.sectionLabel(context))
+```
+
+| Method | Typical default |
+|---|---|
+| `appBarTitle(ctx)` | Inter w700 13px ls:2.0 |
+| `sectionHeader(ctx)` | Inter w700 18px |
+| `screenTitle(ctx)` | Inter w700 28px ls:1.0 |
+| `modalTitle(ctx)` | Inter w700 20px |
+| `formLabel(ctx)` | Inter w600 12px ls:1.0 at 87% opacity |
+| `bodyMedium(ctx)` | Inter w500 14px |
+| `bodyLarge(ctx)` | Inter w500 15px |
+| `bodyXLarge(ctx)` | Inter w600 16px |
+| `bodySecondary(ctx)` | Inter 14px at 60% opacity |
+| `hint(ctx)` | Inter 14px at 50% opacity |
+| `caption(ctx)` | Inter w600 11px ls:1.2 at 60% opacity |
+| `sectionLabel(ctx)` | Inter w700 11px ls:1.5 at 80% opacity |
+
+### AppButtonStyles
+
+Returns `ButtonStyle` for common button roles. Executes the `styles:button` hook.
+
+```dart
+ElevatedButton(
+  style: AppButtonStyles.primary(context),       // full-width primary
+  child: Text('Buy Now', style: AppButtonStyles.labelStyle()),
+)
+
+ElevatedButton(
+  style: AppButtonStyles.primaryCompact(context), // auto-size primary
+  child: Text('Add', style: AppButtonStyles.labelStyle()),
+)
+
+OutlinedButton(
+  style: AppButtonStyles.secondary(context),      // full-width outlined
+  child: Text('Cancel', style: AppButtonStyles.labelStyle()),
+)
+
+OutlinedButton(
+  style: AppButtonStyles.secondaryCompact(context), // auto-size outlined
+  child: Text('Filter', style: AppButtonStyles.labelStyle()),
+)
+```
+
+| Method | Description |
+|---|---|
+| `primary(ctx)` | Full-width (`double.infinity × 56px`) filled primary button |
+| `primaryCompact(ctx)` | Auto-sized filled primary button |
+| `secondary(ctx)` | Full-width outlined button |
+| `secondaryCompact(ctx)` | Auto-sized outlined button |
+| `labelStyle({fontSize, fontWeight, letterSpacing, color})` | Context-free `TextStyle` for button labels; inherits font from text theme |
+
+### AppInputStyles
+
+Returns `InputDecoration` for form fields. Executes the `styles:input` hook.
+
+```dart
+TextFormField(
+  decoration: AppInputStyles.outlined(context, labelText: 'Email'),
+)
+
+TextFormField(
+  decoration: AppInputStyles.filled(context, hintText: 'Search...', prefixIcon: Icon(Icons.search)),
+)
+```
+
+| Method | Description |
+|---|---|
+| `outlined(ctx, {labelText, suffixIcon})` | Standard outlined field — auth screens |
+| `filled(ctx, {hintText, prefixIcon})` | Filled field with rounded corners — address / search forms |
+
+### AppBackgroundStyles
+
+Returns `BoxDecoration` (or `Widget` for `screenWidget`) for background areas. Executes the `styles:background` hook.
+
+```dart
+// Scaffold body with themed background widget (supports animated gradients)
+Scaffold(
+  body: AppBackgroundStyles.screenWidget(context, child: CustomScrollView(...)),
+)
+
+// Card decoration
+DecoratedBox(
+  decoration: AppBackgroundStyles.card(context),
+  child: ProductCard(),
+)
+```
+
+| Method | Returns | Typical use |
+|---|---|---|
+| `screen(ctx)` | `BoxDecoration` | Scaffold background |
+| `screenWidget(ctx, {child})` | `Widget` | Scaffold body — allows animated/gradient background |
+| `card(ctx)` | `BoxDecoration` | Product cards, list items |
+| `section(ctx)` | `BoxDecoration` | Section header band |
+| `header(ctx)` | `BoxDecoration` | Hero / SliverAppBar band |
+| `input(ctx)` | `BoxDecoration` | Text field fill |
+| `chip(ctx)` | `BoxDecoration` | Filter chip background |
+| `overlay(ctx)` | `BoxDecoration` | Modal scrim |
+
+### AppCustomStyles
+
+Escape hatch for plugin-specific or ad-hoc styles not covered by the core facades. Executes the `styles:custom` hook.
+
+```dart
+// Registering (in a plugin's onRegister()):
+hookRegistry.register('styles:custom', (data) {
+  final map = data as Map<String, dynamic>;
+  if (map['name'] == 'promo_badge') {
+    final ctx = map['context'] as BuildContext;
+    return TextStyle(fontSize: 10, color: Theme.of(ctx).colorScheme.error);
+  }
+  return map; // pass through unknown names
+});
+
+// Consuming:
+final style = AppCustomStyles.get<TextStyle>(context, 'promo_badge');
+final deco  = AppCustomStyles.get<BoxDecoration>(context, 'card_elevated');
+```
+
+| Method | Description |
+|---|---|
+| `get<T>(ctx, name)` | Returns the value registered for `name` cast to `T`; throws `TypeError` if type mismatches |
+
+### Registering a palette plugin
+
+A palette plugin overrides all five hooks at once:
+
+```dart
+class MyThemePlugin extends FeaturePlugin {
+  @override String get name => 'my_theme';
+  @override String get version => '1.0.0';
+
+  @override
+  void onRegister() {
+    hookRegistry.register('styles:text', _textStyles, priority: 10);
+    hookRegistry.register('styles:button', _buttonStyles, priority: 10);
+    hookRegistry.register('styles:input', _inputStyles, priority: 10);
+    hookRegistry.register('styles:background', _backgroundStyles, priority: 10);
+  }
+
+  dynamic _textStyles(dynamic data) {
+    final map = data as Map<String, dynamic>;
+    final ctx = map['context'] as BuildContext;
+    switch (map['name'] as String) {
+      case 'appBarTitle': return TextStyle(fontSize: 13, fontWeight: FontWeight.w800, ...);
+      default: return map; // pass through unhandled names
+    }
+  }
+  // ... _buttonStyles, _inputStyles, _backgroundStyles follow same pattern
+}
+```
+
+**Rules:**
+- Always return `map` (the original data) for unhandled names — lets lower-priority handlers or the built-in fallback fill them in.
+- Register at `priority: 10` (or higher) to override the default fallback.
+- The built-in fallback (priority 0) always runs last; it uses Flutter's active `ThemeData`.
+
+---
+
 ## Architectural Rules
 
 These rules are enforced by the design. Violating them causes compile errors, runtime exceptions, or broken DI.
@@ -1126,3 +1293,4 @@ These rules are enforced by the design. Violating them causes compile errors, ru
 - [CACHE_SYSTEM.md](CACHE_SYSTEM.md)
 - [FEATURE_SECTION.md](FEATURE_SECTION.md)
 - [REGISTRIES.md](REGISTRIES.md)
+- [UI_STYLES.md](UI_STYLES.md)

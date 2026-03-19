@@ -1,18 +1,19 @@
 # Registry Systems
 
+> **Current version: 2.3.0**
+
 ## Overview
 
-`moose_core` provides five registry systems, all owned by `MooseAppContext` and injected into plugins and adapters via convenience getters. All registries are instance-based — there are no singletons. Each `MooseAppContext` owns an independent set.
+`moose_core` provides four registry systems, all owned by `MooseAppContext` and injected into plugins and adapters via convenience getters. All registries are instance-based — there are no singletons. Each `MooseAppContext` owns an independent set.
 
 | Registry | Purpose |
 |---|---|
 | `HookRegistry` | Synchronous data transformation pipeline — modify data passing through named hook points |
 | `EventBus` | Asynchronous publish/subscribe — fire-and-forget notifications across plugins |
-| `WidgetRegistry` | Dynamic UI composition — map string keys to `FeatureSection` builders |
-| `AddonRegistry` | Slot-based UI injection — multiple plugins contribute widgets to named slots |
+| `WidgetRegistry` | Dynamic UI composition — map string keys to `FeatureSection` builders or plain widget builders |
 | `ActionRegistry` | User interaction handling — route `UserInteraction` entities to navigation/URL/custom handlers |
 
-Access in plugins via convenience getters (`hookRegistry`, `eventBus`, `widgetRegistry`, `addonRegistry`, `actionRegistry`). Access in widgets via `context.moose.<registry>` or `MooseScope.<registry>Of(context)`.
+Access in plugins via convenience getters (`hookRegistry`, `eventBus`, `widgetRegistry`, `actionRegistry`). Access in widgets via `context.moose.<registry>` or `MooseScope.<registry>Of(context)`.
 
 ---
 
@@ -40,10 +41,16 @@ class HookRegistry {
   /// Default priority is 1.
   void register(String hookName, dynamic Function(dynamic) callback, {int priority = 1});
 
-  /// Execute all callbacks registered on hookName, threading data through.
+  /// Execute all callbacks synchronously, threading data through each in priority order.
   /// Returns the original data if no callbacks are registered.
   /// Errors in individual callbacks are logged and skipped — remaining callbacks still run.
+  /// Asserts (debug mode) if any callback returns a Future — use executeAsync() for async hooks.
   T execute<T>(String hookName, T data);
+
+  /// Execute all callbacks asynchronously, awaiting each result before passing to the next.
+  /// Sync callbacks are also supported — their return value is used directly.
+  /// Use this whenever one or more registered callbacks return a Future.
+  Future<T> executeAsync<T>(String hookName, T data);
 
   /// Remove a specific callback from a hook point (by function reference equality).
   void removeHook(String hookName, dynamic Function(dynamic) callback);
@@ -217,9 +224,10 @@ class EventBus {
   /// Publish an event to all current subscribers. Fire-and-forget.
   void fire(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
 
-  /// Publish an event and await one microtask cycle before returning.
-  /// Useful when you need subscribers to have been notified before continuing.
-  Future<void> fireAndWait(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
+  /// Fire and yield once to the microtask queue.
+  /// Synchronous handlers complete before the returned Future resolves.
+  /// Async I/O handlers may still be in flight — use a Completer for full coordination.
+  Future<void> fireAndFlush(String eventName, {Map<String, dynamic>? data, Map<String, dynamic>? metadata});
 
   /// Raw Stream<Event> for the named event — supports stream operators.
   Stream<Event> stream(String eventName);
@@ -341,7 +349,12 @@ notification.received
 
 ### Purpose
 
-`WidgetRegistry` maps string keys to `FeatureSection` builder functions. Screens call `buildSectionGroup` to render all sections declared in `environment.json` for a plugin/group combination, without any compile-time dependency on the section classes themselves.
+`WidgetRegistry` maps string keys to builder functions for two purposes:
+
+- **Section builders** (`registerSection`) — map a key to a `FeatureSection` builder, driven by `environment.json` section config
+- **Widget builders** (`registerWidget`) — map a key to a plain widget builder that may return `null` to opt out; multiple plugins can contribute to the same key (slot-based UI injection)
+
+Both registration types share a single internal map (`Map<String, List<_Entry>>`). Priority controls ordering within a key — higher priority is returned first.
 
 ### API
 
@@ -352,16 +365,36 @@ typedef SectionBuilderFn = FeatureSection Function(
   void Function(String event, dynamic payload)? onEvent,
 });
 
+typedef WidgetBuilderFn = Widget? Function(
+  BuildContext context, {
+  Map<String, dynamic>? data,
+  void Function(String, dynamic)? onEvent,
+});
+
 class WidgetRegistry {
   WidgetRegistry();
 
   /// Register a FeatureSection builder under a key.
-  void register(String name, SectionBuilderFn builder);
+  void registerSection(String name, SectionBuilderFn builder, {int priority = 0});
 
-  /// Build a single registered section by key.
-  /// In debug mode: returns UnknownSectionWidget if key is not registered.
-  /// In release mode: returns SizedBox.shrink() if key is not registered.
+  /// Register a plain widget builder under a key.
+  /// Multiple plugins may register builders for the same key.
+  /// Builder may return null to opt out.
+  void registerWidget(String name, WidgetBuilderFn builder, {int priority = 0});
+
+  /// Build the first non-null result for a key.
+  /// In debug mode: returns UnknownSectionWidget if no builder produces a result.
+  /// In release mode: returns SizedBox.shrink() if no builder produces a result.
   Widget build(
+    String name,
+    BuildContext context, {
+    Map<String, dynamic>? data,
+    void Function(String event, dynamic payload)? onEvent,
+  });
+
+  /// Call all builders for a key; collect non-null results in priority order.
+  /// Builder errors are caught and logged; other builders continue running.
+  List<Widget> buildAll(
     String name,
     BuildContext context, {
     Map<String, dynamic>? data,
@@ -399,20 +432,66 @@ Register in `onRegister()` — always synchronous, always before `onInit`:
 class ProductsPlugin extends FeaturePlugin {
   @override
   void onRegister() {
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.featured_section',
       (context, {data, onEvent}) => FeaturedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
       ),
     );
 
-    widgetRegistry.register(
+    widgetRegistry.registerSection(
       'products.related_section',
       (context, {data, onEvent}) => RelatedProductsSection(
         settings: data?['settings'] as Map<String, dynamic>?,
         productId: data?['productId'] as String?,
         onEvent: onEvent,
       ),
+    );
+  }
+}
+```
+
+### Registering widget builders (in a plugin)
+
+Use `registerWidget` when multiple plugins may contribute to the same named slot:
+
+```dart
+class PromotionsPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    widgetRegistry.registerWidget(
+      'product.card:badge',
+      (context, {data, onEvent}) {
+        final product = data?['product'] as Product?;
+        if (product == null || !product.onSale) return null; // opt out
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text('SALE', style: TextStyle(color: Colors.white, fontSize: 10)),
+        );
+      },
+      priority: 10,
+    );
+  }
+}
+
+class LoyaltyPlugin extends FeaturePlugin {
+  @override
+  void onRegister() {
+    widgetRegistry.registerWidget(
+      'product.card:badge',
+      (context, {data, onEvent}) {
+        final product = data?['product'] as Product?;
+        final points = product?.getExtension<int>('loyalty_points');
+        if (points == null || points == 0) return null;
+
+        return LoyaltyBadge(points: points);
+      },
+      priority: 5, // renders after sale badge
     );
   }
 }
@@ -480,72 +559,9 @@ final widget = context.moose.widgetRegistry.build(
 );
 ```
 
-### Naming convention
+### Slot injection with buildAll (in a widget)
 
-`<plugin_name>.<section_name>` — the plugin prefix prevents collisions:
-
-```
-products.featured_section
-products.categories_section
-cart.mini_cart_widget
-home.hero_section
-checkout.order_summary_section
-```
-
----
-
-## AddonRegistry
-
-### Purpose
-
-`AddonRegistry` enables **slot-based UI injection**. A section exposes a named slot; other plugins register builders for that slot. All registered builders are called; each may return a widget or `null`. Non-null results are collected into a `List<Widget>` in descending priority order.
-
-Unlike `WidgetRegistry` (one builder owns a full section), `AddonRegistry` supports zero-to-many contributors per slot.
-
-### API
-
-```dart
-typedef WidgetBuilderFn = Widget? Function(
-  BuildContext context, {
-  Map<String, dynamic>? data,
-  void Function(String event, dynamic payload)? onEvent,
-});
-
-class AddonRegistry {
-  AddonRegistry();
-
-  /// Register a builder for a named slot.
-  /// Duplicate builder references for the same slot are silently ignored.
-  void register(String name, WidgetBuilderFn builder, {int priority = 1});
-
-  /// Call all builders for the slot; collect non-null results in priority order.
-  /// Builder errors are caught and logged; other builders continue running.
-  List<Widget> build<T>(String name, BuildContext context, {
-    Map<String, dynamic>? data,
-    void Function(String event, dynamic payload)? onEvent,
-  });
-
-  /// Remove a specific builder from a slot (by function reference equality).
-  void removeAddon(String name, WidgetBuilderFn builder);
-
-  /// Remove all builders from a slot.
-  void clearAddons(String name);
-
-  /// Remove all builders from all slots.
-  void clearAllAddons();
-
-  /// All registered slot names.
-  List<String> getRegisteredAddons();
-
-  /// Count of builders registered for a slot.
-  int getAddonCount(String name);
-
-  /// True if a slot has at least one registered builder.
-  bool hasAddon(String name);
-}
-```
-
-### Exposing a slot (in a section)
+Use `buildAll` to collect contributions from all registered widget builders for a slot:
 
 ```dart
 class ProductCard extends StatelessWidget {
@@ -553,7 +569,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badges = context.moose.addonRegistry.build(
+    final badges = context.moose.widgetRegistry.buildAll(
       'product.card:badge',
       context,
       data: {'product': product},
@@ -574,57 +590,19 @@ class ProductCard extends StatelessWidget {
 }
 ```
 
-### Contributing to a slot (in a plugin)
+### Widget builder naming convention
 
-Register in `onRegister()`:
-
-```dart
-class PromotionsPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    addonRegistry.register(
-      'product.card:badge',
-      (context, {data, onEvent}) {
-        final product = data?['product'] as Product?;
-        if (product == null || !product.onSale) return null; // opt out
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text('SALE', style: TextStyle(color: Colors.white, fontSize: 10)),
-        );
-      },
-      priority: 10,
-    );
-  }
-}
-
-class LoyaltyPlugin extends FeaturePlugin {
-  @override
-  void onRegister() {
-    addonRegistry.register(
-      'product.card:badge',
-      (context, {data, onEvent}) {
-        final product = data?['product'] as Product?;
-        final points = product?.getExtension<int>('loyalty_points');
-        if (points == null || points == 0) return null;
-
-        return LoyaltyBadge(points: points);
-      },
-      priority: 5, // renders after sale badge
-    );
-  }
-}
-```
-
-### Slot naming convention
-
-`<component>:<slot>` or `<plugin>.<component>:<slot>`:
+Use `<plugin_name>.<section_name>` for section builders and `<component>:<slot>` or `<plugin>.<component>:<slot>` for widget builders registered via `registerWidget`:
 
 ```
+// registerSection keys
+products.featured_section
+products.categories_section
+cart.mini_cart_widget
+home.hero_section
+checkout.order_summary_section
+
+// registerWidget keys (slot injection)
 product.card:badge        // badge slot on product cards
 product.card:overlay      // overlay slot on product cards
 cart.item:actions         // action button slot on cart line items
@@ -632,16 +610,6 @@ checkout:summary.extras   // extra rows in the checkout summary
 pdp:above.price           // slot above the price on the product detail page
 home.hero:overlay         // overlay on the home hero section
 ```
-
-### WidgetRegistry vs AddonRegistry
-
-| | WidgetRegistry | AddonRegistry |
-|---|---|---|
-| Returns | Single `Widget` | `List<Widget>` (zero or more) |
-| Builder return type | `FeatureSection` (never null) | `Widget?` (null = skip) |
-| Multiple registrations | Last registered wins | All registered run, priority-ordered |
-| Owns the area | Yes — owns a full section | No — supplements an existing section |
-| Configured in JSON | Yes (`environment.json` sections) | No |
 
 ---
 
@@ -779,8 +747,8 @@ class MyPlugin extends FeaturePlugin {
   @override
   void onRegister() {
     hookRegistry.register('...', ...);
-    widgetRegistry.register('...', ...);
-    addonRegistry.register('...', ...);
+    widgetRegistry.registerSection('...', ...);
+    widgetRegistry.registerWidget('...', ...);
     actionRegistry.registerCustomHandler('...', ...);
     eventBus.on('...', (event) { ... });
   }
@@ -792,7 +760,6 @@ class MyPlugin extends FeaturePlugin {
 ```dart
 context.moose.hookRegistry
 context.moose.widgetRegistry
-context.moose.addonRegistry
 context.moose.actionRegistry
 context.moose.eventBus
 ```
@@ -878,26 +845,16 @@ test('isRegistered returns false before register', () {
   final registry = WidgetRegistry();
   expect(registry.isRegistered('some.section'), isFalse);
 });
-```
 
-### AddonRegistry
+test('buildAll returns only non-null results in priority order', () {
+  final registry = WidgetRegistry();
 
-```dart
-test('build returns only non-null results', () {
-  final registry = AddonRegistry();
-
-  registry.register('slot', (ctx, {data, onEvent}) => const Text('A'), priority: 10);
-  registry.register('slot', (ctx, {data, onEvent}) => null, priority: 5);
-  registry.register('slot', (ctx, {data, onEvent}) => const Text('C'), priority: 1);
+  registry.registerWidget('slot', (ctx, {data, onEvent}) => const Text('A'), priority: 10);
+  registry.registerWidget('slot', (ctx, {data, onEvent}) => null, priority: 5);
+  registry.registerWidget('slot', (ctx, {data, onEvent}) => const Text('C'), priority: 1);
 
   // Requires a real BuildContext — use flutter_test's tester
-});
-
-test('getAddonCount returns correct count', () {
-  final registry = AddonRegistry();
-  registry.register('slot', (ctx, {data, onEvent}) => null);
-  registry.register('slot', (ctx, {data, onEvent}) => null);
-  expect(registry.getAddonCount('slot'), equals(2));
+  // Result contains Text('A') and Text('C'); null entry is excluded
 });
 ```
 
@@ -928,26 +885,24 @@ test('hasCustomHandler returns false before registration', () {
 ```dart
 // HookRegistry
 hookRegistry.register('hook:name', callback, priority: 10);
-T result = hookRegistry.execute('hook:name', data);
+T result = hookRegistry.execute('hook:name', data);               // sync — asserts on Future return
+T result = await hookRegistry.executeAsync('hook:name', data);    // async — awaits each callback
 bool exists = hookRegistry.hasHook('hook:name');
 
 // EventBus
 final sub = eventBus.on('event.name', (event) { ... });
 eventBus.onAsync('event.name', (event) async { ... });
 eventBus.fire('event.name', data: {'key': 'value'});
-await eventBus.fireAndWait('event.name', data: {...});
+await eventBus.fireAndFlush('event.name', data: {...});
 await sub.cancel(); // in onStop()
 
 // WidgetRegistry
-widgetRegistry.register('plugin.section_name', (ctx, {data, onEvent}) => MySection(...));
+widgetRegistry.registerSection('plugin.section_name', (ctx, {data, onEvent}) => MySection(...));
+widgetRegistry.registerWidget('component:slot', (ctx, {data, onEvent}) => MyWidget(...), priority: 10);
 Widget w = widgetRegistry.build('plugin.section_name', ctx, data: {...});
-List<Widget> ws = widgetRegistry.buildSectionGroup(ctx, pluginName: 'home', groupName: 'main');
+List<Widget> ws = widgetRegistry.buildAll('component:slot', ctx, data: {...});
+List<Widget> sections = widgetRegistry.buildSectionGroup(ctx, pluginName: 'home', groupName: 'main');
 bool exists = widgetRegistry.isRegistered('plugin.section_name');
-
-// AddonRegistry
-addonRegistry.register('component:slot', builder, priority: 10);
-List<Widget> addons = addonRegistry.build('component:slot', ctx, data: {...});
-bool has = addonRegistry.hasAddon('component:slot');
 
 // ActionRegistry
 actionRegistry.registerCustomHandler('action_id', (ctx, params) { ... });
@@ -961,6 +916,6 @@ bool has = actionRegistry.hasCustomHandler('action_id');
 
 - [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — Plugin lifecycle and how registries are used from plugins
 - [ADAPTER_SYSTEM.md](./ADAPTER_SYSTEM.md) — How adapters pass registries to repository constructors
-- [FEATURE_SECTION.md](./FEATURE_SECTION.md) — FeatureSection and AddonRegistry slot integration
+- [FEATURE_SECTION.md](./FEATURE_SECTION.md) — FeatureSection and WidgetRegistry integration
 - [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) — Extended EventBus and HookRegistry patterns
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Overall layer structure

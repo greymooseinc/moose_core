@@ -47,17 +47,24 @@ class EventSubscription {
   final String _eventName;
   final StreamSubscription _subscription;
   final EventBus _eventBus;
+  bool _cancelled = false;
 
   EventSubscription._(this._eventName, this._subscription, this._eventBus);
 
   /// Cancel this subscription
   Future<void> cancel() async {
+    _cancelled = true;
     await _subscription.cancel();
     _eventBus._removeSubscription(this);
   }
 
-  /// Check if the subscription is active
-  bool get isActive => !_subscription.isPaused;
+  /// Whether this subscription is active (not cancelled and not paused).
+  ///
+  /// Returns `false` after [cancel] is called, and `false` while the
+  /// subscription is paused. Use this instead of inspecting the underlying
+  /// [StreamSubscription.isPaused], which returns `false` on a cancelled
+  /// subscription and would give a false "active" reading.
+  bool get isActive => !_cancelled && !_subscription.isPaused;
 
   /// Pause the subscription temporarily
   void pause([Future<void>? resumeSignal]) {
@@ -238,23 +245,27 @@ class EventBus {
     }
   }
 
-  /// Fire an event and wait for all handlers to complete
+  /// Fire an event and flush the microtask queue once.
   ///
-  /// This is useful when you need to ensure all event handlers have finished
-  /// processing before continuing execution
+  /// This yields to the microtask queue a single time after firing, which
+  /// allows synchronous handlers and handlers that complete within a single
+  /// microtask to finish before execution continues. It does **not** guarantee
+  /// that all async handlers (e.g. those performing I/O) have completed —
+  /// use [onAsync] with explicit coordination (e.g. a Completer) when you
+  /// need full async-handler completion.
   ///
   /// Example:
   /// ```dart
-  /// await EventBus().fireAndWait('critical.operation', data: {...});
-  /// // All handlers have completed
+  /// await eventBus.fireAndFlush('cache.invalidated', data: {'key': 'products'});
+  /// // Synchronous handlers have run; async handlers may still be in flight.
   /// ```
-  Future<void> fireAndWait(
+  Future<void> fireAndFlush(
     String eventName, {
     Map<String, dynamic>? data,
     Map<String, dynamic>? metadata,
   }) async {
     fire(eventName, data: data, metadata: metadata);
-    // Allow microtasks to complete
+    // Yield once to flush synchronous and single-microtask handlers.
     await Future.delayed(Duration.zero);
   }
 

@@ -1,5 +1,7 @@
 # FeatureSection
 
+> **Current version: 2.3.0**
+
 ## Overview
 
 `FeatureSection` is the abstract base class for all configurable, JSON-driven UI sections in `moose_core`. It extends `StatelessWidget` and adds two things on top:
@@ -422,14 +424,14 @@ context.moose.widgetRegistry.buildSectionGroup(
 
 ---
 
-## AddonRegistry Integration
+## Widget Slot Integration
 
-Sections can include addon slots — named injection points where other plugins contribute widgets without modifying the section. Access `addonRegistry` via `context.moose`:
+Sections can include widget slots — named injection points where other plugins contribute widgets without modifying the section. Use `widgetRegistry.buildAll()` to collect all registered widgets for a slot:
 
 ```dart
 @override
 Widget build(BuildContext context) {
-  final addons = context.moose.addonRegistry.build(
+  final addons = context.moose.widgetRegistry.buildAll(
     'products.above_price',
     context,
     data: {'productId': productId},
@@ -444,11 +446,11 @@ Widget build(BuildContext context) {
 }
 ```
 
-Another plugin registers into the same slot:
+Another plugin registers into the same slot using `registerWidget`:
 
 ```dart
 // In LoyaltyPlugin.onRegister()
-addonRegistry.register(
+widgetRegistry.registerWidget(
   'products.above_price',
   (context, {data, onEvent}) {
     final id = data?['productId'] as String?;
@@ -458,7 +460,7 @@ addonRegistry.register(
 );
 ```
 
-Addons are rendered in descending priority order. A builder returning `null` is silently skipped.
+Widgets are rendered in descending priority order. A builder returning `null` is silently skipped. Use `buildAll()` when multiple plugins may contribute; use `build()` when only one widget is expected.
 
 ---
 
@@ -524,4 +526,4 @@ test('getSetting coerces int to double', () {
 
 - [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) — registering sections from within a plugin
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — overall layer structure and DI
-- [API.md](./API.md) — `WidgetRegistry`, `AddonRegistry`, and `MooseScope` API reference
+- [API.md](./API.md) — `WidgetRegistry` and `MooseScope` API reference

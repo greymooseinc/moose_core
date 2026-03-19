@@ -381,16 +381,5 @@ class AdapterRegistry {
   }
 }
 
-// =============================================================================
-// EXCEPTIONS
-// =============================================================================
-
-/// Exception thrown when attempting to get a repository that hasn't been registered.
-class RepositoryNotRegisteredException implements Exception {
-  final String message;
-
-  RepositoryNotRegisteredException(this.message);
-
-  @override
-  String toString() => 'RepositoryNotRegisteredException: $message';
-}
+// RepositoryNotRegisteredException is defined in backend_adapter.dart and
+// available here via the existing import of that file.
