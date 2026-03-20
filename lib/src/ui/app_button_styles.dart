@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/moose_scope.dart';
+import 'style_hook_data.dart';
 
 /// Hook-calling facade for button styles.
 ///
@@ -17,8 +18,10 @@ import '../app/moose_scope.dart';
 /// ```
 abstract final class AppButtonStyles {
   static ButtonStyle _get(BuildContext context, String name) {
-    final data = <String, dynamic>{'name': name, 'context': context};
-    final result = MooseScope.hookRegistryOf(context).execute<dynamic>('styles:button', data);
+    final result = MooseScope.hookRegistryOf(context).execute<dynamic>(
+      'styles:button',
+      StyleHookData(name: name, context: context),
+    );
     // If no hook was registered the registry returns the map unchanged — fall back to theme defaults.
     if (result is ButtonStyle) return result;
     return _default(context, name);

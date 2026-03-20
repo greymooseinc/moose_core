@@ -200,7 +200,6 @@ abstract class FeaturePlugin {
   /// [defaultValue] or declaring a setting in [getDefaultSettings].
   T getSetting<T>(String key, {T? defaultValue}) {
     final value = appContext.configManager.get('plugins:$name:settings:$key');
-    if (value == null && defaultValue != null) return defaultValue;
-    return value as T;
+    return (value ?? defaultValue) as T;
   }
 }

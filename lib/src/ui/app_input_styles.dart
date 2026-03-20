@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/moose_scope.dart';
+import 'style_hook_data.dart';
 
 /// Hook-calling facade for input decoration styles.
 ///
@@ -22,11 +23,10 @@ abstract final class AppInputStyles {
     String? labelText,
     Widget? suffixIcon,
   }) {
-    final data = <String, dynamic>{
-      'name': 'outlined', 'context': context,
-      'labelText': labelText, 'suffixIcon': suffixIcon,
-    };
-    final result = MooseScope.hookRegistryOf(context).execute<dynamic>('styles:input', data);
+    final result = MooseScope.hookRegistryOf(context).execute<dynamic>(
+      'styles:input',
+      StyleHookData(name: 'outlined', context: context, labelText: labelText, suffixIcon: suffixIcon),
+    );
     if (result is InputDecoration) return result;
     return _defaultOutlined(context, labelText: labelText, suffixIcon: suffixIcon);
   }
@@ -37,11 +37,10 @@ abstract final class AppInputStyles {
     String? hintText,
     Widget? prefixIcon,
   }) {
-    final data = <String, dynamic>{
-      'name': 'filled', 'context': context,
-      'hintText': hintText, 'prefixIcon': prefixIcon,
-    };
-    final result = MooseScope.hookRegistryOf(context).execute<dynamic>('styles:input', data);
+    final result = MooseScope.hookRegistryOf(context).execute<dynamic>(
+      'styles:input',
+      StyleHookData(name: 'filled', context: context, hintText: hintText, prefixIcon: prefixIcon),
+    );
     if (result is InputDecoration) return result;
     return _defaultFilled(context, hintText: hintText, prefixIcon: prefixIcon);
   }

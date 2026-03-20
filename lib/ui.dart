@@ -10,6 +10,7 @@
 /// ```
 library;
 
+export 'src/ui/style_hook_data.dart';
 export 'src/ui/app_text_styles.dart';
 export 'src/ui/app_button_styles.dart';
 export 'src/ui/app_input_styles.dart';

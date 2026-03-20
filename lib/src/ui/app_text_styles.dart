@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/moose_scope.dart';
+import 'style_hook_data.dart';
 
 /// Hook-calling facade for text styles.
 ///
@@ -14,8 +15,10 @@ import '../app/moose_scope.dart';
 /// ```
 abstract final class AppTextStyles {
   static TextStyle _get(BuildContext context, String name) {
-    final data = <String, dynamic>{'name': name, 'context': context};
-    final result = MooseScope.hookRegistryOf(context).execute<dynamic>('styles:text', data);
+    final result = MooseScope.hookRegistryOf(context).execute<dynamic>(
+      'styles:text',
+      StyleHookData(name: name, context: context),
+    );
     // If no hook was registered the registry returns the map unchanged — fall back to theme defaults.
     if (result is TextStyle) return result;
     return _default(context, name);

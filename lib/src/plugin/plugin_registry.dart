@@ -61,26 +61,50 @@ class PluginRegistry {
 
   /// Asynchronously initializes every registered plugin in registration order.
   ///
-  /// Optionally collects per-plugin timing into [timings] (populated by
-  /// [MooseBootstrapper] for the [BootstrapReport]).
-  Future<void> initAll({Map<String, Duration>? timings}) async {
+  /// Each plugin's [FeaturePlugin.onInit] is isolated in a try/catch — a
+  /// failure in one plugin is recorded in [failures] and execution continues
+  /// with the remaining plugins. Timing for successful plugins is collected
+  /// in [timings] (both are populated by [MooseBootstrapper]).
+  Future<void> initAll({
+    Map<String, Duration>? timings,
+    Map<String, Object>? failures,
+  }) async {
     for (final plugin in _plugins.values) {
       final sw = Stopwatch()..start();
-      await plugin.onInit();
-      sw.stop();
-      timings?[plugin.name] = sw.elapsed;
-      _logger.success('Initialized plugin: ${plugin.name} (onInit)');
+      try {
+        await plugin.onInit();
+        sw.stop();
+        timings?[plugin.name] = sw.elapsed;
+        _logger.success('Initialized plugin: ${plugin.name} (onInit)');
+      } catch (e, stack) {
+        sw.stop();
+        _logger.error('Plugin "${plugin.name}" onInit failed', e, stack);
+        failures?[plugin.name] = e;
+      }
     }
   }
 
   /// Asynchronously starts every registered plugin in registration order.
-  Future<void> startAll({Map<String, Duration>? timings}) async {
+  ///
+  /// Each plugin's [FeaturePlugin.onStart] is isolated in a try/catch — a
+  /// failure in one plugin is recorded in [failures] and execution continues
+  /// with the remaining plugins.
+  Future<void> startAll({
+    Map<String, Duration>? timings,
+    Map<String, Object>? failures,
+  }) async {
     for (final plugin in _plugins.values) {
       final sw = Stopwatch()..start();
-      await plugin.onStart();
-      sw.stop();
-      timings?[plugin.name] = sw.elapsed;
-      _logger.success('Started plugin: ${plugin.name} (onStart)');
+      try {
+        await plugin.onStart();
+        sw.stop();
+        timings?[plugin.name] = sw.elapsed;
+        _logger.success('Started plugin: ${plugin.name} (onStart)');
+      } catch (e, stack) {
+        sw.stop();
+        _logger.error('Plugin "${plugin.name}" onStart failed', e, stack);
+        failures?[plugin.name] = e;
+      }
     }
   }
 

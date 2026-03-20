@@ -83,8 +83,20 @@ class WidgetRegistry {
     return _registry.keys.toList();
   }
 
+  /// Removes all builders registered under [name].
   void unregister(String name) {
     _registry.remove(name);
+  }
+
+  /// Removes a specific [builder] from the entries registered under [name].
+  ///
+  /// Other builders registered under the same key are unaffected. Has no
+  /// effect if [builder] is not currently registered under [name].
+  void unregisterBuilder(String name, WidgetBuilderFn builder) {
+    final entries = _registry[name];
+    if (entries == null) return;
+    entries.removeWhere((e) => e.builder == builder);
+    if (entries.isEmpty) _registry.remove(name);
   }
 
   /// Returns the first non-null widget produced by the builders registered
