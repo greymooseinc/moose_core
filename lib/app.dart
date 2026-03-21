@@ -16,3 +16,4 @@ export 'src/app/moose_scope.dart';
 export 'src/app/moose_bootstrapper.dart';
 export 'src/app/moose_lifecycle_observer.dart';
 export 'src/app/moose_app.dart';
+export 'src/theme/moose_theme.dart';

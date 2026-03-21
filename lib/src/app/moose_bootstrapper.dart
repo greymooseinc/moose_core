@@ -1,6 +1,10 @@
+import 'package:flutter/material.dart';
+
 import '../adapter/backend_adapter.dart';
 import '../plugin/feature_plugin.dart';
 import '../services/app_navigator.dart';
+import '../theme/moose_theme.dart';
+import '../ui/style_hook_data.dart';
 import 'moose_app_context.dart';
 
 /// Structured result returned by [MooseBootstrapper.run].
@@ -143,6 +147,7 @@ class MooseBootstrapper {
   ///  * [BootstrapReport.failures], for per-adapter and per-plugin error details.
   Future<BootstrapReport> run({
     required Map<String, dynamic> config,
+    List<MooseTheme> themes = const [],
     List<BackendAdapter> adapters = const [],
     List<FeaturePlugin Function()> plugins = const [],
   }) async {
@@ -153,6 +158,19 @@ class MooseBootstrapper {
 
     // Step 1: Initialize configuration.
     appContext.configManager.initialize(config);
+
+    // Step 0 (applied after config): Resolve and wire the active theme.
+    //
+    // Theme hooks are registered before any plugin, so plugins may still
+    // override individual hooks at higher priority if needed.
+    if (themes.isNotEmpty) {
+      final themeName = appContext.configManager.get('theme') as String?;
+      final active = themes.firstWhere(
+        (t) => t.name == themeName,
+        orElse: () => themes.first,
+      );
+      _registerThemeHooks(active);
+    }
 
     // Step 2: Initialize the scoped persistent cache layer.
     await appContext.cache.initPersistent();
@@ -223,5 +241,48 @@ class MooseBootstrapper {
       pluginStartTimings: startTimings,
       failures: failures,
     );
+  }
+
+  /// Registers `theme:palette_*` and `styles:*` hooks for [theme].
+  ///
+  /// Called before plugin registration so plugins can still override
+  /// individual hooks at higher priority.
+  void _registerThemeHooks(MooseTheme theme) {
+    final hooks = appContext.hookRegistry;
+
+    hooks.register('theme:palette_light', (_) => theme.light);
+    hooks.register('theme:palette_dark', (_) => theme.dark);
+
+    hooks.register('styles:text', (data) {
+      final d = data as StyleHookData;
+      return theme.textStyles.resolve(d.name, d.context);
+    });
+
+    hooks.register('styles:button', (data) {
+      final d = data as StyleHookData;
+      return theme.buttonStyles.resolve(d.name, d.context);
+    });
+
+    hooks.register('styles:input', (data) {
+      final d = data as StyleHookData;
+      return theme.inputStyles.resolve(d.name, d.context, d);
+    });
+
+    hooks.register('styles:background', (data) {
+      final d = data as Map<String, dynamic>;
+      return theme.resolveBackground(
+        d['name'] as String,
+        d['context'] as BuildContext,
+        d,
+      );
+    });
+
+    hooks.register('styles:custom', (data) {
+      final d = data as Map<String, dynamic>;
+      return theme.resolveCustom(
+        d['name'] as String,
+        d['context'] as BuildContext,
+      );
+    });
   }
 }

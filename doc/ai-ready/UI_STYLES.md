@@ -2,7 +2,7 @@
 
 ## Overview
 
-`package:moose_core/ui.dart` provides **hook-calling style facades** — thin static classes that delegate to the active palette plugin via `HookRegistry`. Plugins that need text, button, or input styles import this barrel; they never import from another plugin or from any app-level file.
+`package:moose_core/ui.dart` provides **hook-calling style facades** — thin static classes that delegate to the active theme via `HookRegistry`. Plugins that need text, button, or input styles import this barrel; they never import from another plugin or from any app-level file.
 
 ```dart
 import 'package:moose_core/ui.dart';
@@ -15,6 +15,7 @@ This single import exposes four classes:
 | `AppTextStyles` | `styles:text` | `TextStyle` |
 | `AppButtonStyles` | `styles:button` | `ButtonStyle` |
 | `AppInputStyles` | `styles:input` | `InputDecoration` |
+| `AppBackgroundStyles` | `styles:background` | `BoxDecoration` / `dynamic` |
 | `AppCustomStyles` | `styles:custom` | `T` (generic) |
 
 ---
@@ -287,48 +288,64 @@ hookRegistry.register('styles:input', (data) {
 
 ---
 
-## Building a palette plugin
+## How themes are wired
 
-A palette plugin registers all four hooks and is swapped out by removing it from the plugin list in `main.dart` and adding an alternative. No other code changes are needed.
+Styles are provided by a `MooseTheme` — an abstract class that bundles `ThemeData` (light/dark) with style resolvers. Themes are registered in `MooseApp` and selected by name from `environment.json`. The bootstrapper wires all `styles:*` and `theme:palette_*` hooks automatically before any plugin runs.
 
 ```dart
-class MyBrandPlugin extends FeaturePlugin {
+// main.dart
+MooseApp(
+  themes: [DefaultTheme(), ColorfulTheme()],
+  ...
+)
+```
+
+```json
+// environment.json
+{ "theme": "default" }
+```
+
+- If `"theme"` is absent or doesn't match any registered theme name, the **first theme** in the list is used.
+- Themes are registered at priority 1 — plugins can still override individual hooks at higher priority.
+- No runtime theme switching — the active theme is selected once at startup.
+
+### Creating a custom theme
+
+```dart
+class MyBrandTheme extends MooseTheme {
   @override
   String get name => 'my_brand';
 
   @override
-  String get version => '1.0.0';
+  ThemeData get light => MyBrandThemes.light;
 
   @override
-  void onRegister() {
-    hookRegistry.register('styles:text', (data) {
-      final map = data as Map<String, dynamic>;
-      return MyBrandTextStyles.resolve(
-        map['name'] as String,
-        map['context'] as BuildContext,
-      );
-    });
+  ThemeData get dark => MyBrandThemes.dark;
 
-    hookRegistry.register('styles:button', (data) {
-      final map = data as Map<String, dynamic>;
-      return MyBrandButtonStyles.resolve(
-        map['name'] as String,
-        map['context'] as BuildContext,
-      );
-    });
+  @override
+  TextStyle resolveText(String name, BuildContext ctx) =>
+      MyBrandTextStyles.resolve(name, ctx);
 
-    hookRegistry.register('styles:input', (data) {
-      final map = data as Map<String, dynamic>;
-      return MyBrandInputStyles.resolve(
-        map['name'] as String,
-        map['context'] as BuildContext,
-        map,
-      );
-    });
+  @override
+  ButtonStyle resolveButton(String name, BuildContext ctx) =>
+      MyBrandButtonStyles.resolve(name, ctx);
 
-    // Optional — theme hook for ThemeManagerPlugin
-    hookRegistry.register('theme:palette_light', (_) => MyBrandThemes.light);
-    hookRegistry.register('theme:palette_dark',  (_) => MyBrandThemes.dark);
+  @override
+  InputDecoration resolveInput(String name, BuildContext ctx, StyleHookData data) =>
+      MyBrandInputStyles.resolve(name, ctx, data);
+
+  // Optional — override for custom background styles
+  @override
+  dynamic resolveBackground(String name, BuildContext ctx, Map<String, dynamic> data) =>
+      MyBrandBackgroundStyles.resolve(name, ctx, data);
+
+  // Optional — override for custom named style tokens
+  @override
+  dynamic resolveCustom(String name, BuildContext ctx) {
+    switch (name) {
+      case 'my_special_widget': return const MySpecialWidget();
+      default: return null;
+    }
   }
 }
 ```
@@ -375,19 +392,19 @@ hookRegistry.register('styles:text', (data) {
 
 ---
 
-## ThemeDefaultPlugin — the built-in palette
+## DefaultTheme — the built-in theme
 
-`ThemeDefaultPlugin` (in `moose_extensions`) is the reference implementation. It registers:
+`DefaultTheme` (in `lib/themes/` of `moose_extensions`) is the reference implementation. It wires all hooks via `MooseTheme`:
 
 | Hook | Handled by |
 |---|---|
-| `styles:text` | `DefaultTextStyles.resolve(name, ctx)` |
-| `styles:button` | `DefaultButtonStyles.resolve(name, ctx)` |
-| `styles:input` | `DefaultInputStyles.resolve(name, ctx, map)` |
 | `theme:palette_light` | `DefaultThemes.light` |
 | `theme:palette_dark` | `DefaultThemes.dark` |
+| `styles:text` | `DefaultTextStyles.resolve(name, ctx)` |
+| `styles:button` | `DefaultButtonStyles.resolve(name, ctx)` |
+| `styles:input` | `DefaultInputStyles.resolve(name, ctx, data)` |
 
-The default palette uses **Inter** (via `google_fonts`) with colours sourced entirely from `ThemeData.colorScheme`. It has no hard-coded hex values, so light/dark mode works automatically.
+The default palette uses the bundled **OldStandard** font with colours sourced entirely from `ThemeData.colorScheme`. It has no hard-coded hex values, so light/dark mode works automatically.
 
 ---
 
@@ -422,7 +439,7 @@ The default palette uses **Inter** (via `google_fonts`) with colours sourced ent
 
 6. **`AppButtonStyles.labelStyle()` has no `BuildContext`** — do not try to read theme colours from it. Use `color:` parameter or wrap in a `DefaultTextStyle` at the widget level.
 
-7. **Palette plugins are mutually exclusive by convention** — register only one plugin that handles `styles:text`, `styles:button`, and `styles:input`. Using two without explicit priority differences will cause the last-registered one to silently win.
+7. **Themes are mutually exclusive by design** — `MooseBootstrapper` selects exactly one `MooseTheme` based on `environment.json`. Plugins may still register individual style overrides at higher priority, but there should be only one active theme.
 
 ---
 

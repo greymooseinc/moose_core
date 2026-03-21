@@ -16,6 +16,7 @@
 | **Clean architecture** | Presentation → BLoC → Repository → BackendAdapter, enforced by the framework |
 | **Swappable backends** | WooCommerce, Shopify, or custom — swap without touching UI code |
 | **Plugin-based features** | Every feature is an isolated `FeaturePlugin` with its own routes, widgets, and hooks |
+| **Swappable themes** | `MooseTheme` bundles `ThemeData` + style resolvers; select via `environment.json` — no code change to switch |
 | **AI-agent-ready** | 18 structured docs in `doc/ai-ready/` so AI agents generate correct code first time |
 | **Dynamic UI composition** | `WidgetRegistry` lets adapters and plugins inject UI sections at runtime |
 | **Event-driven communication** | `EventBus` + `HookRegistry` for decoupled cross-plugin messaging |
@@ -51,6 +52,10 @@ my_store/
 │   │   │   └── sections/
 │   │   │
 │   │   └── ...
+│   │
+│   ├── themes/
+│   │   ├── default_theme.dart           # MooseTheme — bundles ThemeData + style resolvers
+│   │   └── colorful_theme.dart
 │   │
 │   └── adapters/
 │       └── woocommerce/
@@ -124,6 +129,7 @@ void main() async {
   runApp(
     MooseApp(
       config: config,
+      themes: [DefaultTheme(), ColorfulTheme()],  // active theme from config['theme']
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin(), () => CartPlugin()],
       builder: (context, appContext) => MyApp(appContext: appContext),
@@ -145,6 +151,36 @@ MooseApp(
   loadingWidget: const SplashScreen(),
 )
 ```
+
+---
+
+## Theming
+
+Extend `MooseTheme` to bundle a complete visual configuration — `ThemeData` for light/dark plus style resolvers for text, buttons, inputs, and backgrounds:
+
+```dart
+class MyBrandTheme extends MooseTheme {
+  @override String get name => 'my_brand';
+  @override ThemeData get light => MyBrandThemes.light;
+  @override ThemeData get dark => MyBrandThemes.dark;
+  @override TextStyle resolveText(String name, BuildContext ctx) => MyBrandTextStyles.resolve(name, ctx);
+  @override ButtonStyle resolveButton(String name, BuildContext ctx) => MyBrandButtonStyles.resolve(name, ctx);
+  @override InputDecoration resolveInput(String name, BuildContext ctx, StyleHookData data) =>
+      MyBrandInputStyles.resolve(name, ctx, data);
+}
+```
+
+Register themes in `MooseApp` and select the active one via `environment.json`:
+
+```dart
+MooseApp(themes: [DefaultTheme(), MyBrandTheme()], ...)
+```
+
+```json
+{ "theme": "my_brand" }
+```
+
+If `"theme"` is absent or does not match any registered name, the first theme in the list is used. No code change is needed to switch themes — only the JSON value changes.
 
 ---
 

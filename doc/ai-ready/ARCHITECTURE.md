@@ -38,6 +38,8 @@ Complete architectural reference for AI agents building plugins, adapters, and s
 
 Cross-cutting services (caching, events, hooks, navigation, config) are owned by `MooseAppContext` and accessed through it — never via singletons.
 
+The **Theme Layer** sits outside the plugin system. A `MooseTheme` bundles `ThemeData` (light/dark) with style resolvers for text, buttons, inputs, backgrounds, and custom tokens. Themes are registered in `MooseApp(themes: [...])` and the active one is selected from `environment.json` before any plugin runs.
+
 ---
 
 ## Dependency Injection: MooseAppContext
@@ -97,6 +99,7 @@ final testCtx = MooseAppContext(hookRegistry: MockHookRegistry());
 runApp(
   MooseApp(
     config: config,
+    themes: [DefaultTheme(), ColorfulTheme()],  // optional; active theme set via environment.json "theme" key
     adapters: [WooCommerceAdapter()],
     plugins: [() => ProductsPlugin()],
     builder: (context, appContext) => MyApp(appContext: appContext),
@@ -119,6 +122,11 @@ MooseScope.adapterRegistryOf(context)             // static accessor
 `MooseBootstrapper.run()` orchestrates startup in exactly this order:
 
 ```
+Step 0  (after config) — resolve active MooseTheme
+        ↓ reads 'theme' key from environment.json
+        ↓ → finds matching theme by name; falls back to themes.first
+        ↓ → registers theme:palette_*, styles:text/button/input/background/custom hooks
+
 Step 1  configManager.initialize(config)
         ↓ loads environment.json / config map
 
@@ -1013,6 +1021,7 @@ void main() async {
   runApp(
     MooseApp(
       config: config,
+      themes: [DefaultTheme()],
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin()],
       builder: (context, appContext) => MyApp(appContext: appContext),

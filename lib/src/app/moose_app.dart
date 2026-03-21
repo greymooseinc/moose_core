@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../adapter/backend_adapter.dart';
 import '../plugin/feature_plugin.dart';
+import '../theme/moose_theme.dart';
 import 'moose_app_context.dart';
 import 'moose_bootstrapper.dart';
 import 'moose_scope.dart';
@@ -82,6 +83,22 @@ class MooseApp extends StatefulWidget {
   /// [CircularProgressIndicator] if not provided.
   final Widget? loadingWidget;
 
+  /// Themes available to this application.
+  ///
+  /// The active theme is selected by matching the `"theme"` key in
+  /// [config] against each theme's [MooseTheme.name]. If no match is found,
+  /// or if [config] has no `"theme"` key, the first entry in the list is used
+  /// as the fallback. When the list is empty, no theme hooks are registered
+  /// and existing plugin-registered hooks remain in effect.
+  ///
+  /// ```dart
+  /// MooseApp(
+  ///   themes: [DefaultTheme(), ColorfulTheme()],
+  ///   ...
+  /// )
+  /// ```
+  final List<MooseTheme> themes;
+
   /// Optional callback invoked with the [BootstrapReport] once the bootstrap
   /// sequence completes — whether it succeeded or not.
   ///
@@ -106,6 +123,7 @@ class MooseApp extends StatefulWidget {
     required this.adapters,
     required this.plugins,
     required this.builder,
+    this.themes = const [],
     this.loadingWidget,
     this.onBootstrapComplete,
   });
@@ -128,6 +146,7 @@ class _MooseAppState extends State<MooseApp> {
   Future<void> _bootstrap() async {
     final report = await MooseBootstrapper(appContext: _appContext).run(
       config: widget.config,
+      themes: widget.themes,
       adapters: widget.adapters,
       plugins: widget.plugins,
     );

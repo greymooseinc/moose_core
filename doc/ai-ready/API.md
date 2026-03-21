@@ -30,7 +30,7 @@ import 'package:moose_core/ui.dart';          // AppTextStyles, AppButtonStyles,
 
 | Module | Exports |
 |--------|---------|
-| **app.dart** | `MooseAppContext`, `MooseScope`, `MooseBootstrapper`, `BootstrapReport`, `MooseContextExtension` |
+| **app.dart** | `MooseAppContext`, `MooseScope`, `MooseBootstrapper`, `BootstrapReport`, `MooseContextExtension`, `MooseTheme` |
 | **entities.dart** | `Product`, `Cart`, `CartItem`, `Order`, `Category`, `ProductTag`, `Collection`, `ProductFilters`, `SearchFilters`, `Post`, `PromoBanner`, `ProductReview`, `ProductReviewStats`, `SearchResult`, `PaginatedResult`, `UserInteraction`, `BottomTab`, `SectionConfig`, `AuthCredentials`, `AuthResult`, `User`, `Address`, `Country`, and more |
 | **repositories.dart** | `CoreRepository`, `ProductsRepository`, `CartRepository`, `ReviewRepository`, `SearchRepository`, `PostRepository`, `AuthRepository`, `LocationRepository`, `PushNotificationRepository`, `ShortsRepository`, `StoreRepository`, `BannerRepository` |
 | **plugin.dart** | `FeaturePlugin`, `PluginRegistry` |
@@ -156,6 +156,7 @@ class MooseBootstrapper {
 
   Future<BootstrapReport> run({
     required Map<String, dynamic> config,
+    List<MooseTheme> themes = const [],    // active theme selected via config['theme']
     List<BackendAdapter> adapters = const [],
     List<FeaturePlugin Function()> plugins = const [],
   });
@@ -182,6 +183,7 @@ void main() async {
   runApp(
     MooseApp(
       config: config,
+      themes: [DefaultTheme(), ColorfulTheme()],  // active theme: config['theme'] key
       adapters: [WooCommerceAdapter()],
       plugins: [() => ProductsPlugin(), () => CartPlugin()],
       builder: (context, appContext) => MyApp(appContext: appContext),
