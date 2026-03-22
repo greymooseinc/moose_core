@@ -6,6 +6,7 @@ import '../services/app_navigator.dart';
 import '../theme/moose_theme.dart';
 import '../ui/style_hook_data.dart';
 import 'moose_app_context.dart';
+import 'page_screen.dart';
 
 /// Structured result returned by [MooseBootstrapper.run].
 ///
@@ -159,6 +160,13 @@ class MooseBootstrapper {
     // Step 1: Initialize configuration.
     appContext.configManager.initialize(config);
 
+    // Step 1b: Build page routes from the `pages` array in environment.json.
+    //
+    // Each active entry with a non-empty `route` key maps to a PageScreen.
+    // A fallback `/home` route is added when no page declares that route.
+    // These routes are stored on appContext and merged into getAllRoutes().
+    _registerPagesRoutes();
+
     // Step 0 (applied after config): Resolve and wire the active theme.
     //
     // Theme hooks are registered before any plugin, so plugins may still
@@ -241,6 +249,30 @@ class MooseBootstrapper {
       pluginStartTimings: startTimings,
       failures: failures,
     );
+  }
+
+  /// Reads the `pages` array from [ConfigManager] and populates
+  /// [MooseAppContext.pagesRoutes] with a [PageScreen] builder per active entry.
+  ///
+  /// A fallback `/home` route is added when no page entry claims that path.
+  void _registerPagesRoutes() {
+    final pages = appContext.configManager.get('pages');
+    final routes = appContext.pagesRoutes;
+
+    if (pages is List) {
+      for (final entry in pages.whereType<Map>()) {
+        final e = entry.cast<String, dynamic>();
+        if (e['active'] == false) continue;
+        final route = e['route'] as String? ?? '';
+        if (route.isEmpty) continue;
+        final config = Map<String, dynamic>.from(e);
+        routes[route] = (_) => PageScreen(pageConfig: config);
+      }
+    }
+
+    if (!routes.containsKey('/home')) {
+      routes['/home'] = (_) => const PageScreen(pageConfig: {});
+    }
   }
 
   /// Registers `theme:palette_*` and `styles:*` hooks for [theme].

@@ -17,6 +17,7 @@
 | **Swappable backends** | WooCommerce, Shopify, or custom — swap without touching UI code |
 | **Plugin-based features** | Every feature is an isolated `FeaturePlugin` with its own routes, widgets, and hooks |
 | **Swappable themes** | `MooseTheme` bundles `ThemeData` + style resolvers; select via `environment.json` — no code change to switch |
+| **Config-driven pages** | Define full screens in `environment.json` under `pages` — `MooseBootstrapper` registers `PageScreen` routes automatically, no plugin code required |
 | **AI-agent-ready** | 18 structured docs in `doc/ai-ready/` so AI agents generate correct code first time |
 | **Dynamic UI composition** | `WidgetRegistry` lets adapters and plugins inject UI sections at runtime |
 | **Event-driven communication** | `EventBus` + `HookRegistry` for decoupled cross-plugin messaging |
@@ -99,7 +100,7 @@ my_store/
 
   MooseAppContext  ──  owns all registries
   MooseScope       ──  InheritedWidget; serves context.moose
-  MooseBootstrapper ─  wires adapters + plugins at startup
+  MooseBootstrapper ─  wires adapters, plugins, and page routes at startup
 ```
 
 ---
@@ -139,6 +140,24 @@ void main() async {
 ```
 
 `MooseApp` creates `MooseAppContext`, runs `MooseBootstrapper`, wraps the tree in `MooseScope`, and shows a spinner until bootstrap completes — no boilerplate required.
+
+Page-screen routes are registered automatically from the top-level `pages` array in `environment.json`. No plugin or Dart code is needed to add a new page:
+
+```json
+{
+  "theme": "default",
+  "pages": [
+    {
+      "route": "/home",
+      "active": true,
+      "appBar": { "title": "Home", "buttonsLeft": [], "buttonsRight": [] },
+      "sections": [
+        { "name": "products.featured", "active": true, "settings": { "title": "Hot Picks" } }
+      ]
+    }
+  ]
+}
+```
 
 Supply `loadingWidget` for a custom splash screen:
 
@@ -201,6 +220,9 @@ class ProductsPlugin extends FeaturePlugin {
     actionRegistry.register('products.refresh', (ctx, _) async { /* ... */ });
   }
 
+  // Optional: declare plugin-owned routes here.
+  // Full-page screens can also be configured in environment.json['pages']
+  // without any Dart code — MooseBootstrapper registers them as PageScreen routes.
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
     '/products': (_) => ProductsListScreen(),
@@ -275,7 +297,7 @@ class FeaturedProductsSection extends FeatureSection {
 import 'package:moose_core/moose_core.dart';   // everything
 
 // or selectively:
-import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, MooseBootstrapper
+import 'package:moose_core/app.dart';          // MooseAppContext, MooseScope, MooseBootstrapper, MooseApp, PageScreen
 import 'package:moose_core/entities.dart';     // Product, Cart, Order, Category, User ...
 import 'package:moose_core/repositories.dart'; // ProductsRepository, CartRepository ...
 import 'package:moose_core/plugin.dart';       // FeaturePlugin, PluginRegistry

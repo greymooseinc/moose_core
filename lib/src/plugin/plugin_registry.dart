@@ -179,11 +179,16 @@ class PluginRegistry {
 
   int get pluginCount => _plugins.length;
 
-  /// Collects routes from all registered plugins into a single map.
+  /// Collects routes from all registered plugins and [extraRoutes] into a
+  /// single map. Pass [MooseAppContext.pagesRoutes] as [extraRoutes] to
+  /// include page-screen routes generated from `environment.json`.
   ///
-  /// If no plugin registers `/home`, a minimal placeholder is added.
-  Map<String, WidgetBuilder> getAllRoutes() {
-    final routes = <String, WidgetBuilder>{};
+  /// If no plugin or extra route registers `/home`, a minimal placeholder
+  /// is added.
+  Map<String, WidgetBuilder> getAllRoutes({
+    Map<String, WidgetBuilder> extraRoutes = const {},
+  }) {
+    final routes = <String, WidgetBuilder>{...extraRoutes};
     for (final plugin in _plugins.values) {
       final pluginRoutes = plugin.getRoutes();
       if (pluginRoutes != null) routes.addAll(pluginRoutes);

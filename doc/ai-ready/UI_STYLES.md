@@ -377,7 +377,7 @@ abstract final class MyBrandTextStyles {
 
 ### Partially overriding a palette
 
-Register only the hooks you want to override at a higher priority. Hooks not registered fall through to the lower-priority default handler (e.g. `ThemeDefaultPlugin`):
+Register only the hooks you want to override at a higher priority. Hooks not registered fall through to the lower-priority default handler registered by `MooseBootstrapper` from the active `MooseTheme`:
 
 ```dart
 // Override only the appBarTitle style; everything else stays default

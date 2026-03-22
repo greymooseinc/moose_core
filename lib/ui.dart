@@ -16,3 +16,4 @@ export 'src/ui/app_button_styles.dart';
 export 'src/ui/app_input_styles.dart';
 export 'src/ui/app_background_styles.dart';
 export 'src/ui/app_custom_styles.dart';
+export 'src/ui/moose_app_bar.dart';

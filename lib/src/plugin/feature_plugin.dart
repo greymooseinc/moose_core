@@ -175,8 +175,13 @@ abstract class FeaturePlugin {
   /// Use this to release subscriptions/resources owned by the plugin.
   Future<void> onStop() async {}
 
-  /// Optional: Plugin can provide routes
-  Map<String, WidgetBuilder>? getRoutes();
+  /// Optional: Plugin can provide routes.
+  ///
+  /// Return a map of route paths to [WidgetBuilder]s. Return `null` (the
+  /// default) when the plugin contributes no routes. Page-screen routes
+  /// defined in `environment.json` under the `pages` key are registered
+  /// automatically by [MooseBootstrapper] and do not require a plugin override.
+  Map<String, WidgetBuilder>? getRoutes() => null;
 
   /// Optional: Bottom navigation tabs exposed by this plugin.
   ///

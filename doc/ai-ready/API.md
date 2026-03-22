@@ -30,7 +30,7 @@ import 'package:moose_core/ui.dart';          // AppTextStyles, AppButtonStyles,
 
 | Module | Exports |
 |--------|---------|
-| **app.dart** | `MooseAppContext`, `MooseScope`, `MooseBootstrapper`, `BootstrapReport`, `MooseContextExtension`, `MooseTheme` |
+| **app.dart** | `MooseAppContext`, `MooseScope`, `MooseBootstrapper`, `BootstrapReport`, `MooseContextExtension`, `MooseApp`, `MooseTheme`, `PageScreen` |
 | **entities.dart** | `Product`, `Cart`, `CartItem`, `Order`, `Category`, `ProductTag`, `Collection`, `ProductFilters`, `SearchFilters`, `Post`, `PromoBanner`, `ProductReview`, `ProductReviewStats`, `SearchResult`, `PaginatedResult`, `UserInteraction`, `BottomTab`, `SectionConfig`, `AuthCredentials`, `AuthResult`, `User`, `Address`, `Country`, and more |
 | **repositories.dart** | `CoreRepository`, `ProductsRepository`, `CartRepository`, `ReviewRepository`, `SearchRepository`, `PostRepository`, `AuthRepository`, `LocationRepository`, `PushNotificationRepository`, `ShortsRepository`, `StoreRepository`, `BannerRepository` |
 | **plugin.dart** | `FeaturePlugin`, `PluginRegistry` |
@@ -59,6 +59,10 @@ class MooseAppContext {
   final EventBus eventBus;
   final AppLogger logger;
   final CacheManager cache;   // NOTE: field is 'cache', not 'cacheManager'
+
+  // Routes generated from environment.json 'pages' array.
+  // Populated by MooseBootstrapper (Step 1b). Pass to getAllRoutes(extraRoutes: ...).
+  final Map<String, WidgetBuilder> pagesRoutes;
 
   // All fields are optional; default instances created if not provided.
   // Inject custom/mock instances for testing.
@@ -163,10 +167,13 @@ class MooseBootstrapper {
 }
 ```
 
-**Bootstrap sequence (7 steps):**
+**Bootstrap sequence:**
 
 1. `configManager.initialize(config)` — loads the config map
+1b. `_registerPagesRoutes()` — reads top-level `pages` array from config; builds `PageScreen` route entries into `appContext.pagesRoutes`; adds `/home` fallback if absent
+0. Resolve active `MooseTheme` — reads `config['theme']`, wires `theme:palette_*` and `styles:*` hooks
 2. `cache.initPersistent()` — initializes `SharedPreferences` layer
+2b. `appContext.restoreAuthState()` — restores last-known user from persistent cache (instant UI on first frame)
 3. `AppNavigator.setEventBus(eventBus)` — wires navigation to scoped event bus
 4. Register each adapter via `adapterRegistry.registerAdapter()`
 5. Register each plugin via `pluginRegistry.register()` (sync; injects `appContext`, calls `onRegister`)
@@ -254,8 +261,10 @@ abstract class FeaturePlugin {
   Future<void> onAppLifecycle(AppLifecycleState state) async {} // async — Flutter lifecycle
   Future<void> onStop() async {}                             // async — teardown (reverse order)
 
-  // Routes
-  Map<String, WidgetBuilder>? getRoutes();
+  // Routes — optional; returns null by default.
+  // Page-screen routes from environment.json['pages'] are registered by MooseBootstrapper
+  // and do not require a plugin override.
+  Map<String, WidgetBuilder>? getRoutes() => null;
 }
 ```
 
@@ -309,6 +318,9 @@ class ProductsPlugin extends FeaturePlugin {
     // Cancel subscriptions, flush caches
   }
 
+  // Optional: plugins that own dedicated screens declare routes here.
+  // Alternatively, add entries to environment.json['pages'] — the bootstrapper
+  // registers those as PageScreen routes automatically without any plugin code.
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
     '/products': (context) => const ProductsScreen(),
@@ -341,8 +353,9 @@ class PluginRegistry {
   List<String> getRegisteredPlugins();
   int get pluginCount;
 
-  // Collects routes from all plugins; adds '/home' fallback if none provided
-  Map<String, WidgetBuilder> getAllRoutes();
+  // Collects routes from all plugins plus extraRoutes; adds '/home' fallback if none provided.
+  // Pass appContext.pagesRoutes as extraRoutes to include page-screen routes from environment.json.
+  Map<String, WidgetBuilder> getAllRoutes({Map<String, WidgetBuilder> extraRoutes = const {}});
 
   void clearAll(); // tests only
 }

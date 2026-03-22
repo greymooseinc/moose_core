@@ -63,6 +63,11 @@ class MooseAppContext {
   /// Also restored from PersistentCache on cold start by MooseBootstrapper.
   final ValueNotifier<User?> currentUser;
 
+  /// Routes built from the 'pages' array in environment.json.
+  /// Populated by MooseBootstrapper (Step 1b) before any plugin runs.
+  /// Pass to PluginRegistry.getAllRoutes(extraRoutes: appContext.pagesRoutes).
+  final Map<String, WidgetBuilder> pagesRoutes;
+
   // Shortcut: delegates to adapterRegistry.getRepository<T>().
   // If T is AuthRepository, wireAuthRepository() is called automatically on first access.
   T getRepository<T extends CoreRepository>();
@@ -122,39 +127,45 @@ MooseScope.adapterRegistryOf(context)             // static accessor
 `MooseBootstrapper.run()` orchestrates startup in exactly this order:
 
 ```
-Step 0  (after config) — resolve active MooseTheme
-        ↓ reads 'theme' key from environment.json
-        ↓ → finds matching theme by name; falls back to themes.first
-        ↓ → registers theme:palette_*, styles:text/button/input/background/custom hooks
+Step 1   configManager.initialize(config)
+         ↓ loads environment.json / config map
 
-Step 1  configManager.initialize(config)
-        ↓ loads environment.json / config map
+Step 1b  MooseBootstrapper._registerPagesRoutes()
+         ↓ reads top-level 'pages' array from config
+         ↓ → each active entry with a non-empty 'route' key → PageScreen(pageConfig: config)
+         ↓ → stored in appContext.pagesRoutes; passed to PluginRegistry.getAllRoutes() at startup
+         ↓ → '/home' fallback added if no page entry claims it
 
-Step 2  cache.initPersistent()
-        ↓ initializes SharedPreferences layer
+Step 0   (after config) — resolve active MooseTheme
+         ↓ reads 'theme' key from environment.json
+         ↓ → finds matching theme by name; falls back to themes.first
+         ↓ → registers theme:palette_*, styles:text/button/input/background/custom hooks
 
-Step 2b appContext.restoreAuthState()
-        ↓ reads 'moose:auth:current_user' from PersistentCache
-        ↓ → if found: currentUser.value = User.fromJson(cached)  (instant UI on first frame)
-        ↓ → authStateChanges stream will confirm/correct once adapter wires up
+Step 2   cache.initPersistent()
+         ↓ initializes SharedPreferences layer
 
-Step 3  AppNavigator.setEventBus(eventBus)
-        ↓ wires navigation to scoped event bus
+Step 2b  appContext.restoreAuthState()
+         ↓ reads 'moose:auth:current_user' from PersistentCache
+         ↓ → if found: currentUser.value = User.fromJson(cached)  (instant UI on first frame)
+         ↓ → authStateChanges stream will confirm/correct once adapter wires up
 
-Step 4  adapterRegistry.registerAdapter() × N
-        ↓ injects appContext → calls initializeFromConfig()
-        ↓ → validates config → calls initialize() → registers lazy repo factories
-        ↓ → registers adapter defaults in ConfigManager
+Step 3   AppNavigator.setEventBus(eventBus)
+         ↓ wires navigation to scoped event bus
 
-Step 5  pluginRegistry.register(plugin, appContext:) × N   [sync]
-        ↓ injects appContext into plugin, calls onRegister()
-        ↓ → registers plugin defaults in ConfigManager
+Step 4   adapterRegistry.registerAdapter() × N
+         ↓ injects appContext → calls initializeFromConfig()
+         ↓ → validates config → calls initialize() → registers lazy repo factories
+         ↓ → registers adapter defaults in ConfigManager
 
-Step 6  pluginRegistry.initAll()   [async]
-        ↓ calls onInit() on each registered plugin
+Step 5   pluginRegistry.register(plugin, appContext:) × N   [sync]
+         ↓ injects appContext into plugin, calls onRegister()
+         ↓ → registers plugin defaults in ConfigManager
 
-Step 7  pluginRegistry.startAll()   [async]
-        ↓ calls onStart() on each registered plugin
+Step 6   pluginRegistry.initAll()   [async]
+         ↓ calls onInit() on each registered plugin
+
+Step 7   pluginRegistry.startAll()   [async]
+         ↓ calls onStart() on each registered plugin
 ```
 
 ```dart
@@ -227,7 +238,10 @@ abstract class FeaturePlugin {
   Future<void> onAppLifecycle(AppLifecycleState state) async {} // async — optional
   Future<void> onStop() async {}                              // async — optional
 
-  Map<String, WidgetBuilder>? getRoutes();
+  // Optional — default returns null. Plugins that own dedicated screens
+  // override this. Page-screen routes from environment.json['pages'] are
+  // registered by MooseBootstrapper and do NOT require a plugin override.
+  Map<String, WidgetBuilder>? getRoutes() => null;
 }
 ```
 
@@ -882,7 +896,22 @@ AppNavigator.pop(context);
       "active": true,
       "settings": {}
     }
-  }
+  },
+  "pages": [
+    {
+      "route": "/home",
+      "active": true,
+      "appBar": {
+        "title": "Home",
+        "buttonsLeft": [],
+        "buttonsRight": []
+      },
+      "sections": [
+        { "name": "products.featured", "active": true, "settings": { "title": "Hot Picks" } }
+      ]
+    }
+  ],
+  "theme": "default"
 }
 ```
 
@@ -1008,6 +1037,8 @@ class ProductsPlugin extends FeaturePlugin {
 
   @override Future<void> onInit() async {}
 
+  // Plugin-declared routes. Alternatively, define screens via the 'pages'
+  // array in environment.json — MooseBootstrapper registers those automatically.
   @override
   Map<String, WidgetBuilder>? getRoutes() => {
     '/products': (_) => const ProductsScreen(),

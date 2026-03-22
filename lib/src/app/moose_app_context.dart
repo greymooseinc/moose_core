@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../actions/action_registry.dart';
 import '../adapter/adapter_registry.dart';
@@ -260,6 +260,13 @@ class MooseAppContext {
   ///  * [restoreAuthState], which populates this notifier from the
   ///    persistent cache on cold start.
   final ValueNotifier<User?> currentUser = ValueNotifier(null);
+
+  /// Routes generated from the `pages` array in `environment.json`.
+  ///
+  /// Populated by [MooseBootstrapper] after config is loaded, before any plugin
+  /// is registered. These routes are merged into [PluginRegistry.getAllRoutes]
+  /// so page-screen navigation works without any plugin owning the route table.
+  final Map<String, WidgetBuilder> pagesRoutes = {};
 
   // Cache key under which the authenticated user is persisted.
   // Reserved — other plugins must not write to this key.
