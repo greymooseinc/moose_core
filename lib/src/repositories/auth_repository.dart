@@ -3,6 +3,7 @@ import '../entities/auth_credentials.dart';
 import '../entities/auth_result.dart';
 import '../entities/user.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// Abstract repository for authentication operations
 ///
@@ -131,7 +132,10 @@ abstract class AuthRepository extends CoreRepository {
   ///   print('Signed in as: ${result.user!.displayName}');
   /// }
   /// ```
-  Future<AuthResult> signIn(AuthCredentials credentials);
+  Future<AuthResult> signIn(
+    AuthCredentials credentials, {
+    RepositoryOptions? options,
+  });
 
   /// Sign up a new user with the provided credentials
   ///
@@ -161,6 +165,7 @@ abstract class AuthRepository extends CoreRepository {
     String? displayName,
     String? photoUrl,
     Map<String, dynamic>? metadata,
+    RepositoryOptions? options,
   });
 
   /// Sign out the currently authenticated user
@@ -171,7 +176,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// await authRepo.signOut();
   /// ```
-  Future<void> signOut();
+  Future<void> signOut({RepositoryOptions? options});
 
   /// Get the currently authenticated user
   ///
@@ -184,7 +189,7 @@ abstract class AuthRepository extends CoreRepository {
   ///   print('Logged in as: ${user.email}');
   /// }
   /// ```
-  Future<User?> getCurrentUser();
+  Future<User?> getCurrentUser({RepositoryOptions? options});
 
   /// Stream of authentication state changes
   ///
@@ -219,7 +224,10 @@ abstract class AuthRepository extends CoreRepository {
   ///   print('Password reset email sent');
   /// }
   /// ```
-  Future<PasswordResetResult> sendPasswordResetEmail(String email);
+  Future<PasswordResetResult> sendPasswordResetEmail(
+    String email, {
+    RepositoryOptions? options,
+  });
 
   /// Confirm password reset with the provided code and new password
   ///
@@ -240,6 +248,7 @@ abstract class AuthRepository extends CoreRepository {
   Future<PasswordResetResult> confirmPasswordReset({
     required String code,
     required String newPassword,
+    RepositoryOptions? options,
   });
 
   /// Change the password for the currently authenticated user
@@ -260,6 +269,7 @@ abstract class AuthRepository extends CoreRepository {
   Future<PasswordResetResult> changePassword({
     required String currentPassword,
     required String newPassword,
+    RepositoryOptions? options,
   });
 
   // ============================================================================
@@ -274,7 +284,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// await authRepo.sendEmailVerification();
   /// ```
-  Future<void> sendEmailVerification();
+  Future<void> sendEmailVerification({RepositoryOptions? options});
 
   /// Verify email with the provided verification code
   ///
@@ -287,7 +297,10 @@ abstract class AuthRepository extends CoreRepository {
   ///   print('Email verified successfully');
   /// }
   /// ```
-  Future<EmailVerificationResult> verifyEmail(String code);
+  Future<EmailVerificationResult> verifyEmail(
+    String code, {
+    RepositoryOptions? options,
+  });
 
   // ============================================================================
   // PHONE VERIFICATION
@@ -304,7 +317,10 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// await authRepo.sendPhoneVerificationCode('+1234567890');
   /// ```
-  Future<void> sendPhoneVerificationCode(String phoneNumber);
+  Future<void> sendPhoneVerificationCode(
+    String phoneNumber, {
+    RepositoryOptions? options,
+  });
 
   /// Verify phone number with the provided verification code
   ///
@@ -320,6 +336,7 @@ abstract class AuthRepository extends CoreRepository {
   Future<EmailVerificationResult> verifyPhoneNumber({
     required String phoneNumber,
     required String verificationCode,
+    RepositoryOptions? options,
   });
 
   // ============================================================================
@@ -341,6 +358,7 @@ abstract class AuthRepository extends CoreRepository {
     String? displayName,
     String? photoUrl,
     Map<String, dynamic>? metadata,
+    RepositoryOptions? options,
   });
 
   /// Update the current user's email address
@@ -352,7 +370,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// final user = await authRepo.updateEmail('newemail@example.com');
   /// ```
-  Future<User> updateEmail(String newEmail);
+  Future<User> updateEmail(String newEmail, {RepositoryOptions? options});
 
   /// Delete the current user's account
   ///
@@ -363,7 +381,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// await authRepo.deleteAccount();
   /// ```
-  Future<void> deleteAccount();
+  Future<void> deleteAccount({RepositoryOptions? options});
 
   // ============================================================================
   // TOKEN MANAGEMENT
@@ -380,7 +398,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// final token = await authRepo.getIdToken(forceRefresh: true);
   /// ```
-  Future<String?> getIdToken({bool forceRefresh = false});
+  Future<String?> getIdToken({bool forceRefresh = false, RepositoryOptions? options});
 
   /// Refresh the authentication token using a refresh token
   ///
@@ -390,7 +408,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// final result = await authRepo.refreshToken('refresh_token_here');
   /// ```
-  Future<AuthResult> refreshToken(String refreshToken);
+  Future<AuthResult> refreshToken(String refreshToken, {RepositoryOptions? options});
 
   // ============================================================================
   // ACCOUNT LINKING
@@ -406,7 +424,7 @@ abstract class AuthRepository extends CoreRepository {
   ///   OAuthCredentials(provider: 'google.com', idToken: 'token'),
   /// );
   /// ```
-  Future<AuthResult> linkCredential(AuthCredentials credentials);
+  Future<AuthResult> linkCredential(AuthCredentials credentials, {RepositoryOptions? options});
 
   /// Unlink an authentication method from the current user
   ///
@@ -416,7 +434,7 @@ abstract class AuthRepository extends CoreRepository {
   /// ```dart
   /// await authRepo.unlinkProvider('google.com');
   /// ```
-  Future<User> unlinkProvider(String providerId);
+  Future<User> unlinkProvider(String providerId, {RepositoryOptions? options});
 
   // ============================================================================
   // MULTI-FACTOR AUTHENTICATION (OPTIONAL)
@@ -427,12 +445,13 @@ abstract class AuthRepository extends CoreRepository {
   /// Enables MFA for the current user account.
   Future<void> enrollMFA({
     required String phoneNumber,
+    RepositoryOptions? options,
   });
 
   /// Unenroll from multi-factor authentication
   ///
   /// Disables MFA for the current user account.
-  Future<void> unenrollMFA();
+  Future<void> unenrollMFA({RepositoryOptions? options});
 
   // ============================================================================
   // OAUTH 2.0 PKCE (OPTIONAL)
@@ -451,7 +470,7 @@ abstract class AuthRepository extends CoreRepository {
   /// final url = await authRepo.getOAuthAuthorizationUrl();
   /// // Open url in an InAppWebView, then call exchangeOAuthCode() on redirect
   /// ```
-  Future<String> getOAuthAuthorizationUrl() async =>
+  Future<String> getOAuthAuthorizationUrl({RepositoryOptions? options}) async =>
       throw UnsupportedError('OAuth not supported by this auth backend');
 
   /// Returns the redirect URI registered for this OAuth provider.
@@ -480,6 +499,7 @@ abstract class AuthRepository extends CoreRepository {
   Future<AuthResult> exchangeOAuthCode({
     required String code,
     required String state,
+    RepositoryOptions? options,
   }) async =>
       throw UnsupportedError('OAuth not supported by this auth backend');
 }

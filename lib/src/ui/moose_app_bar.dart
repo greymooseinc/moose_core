@@ -27,6 +27,7 @@ class MooseAppBar extends FeatureSection {
   final void Function(String event, dynamic payload)? onEvent;
   final List<Widget> leftActions;
   final List<Widget> rightActions;
+  final Widget? flexibleSpace;
 
   const MooseAppBar({
     super.key,
@@ -34,6 +35,7 @@ class MooseAppBar extends FeatureSection {
     this.onEvent,
     List<Widget>? leftActions,
     List<Widget>? rightActions,
+    this.flexibleSpace,
   })  : leftActions = leftActions ?? const [],
         rightActions = rightActions ?? const [];
 
@@ -88,6 +90,7 @@ class MooseAppBar extends FeatureSection {
               ...rightActions,
               SizedBox(width: getSetting<double>('actionsEndSpacing')),
             ],
+      flexibleSpace: flexibleSpace,
     );
   }
 

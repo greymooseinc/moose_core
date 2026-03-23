@@ -1,64 +1,82 @@
 import 'package:moose_core/entities.dart';
 
 import 'repository.dart';
+import 'repository_options.dart';
 
 abstract class CartRepository extends CoreRepository {
 
-  Future<Cart> getCart({String? cartId, String? customerId});
+  Future<Cart> getCart({
+    String? cartId,
+    String? customerId,
+    RepositoryOptions? options,
+  });
 
-  Future<Cart> createCart({String? customerId});
+  Future<Cart> createCart({
+    String? customerId,
+    RepositoryOptions? options,
+  });
 
   Future<Cart> addItem({
     required String productId,
     String? variationId,
     int quantity = 1,
     Map<String, dynamic>? metadata,
+    RepositoryOptions? options,
   });
 
   Future<Cart> updateItemQuantity({
     required String itemId,
     required int quantity,
+    RepositoryOptions? options,
   });
 
   Future<Cart> removeItem({
     required String itemId,
+    RepositoryOptions? options,
   });
 
-  Future<Cart> clearCart();
+  Future<Cart> clearCart({RepositoryOptions? options});
 
   Future<Cart> applyCoupon({
     required String couponCode,
+    RepositoryOptions? options,
   });
 
   Future<Cart> removeCoupon({
     required String couponCode,
+    RepositoryOptions? options,
   });
 
   Future<Cart> calculateTotals({
     String? shippingMethodId,
     Address? shippingAddress,
+    RepositoryOptions? options,
   });
 
   Future<Cart> setShippingMethod({
     required String shippingMethodId,
+    RepositoryOptions? options,
   });
 
   /// Get available shipping methods based on shipping address
   Future<List<ShippingMethod>> getShippingMethods({
     required Address shippingAddress,
+    RepositoryOptions? options,
   });
 
   /// Get available payment methods
-  Future<List<PaymentMethod>> getPaymentMethods();
+  Future<List<PaymentMethod>> getPaymentMethods({RepositoryOptions? options});
 
-  Future<CartValidationResult> validateCart();
+  Future<CartValidationResult> validateCart({RepositoryOptions? options});
 
   Future<CheckoutResult> checkout({
     required CheckoutRequest checkoutRequest,
+    RepositoryOptions? options,
   });
 
   Future<Order> getOrder({
     required String orderId,
+    RepositoryOptions? options,
   });
 
   Future<List<Order>> getCustomerOrders({
@@ -66,33 +84,39 @@ abstract class CartRepository extends CoreRepository {
     int page = 1,
     int perPage = 10,
     String? status,
+    RepositoryOptions? options,
   });
 
   Future<Order> updateOrderStatus({
     required String orderId,
     required String status,
+    RepositoryOptions? options,
   });
 
   Future<PaymentResult> processPayment({
     required String orderId,
     required String paymentMethodId,
     Map<String, dynamic>? paymentData,
+    RepositoryOptions? options,
   });
 
   Future<PaymentStatus> verifyPayment({
     required String orderId,
     required String transactionId,
+    RepositoryOptions? options,
   });
 
   Future<Order> cancelOrder({
     required String orderId,
     String? reason,
+    RepositoryOptions? options,
   });
 
   Future<RefundResult> requestRefund({
     required String orderId,
     double? amount,
     String? reason,
+    RepositoryOptions? options,
   });
 }
 

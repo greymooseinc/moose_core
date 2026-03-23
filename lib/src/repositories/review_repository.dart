@@ -2,6 +2,7 @@ import '../entities/product_review.dart';
 import '../entities/product_review_stats.dart';
 import '../entities/paginated_result.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// ReviewRepository - Abstract interface for review operations
 ///
@@ -44,6 +45,7 @@ abstract class ReviewRepository extends CoreRepository {
     int perPage = 10,
     String status = 'approved',
     String sortBy = 'newest',
+    RepositoryOptions? options,
   });
 
   /// Create a new review
@@ -52,7 +54,10 @@ abstract class ReviewRepository extends CoreRepository {
   ///
   /// Returns the created review with server-generated ID
   /// Throws exception if creation fails
-  Future<ProductReview> createReview(ProductReview review);
+  Future<ProductReview> createReview(
+    ProductReview review, {
+    RepositoryOptions? options,
+  });
 
   /// Get review statistics for an entity
   ///
@@ -64,6 +69,7 @@ abstract class ReviewRepository extends CoreRepository {
   Future<ProductReviewStats> getReviewStats({
     required String entityType,
     required String entityId,
+    RepositoryOptions? options,
   });
 
   /// Get review images for a specific review
@@ -75,7 +81,10 @@ abstract class ReviewRepository extends CoreRepository {
   ///
   /// This method allows lazy-loading of review images separately from the review content,
   /// which can improve performance when displaying review lists
-  Future<List<String>> getReviewImages(String reviewId);
+  Future<List<String>> getReviewImages(
+    String reviewId, {
+    RepositoryOptions? options,
+  });
 
   /// Get all review images for a product
   ///
@@ -95,6 +104,7 @@ abstract class ReviewRepository extends CoreRepository {
   Future<List<Map<String, dynamic>>> getProductReviewImages({
     required String entityType,
     required String entityId,
+    RepositoryOptions? options,
   });
 
   /// Get a specific review by its ID
@@ -103,5 +113,8 @@ abstract class ReviewRepository extends CoreRepository {
   ///
   /// Returns the ProductReview entity
   /// Throws exception if the review is not found or if loading fails
-  Future<ProductReview> getReviewById(String reviewId);
+  Future<ProductReview> getReviewById(
+    String reviewId, {
+    RepositoryOptions? options,
+  });
 }

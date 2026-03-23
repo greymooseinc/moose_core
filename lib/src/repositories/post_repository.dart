@@ -1,6 +1,7 @@
 import '../entities/post.dart';
 import '../entities/paginated_result.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 abstract class PostRepository extends CoreRepository {
 
@@ -29,7 +30,8 @@ abstract class PostRepository extends CoreRepository {
     String? sortOrder,
     String? status,
     Map<String, dynamic>? metadataFilter,
+    RepositoryOptions? options,
   });
 
-  Future<Post> getPostById(String id);
+  Future<Post> getPostById(String id, {RepositoryOptions? options});
 }

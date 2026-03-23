@@ -55,18 +55,19 @@ abstract class ShortsRepository extends CoreRepository {
     int perPage = 20,
     String? status,
     Map<String, dynamic>? filters,
+    RepositoryOptions? options,
   });
 
   /// Fetch a single short by its unique ID.
   ///
   /// Throws an exception if the short is not found or cannot be fetched.
-  Future<Short> getShortById(String id);
+  Future<Short> getShortById(String id, {RepositoryOptions? options});
 
   /// Optional: Refresh/invalidate cache for shorts data.
   ///
   /// Adapters that implement caching can override this to clear stale data.
   /// Default implementation is a no-op.
-  Future<void> refreshShorts() async {
+  Future<void> refreshShorts({RepositoryOptions? options}) async {
     // Default: no-op
     // Adapters with caching should override this
   }

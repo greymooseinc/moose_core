@@ -1,5 +1,6 @@
 import '../entities/address.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// Repository for store metadata and configuration.
 ///
@@ -15,32 +16,32 @@ abstract class StoreRepository extends CoreRepository {
   /// logo URL, and other basic information.
   ///
   /// Returns a map with store metadata
-  Future<Map<String, dynamic>> getStoreInfo();
+  Future<Map<String, dynamic>> getStoreInfo({RepositoryOptions? options});
 
   /// Get store name
   ///
   /// Returns the display name of the store
-  Future<String> getStoreName();
+  Future<String> getStoreName({RepositoryOptions? options});
 
   /// Get store description
   ///
   /// Returns the store's description or tagline
-  Future<String?> getStoreDescription();
+  Future<String?> getStoreDescription({RepositoryOptions? options});
 
   /// Get store logo URL
   ///
   /// Returns the URL to the store's logo image
-  Future<String?> getStoreLogoUrl();
+  Future<String?> getStoreLogoUrl({RepositoryOptions? options});
 
   /// Get store currency
   ///
   /// Returns the default currency code for the store (e.g., 'USD', 'GBP')
-  Future<String> getStoreCurrency();
+  Future<String> getStoreCurrency({RepositoryOptions? options});
 
   /// Get store timezone
   ///
   /// Returns the timezone identifier for the store (e.g., 'America/New_York')
-  Future<String?> getStoreTimezone();
+  Future<String?> getStoreTimezone({RepositoryOptions? options});
 
   // ==================== Store Locations ====================
 
@@ -54,6 +55,7 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns list of store location addresses
   Future<List<Address>> getStoreLocations({
     String? locationType,
+    RepositoryOptions? options,
   });
 
   /// Get a specific store location by ID
@@ -63,6 +65,7 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns the store location Address, or null if not found
   Future<Address?> getStoreLocation({
     required String locationId,
+    RepositoryOptions? options,
   });
 
   /// Find nearest store locations to coordinates
@@ -78,6 +81,7 @@ abstract class StoreRepository extends CoreRepository {
     required double longitude,
     double radius = 50.0,
     int limit = 10,
+    RepositoryOptions? options,
   });
 
   // ==================== Legal & Policy Information ====================
@@ -85,60 +89,60 @@ abstract class StoreRepository extends CoreRepository {
   /// Get Terms of Service (ToS) link
   ///
   /// Returns the URL to the store's Terms of Service page
-  Future<String?> getTermsOfServiceUrl();
+  Future<String?> getTermsOfServiceUrl({RepositoryOptions? options});
 
   /// Get Privacy Policy link
   ///
   /// Returns the URL to the store's Privacy Policy page
-  Future<String?> getPrivacyPolicyUrl();
+  Future<String?> getPrivacyPolicyUrl({RepositoryOptions? options});
 
   /// Get Return Policy link
   ///
   /// Returns the URL to the store's Return Policy page
-  Future<String?> getReturnPolicyUrl();
+  Future<String?> getReturnPolicyUrl({RepositoryOptions? options});
 
   /// Get Shipping Policy link
   ///
   /// Returns the URL to the store's Shipping Policy page
-  Future<String?> getShippingPolicyUrl();
+  Future<String?> getShippingPolicyUrl({RepositoryOptions? options});
 
   /// Get Refund Policy link
   ///
   /// Returns the URL to the store's Refund Policy page
-  Future<String?> getRefundPolicyUrl();
+  Future<String?> getRefundPolicyUrl({RepositoryOptions? options});
 
   /// Get Cookie Policy link
   ///
   /// Returns the URL to the store's Cookie Policy page
-  Future<String?> getCookiePolicyUrl();
+  Future<String?> getCookiePolicyUrl({RepositoryOptions? options});
 
   /// Get all policy links
   ///
   /// Returns a map of policy type to URL
   /// Keys: 'terms', 'privacy', 'return', 'shipping', 'refund', 'cookie'
-  Future<Map<String, String>> getAllPolicyUrls();
+  Future<Map<String, String>> getAllPolicyUrls({RepositoryOptions? options});
 
   // ==================== Contact Information ====================
 
   /// Get store contact email
   ///
   /// Returns the primary contact email address for the store
-  Future<String?> getContactEmail();
+  Future<String?> getContactEmail({RepositoryOptions? options});
 
   /// Get store contact phone
   ///
   /// Returns the primary contact phone number for the store
-  Future<String?> getContactPhone();
+  Future<String?> getContactPhone({RepositoryOptions? options});
 
   /// Get customer support email
   ///
   /// Returns the customer support email address
-  Future<String?> getSupportEmail();
+  Future<String?> getSupportEmail({RepositoryOptions? options});
 
   /// Get customer support phone
   ///
   /// Returns the customer support phone number
-  Future<String?> getSupportPhone();
+  Future<String?> getSupportPhone({RepositoryOptions? options});
 
   // ==================== Social Media ====================
 
@@ -146,7 +150,7 @@ abstract class StoreRepository extends CoreRepository {
   ///
   /// Returns a map of social media platform to profile URL
   /// Keys: 'facebook', 'twitter', 'instagram', 'youtube', 'linkedin', etc.
-  Future<Map<String, String>> getSocialMediaLinks();
+  Future<Map<String, String>> getSocialMediaLinks({RepositoryOptions? options});
 
   /// Get a specific social media link
   ///
@@ -155,6 +159,7 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns the URL to the store's profile on that platform
   Future<String?> getSocialMediaLink({
     required String platform,
+    RepositoryOptions? options,
   });
 
   // ==================== Operating Hours ====================
@@ -164,7 +169,7 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns operating hours for each day of the week
   /// Format: Map with day keys ('monday', 'tuesday', etc.) and time strings
   /// Example: {'monday': '9:00 AM - 5:00 PM', 'tuesday': '9:00 AM - 5:00 PM'}
-  Future<Map<String, String>?> getOperatingHours();
+  Future<Map<String, String>?> getOperatingHours({RepositoryOptions? options});
 
   /// Check if store is currently open
   ///
@@ -173,6 +178,7 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns true if the store is currently open
   Future<bool> isStoreOpen({
     String? locationId,
+    RepositoryOptions? options,
   });
 
   // ==================== Custom Settings ====================
@@ -188,6 +194,7 @@ abstract class StoreRepository extends CoreRepository {
   Future<dynamic> getSetting({
     required String key,
     dynamic defaultValue,
+    RepositoryOptions? options,
   });
 
   /// Get multiple store settings
@@ -197,19 +204,20 @@ abstract class StoreRepository extends CoreRepository {
   /// Returns a map of key to value for the requested settings
   Future<Map<String, dynamic>> getSettings({
     required List<String> keys,
+    RepositoryOptions? options,
   });
 
   /// Get all store settings
   ///
   /// Returns a map of all available store settings
-  Future<Map<String, dynamic>> getAllSettings();
+  Future<Map<String, dynamic>> getAllSettings({RepositoryOptions? options});
 
   // ==================== Locale ====================
 
   /// Get the currently active store locale (language code, e.g. 'en', 'ja').
   ///
   /// Returns null if locale selection is not supported by this backend.
-  Future<String?> getStoreLocale();
+  Future<String?> getStoreLocale({RepositoryOptions? options});
 
   /// Set the store locale — persists the preference on the backend if possible
   /// (e.g. updates a customer's language preference in their account).
@@ -217,5 +225,8 @@ abstract class StoreRepository extends CoreRepository {
   /// [languageCode] — BCP-47 language code (e.g. 'en', 'ja', 'fr')
   ///
   /// Returns the locale code that was accepted, or null if not supported.
-  Future<String?> setStoreLocale(String languageCode);
+  Future<String?> setStoreLocale(
+    String languageCode, {
+    RepositoryOptions? options,
+  });
 }

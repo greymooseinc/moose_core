@@ -1,5 +1,6 @@
 import '../entities/push_notification.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// Abstract repository for push notification operations
 ///
@@ -36,12 +37,12 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// Returns the permission status after the request.
   /// On iOS, this shows the system permission dialog.
   /// On Android, permissions are granted automatically on most versions.
-  Future<NotificationPermissionStatus> requestPermission();
+  Future<NotificationPermissionStatus> requestPermission({RepositoryOptions? options});
 
   /// Get current notification permission status
   ///
   /// Check if user has granted notification permissions without requesting.
-  Future<NotificationPermissionStatus> getPermissionStatus();
+  Future<NotificationPermissionStatus> getPermissionStatus({RepositoryOptions? options});
 
   /// Get the device's push notification token
   ///
@@ -49,7 +50,7 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// The token may change, so listen to [onTokenRefresh] for updates.
   ///
   /// Returns null if token is not yet available or permissions not granted.
-  Future<String?> getDeviceToken();
+  Future<String?> getDeviceToken({RepositoryOptions? options});
 
   /// Stream of device token refreshes
   ///
@@ -102,7 +103,7 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// await repository.subscribeToTopic('new_arrivals');
   /// await repository.subscribeToTopic('category_${categoryId}');
   /// ```
-  Future<void> subscribeToTopic(String topic);
+  Future<void> subscribeToTopic(String topic, {RepositoryOptions? options});
 
   /// Unsubscribe from a notification topic
   ///
@@ -112,13 +113,13 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// ```dart
   /// await repository.unsubscribeFromTopic('promotions');
   /// ```
-  Future<void> unsubscribeFromTopic(String topic);
+  Future<void> unsubscribeFromTopic(String topic, {RepositoryOptions? options});
 
   /// Get notification badge count
   ///
   /// Returns the current badge count (iOS) or notification count.
   /// Returns null if not supported by the platform.
-  Future<int?> getBadgeCount();
+  Future<int?> getBadgeCount({RepositoryOptions? options});
 
   /// Set notification badge count
   ///
@@ -130,12 +131,12 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// await repository.setBadgeCount(5); // Show 5
   /// await repository.setBadgeCount(0); // Clear badge
   /// ```
-  Future<void> setBadgeCount(int count);
+  Future<void> setBadgeCount(int count, {RepositoryOptions? options});
 
   /// Clear all notifications from the notification center
   ///
   /// Removes all notifications displayed in the system notification tray.
-  Future<void> clearAllNotifications();
+  Future<void> clearAllNotifications({RepositoryOptions? options});
 
   /// Send notification settings to backend (optional)
   ///
@@ -149,7 +150,10 @@ abstract class PushNotificationRepository extends CoreRepository {
   ///   enabledTypes: {'orders', 'promotions'},
   /// ));
   /// ```
-  Future<void> syncSettings(NotificationSettings settings) async {
+  Future<void> syncSettings(
+    NotificationSettings settings, {
+    RepositoryOptions? options,
+  }) async {
     // Optional: Override in implementation to sync with backend
     return;
   }
@@ -165,6 +169,7 @@ abstract class PushNotificationRepository extends CoreRepository {
   Future<List<PushNotification>> getNotificationHistory({
     int limit = 20,
     int offset = 0,
+    RepositoryOptions? options,
   }) async {
     // Optional: Override in implementation if provider supports history
     return [];
@@ -174,7 +179,10 @@ abstract class PushNotificationRepository extends CoreRepository {
   ///
   /// Track read status for notifications.
   /// Returns updated notification or null if not supported.
-  Future<PushNotification?> markAsRead(String notificationId) async {
+  Future<PushNotification?> markAsRead(
+    String notificationId, {
+    RepositoryOptions? options,
+  }) async {
     // Optional: Override in implementation if you want to track read status
     return null;
   }
@@ -182,7 +190,10 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// Delete a notification (optional)
   ///
   /// Remove a specific notification from history.
-  Future<void> deleteNotification(String notificationId) async {
+  Future<void> deleteNotification(
+    String notificationId, {
+    RepositoryOptions? options,
+  }) async {
     // Optional: Override in implementation
     return;
   }
@@ -193,7 +204,7 @@ abstract class PushNotificationRepository extends CoreRepository {
   /// this returns the notification that opened the app.
   ///
   /// Returns null if app was not launched from a notification.
-  Future<PushNotification?> getInitialNotification();
+  Future<PushNotification?> getInitialNotification({RepositoryOptions? options});
 
   /// Set foreground notification presentation options
   ///
@@ -211,6 +222,7 @@ abstract class PushNotificationRepository extends CoreRepository {
     bool showAlert = true,
     bool playSound = true,
     bool showBadge = true,
+    RepositoryOptions? options,
   }) async {
     // Optional: Override in implementation
     return;

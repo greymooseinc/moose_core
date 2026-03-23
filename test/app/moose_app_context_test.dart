@@ -403,55 +403,55 @@ class _StubAuthRepository extends AuthRepository {
   void initialize() {}
 
   @override
-  Future<AuthResult> signIn(AuthCredentials credentials) => throw UnimplementedError();
+  Future<AuthResult> signIn(AuthCredentials credentials, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
   Future<AuthResult> signUp(AuthCredentials credentials,
-      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata}) =>
+      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata, RepositoryOptions? options}) =>
       throw UnimplementedError();
   @override
-  Future<void> signOut() => throw UnimplementedError();
+  Future<void> signOut({RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<User?> getCurrentUser() => throw UnimplementedError();
+  Future<User?> getCurrentUser({RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<PasswordResetResult> sendPasswordResetEmail(String email) => throw UnimplementedError();
+  Future<PasswordResetResult> sendPasswordResetEmail(String email, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
   Future<PasswordResetResult> confirmPasswordReset(
-      {required String code, required String newPassword}) =>
+      {required String code, required String newPassword, RepositoryOptions? options}) =>
       throw UnimplementedError();
   @override
   Future<PasswordResetResult> changePassword(
-      {required String currentPassword, required String newPassword}) =>
+      {required String currentPassword, required String newPassword, RepositoryOptions? options}) =>
       throw UnimplementedError();
   @override
-  Future<void> sendEmailVerification() => throw UnimplementedError();
+  Future<void> sendEmailVerification({RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<EmailVerificationResult> verifyEmail(String code) => throw UnimplementedError();
+  Future<EmailVerificationResult> verifyEmail(String code, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<void> sendPhoneVerificationCode(String phoneNumber) => throw UnimplementedError();
+  Future<void> sendPhoneVerificationCode(String phoneNumber, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
   Future<EmailVerificationResult> verifyPhoneNumber(
-      {required String phoneNumber, required String verificationCode}) =>
+      {required String phoneNumber, required String verificationCode, RepositoryOptions? options}) =>
       throw UnimplementedError();
   @override
   Future<User> updateProfile(
-      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata}) =>
+      {String? displayName, String? photoUrl, Map<String, dynamic>? metadata, RepositoryOptions? options}) =>
       throw UnimplementedError();
   @override
-  Future<User> updateEmail(String newEmail) => throw UnimplementedError();
+  Future<User> updateEmail(String newEmail, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<void> deleteAccount() => throw UnimplementedError();
+  Future<void> deleteAccount({RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<String?> getIdToken({bool forceRefresh = false}) => throw UnimplementedError();
+  Future<String?> getIdToken({bool forceRefresh = false, RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<AuthResult> refreshToken(String refreshToken) => throw UnimplementedError();
+  Future<AuthResult> refreshToken(String refreshToken, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<AuthResult> linkCredential(AuthCredentials credentials) => throw UnimplementedError();
+  Future<AuthResult> linkCredential(AuthCredentials credentials, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<User> unlinkProvider(String providerId) => throw UnimplementedError();
+  Future<User> unlinkProvider(String providerId, {RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<void> enrollMFA({required String phoneNumber}) => throw UnimplementedError();
+  Future<void> enrollMFA({required String phoneNumber, RepositoryOptions? options}) => throw UnimplementedError();
   @override
-  Future<void> unenrollMFA() => throw UnimplementedError();
+  Future<void> unenrollMFA({RepositoryOptions? options}) => throw UnimplementedError();
 }
 
 class _MockPersistentCache extends PersistentCache {

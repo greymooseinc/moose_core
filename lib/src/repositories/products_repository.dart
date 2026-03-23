@@ -12,105 +12,120 @@ import '../entities/product_review_stats.dart';
 import '../entities/product_tag.dart';
 import '../entities/product_availability.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 abstract class ProductsRepository extends CoreRepository {
 
   Future<ProductListResult> getProducts({
     ProductFilters? filters,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<Product> getProductById(String id, {Duration? cacheTTL});
+  Future<Product> getProductById(String id, {RepositoryOptions? options});
 
   Future<List<Product>> getProductsByIds(
     List<String> ids, {
     bool includeVariations = false,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<List<Product>> getProductsBySKUs(List<String> skus, {Duration? cacheTTL});
+  Future<List<Product>> getProductsBySKUs(
+    List<String> skus, {
+    RepositoryOptions? options,
+  });
 
   Future<List<Category>> getCategories({
     String? parentId,
     bool hideEmpty = false,
     String? orderBy,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<Category> getCategoryById(String id, {Duration? cacheTTL});
+  Future<Category> getCategoryById(String id, {RepositoryOptions? options});
 
   Future<List<Collection>> getCollections({
     CollectionFilters? filters,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<List<ProductVariation>> getProductVariations(String productId, {Duration? cacheTTL});
+  Future<List<ProductVariation>> getProductVariations(
+    String productId, {
+    RepositoryOptions? options,
+  });
 
   Future<ProductVariation> getProductVariation(
     String productId,
     String variationId, {
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<List<ProductAttribute>> getProductAttributes(String productId, {Duration? cacheTTL});
+  Future<List<ProductAttribute>> getProductAttributes(
+    String productId, {
+    RepositoryOptions? options,
+  });
 
   Future<List<ProductReview>> getProductReviews(
     String productId, {
     int page = 1,
     int perPage = 10,
     String status = 'approved',
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<ProductReviewStats> getProductReviewStats(String productId, {Duration? cacheTTL});
+  Future<ProductReviewStats> getProductReviewStats(
+    String productId, {
+    RepositoryOptions? options,
+  });
 
   Future<List<Product>> getRelatedProducts(
     String productId, {
     int limit = 10,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
   Future<List<Product>> getUpsellProducts(
     String productId, {
     int limit = 5,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
   Future<List<Product>> getCrossSellProducts(
     String productId, {
     int limit = 5,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
   Future<List<Product>> getFrequentlyBoughtTogether(
     String productId, {
     int limit = 3,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
   Future<List<Product>> getFeaturedProducts({
     int limit = 10,
     String? categoryId,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
   Future<ProductStock> getProductStock(
     String productId, {
     String? variationId,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  Future<List<ProductTag>> getProductTags({Duration? cacheTTL});
+  Future<List<ProductTag>> getProductTags({RepositoryOptions? options});
 
-  Future<List<String>> getProductBrands({Duration? cacheTTL});
+  Future<List<String>> getProductBrands({RepositoryOptions? options});
 
   Future<ProductAvailability> validateProductAvailability({
     required String productId,
     required int quantity,
     String? variationId,
-    Duration? cacheTTL,
+    RepositoryOptions? options,
   });
 
-  /// Create a new product review
-  Future<ProductReview> createReview(ProductReview review);
+  Future<ProductReview> createReview(
+    ProductReview review, {
+    RepositoryOptions? options,
+  });
 }

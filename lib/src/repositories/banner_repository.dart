@@ -1,5 +1,6 @@
 import '../entities/promo_banner.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// Repository responsible for retrieving promotional banners and reporting
 /// engagement metrics (views/clicks) back to the backend.
@@ -14,11 +15,13 @@ abstract class BannerRepository extends CoreRepository {
     String? placement,
     String? locale,
     Map<String, dynamic>? filters,
+    RepositoryOptions? options,
   });
 
   /// Track when the user taps/clicks a banner.
   Future<void> trackBannerClick(
     String bannerId, {
     Map<String, dynamic>? metadata,
+    RepositoryOptions? options,
   });
 }

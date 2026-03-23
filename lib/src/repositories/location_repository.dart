@@ -2,6 +2,7 @@ import '../entities/address.dart';
 import '../entities/country.dart';
 import '../entities/postal_code.dart';
 import 'repository.dart';
+import 'repository_options.dart';
 
 /// Repository for location-based operations.
 ///
@@ -25,6 +26,7 @@ abstract class LocationRepository extends CoreRepository {
     required String query,
     String? countryCode,
     int limit = 10,
+    RepositoryOptions? options,
   });
 
   /// Get full address details from a place ID or address ID
@@ -37,6 +39,7 @@ abstract class LocationRepository extends CoreRepository {
   /// Returns complete Address with all available details
   Future<Address> getAddressDetails({
     required String placeId,
+    RepositoryOptions? options,
   });
 
   // ==================== Postal Code Lookup ====================
@@ -52,6 +55,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<PostalCode?> lookupPostalCode({
     required String postalCode,
     required String countryCode,
+    RepositoryOptions? options,
   });
 
   /// Validate a postal code format
@@ -65,6 +69,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<bool> validatePostalCode({
     required String postalCode,
     required String countryCode,
+    RepositoryOptions? options,
   });
 
   // ==================== Geolocation ====================
@@ -80,6 +85,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<Address?> getAddressFromCoordinates({
     required double latitude,
     required double longitude,
+    RepositoryOptions? options,
   });
 
   /// Get coordinates from an address (forward geocoding)
@@ -91,6 +97,7 @@ abstract class LocationRepository extends CoreRepository {
   /// Returns a map with 'latitude' and 'longitude' keys, or null if not found
   Future<Map<String, double>?> getCoordinatesFromAddress({
     required Address address,
+    RepositoryOptions? options,
   });
 
   // ==================== Countries ====================
@@ -106,6 +113,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<List<Country>> getCountries({
     bool shippingOnly = false,
     bool billingOnly = false,
+    RepositoryOptions? options,
   });
 
   /// Get country by code
@@ -115,6 +123,7 @@ abstract class LocationRepository extends CoreRepository {
   /// Returns Country entity, or null if not found
   Future<Country?> getCountry({
     required String countryCode,
+    RepositoryOptions? options,
   });
 
   /// Get states/provinces for a country
@@ -124,6 +133,7 @@ abstract class LocationRepository extends CoreRepository {
   /// Returns list of CountryState entities for the country
   Future<List<CountryState>> getStates({
     required String countryCode,
+    RepositoryOptions? options,
   });
 
   // ==================== Customer Addresses ====================
@@ -135,6 +145,7 @@ abstract class LocationRepository extends CoreRepository {
   /// Returns list of saved Address entities for the customer
   Future<List<Address>> getCustomerAddresses({
     required String customerId,
+    RepositoryOptions? options,
   });
 
   /// Get a specific customer address by ID
@@ -146,6 +157,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<Address?> getCustomerAddress({
     required String customerId,
     required String addressId,
+    RepositoryOptions? options,
   });
 
   /// Save a new address for a customer
@@ -157,6 +169,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<Address> saveCustomerAddress({
     required String customerId,
     required Address address,
+    RepositoryOptions? options,
   });
 
   /// Update an existing customer address
@@ -170,6 +183,7 @@ abstract class LocationRepository extends CoreRepository {
     required String customerId,
     required String addressId,
     required Address address,
+    RepositoryOptions? options,
   });
 
   /// Delete a customer address
@@ -181,6 +195,7 @@ abstract class LocationRepository extends CoreRepository {
   Future<bool> deleteCustomerAddress({
     required String customerId,
     required String addressId,
+    RepositoryOptions? options,
   });
 
   /// Set an address as the default for a customer
@@ -192,5 +207,6 @@ abstract class LocationRepository extends CoreRepository {
   Future<Address> setDefaultAddress({
     required String customerId,
     required String addressId,
+    RepositoryOptions? options,
   });
 }

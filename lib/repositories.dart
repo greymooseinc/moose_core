@@ -6,6 +6,7 @@ library repositories;
 
 // Base repository
 export 'src/repositories/repository.dart';
+export 'src/repositories/repository_options.dart';
 
 // Feature repositories
 export 'src/repositories/auth_repository.dart';
