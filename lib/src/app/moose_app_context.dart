@@ -261,7 +261,7 @@ class MooseAppContext {
   ///    persistent cache on cold start.
   final ValueNotifier<User?> currentUser = ValueNotifier(null);
 
-  /// Routes generated from the `pages` array in `environment.json`.
+  /// Routes generated from the `pages` object in `environment.json`.
   ///
   /// Populated by [MooseBootstrapper] after config is loaded, before any plugin
   /// is registered. These routes are merged into [PluginRegistry.getAllRoutes]

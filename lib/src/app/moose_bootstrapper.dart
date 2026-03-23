@@ -160,9 +160,9 @@ class MooseBootstrapper {
     // Step 1: Initialize configuration.
     appContext.configManager.initialize(config);
 
-    // Step 1b: Build page routes from the `pages` array in environment.json.
+    // Step 1b: Build page routes from the `pages` object in environment.json.
     //
-    // Each active entry with a non-empty `route` key maps to a PageScreen.
+    // Each active entry whose key is a non-empty route path maps to a PageScreen.
     // A fallback `/home` route is added when no page declares that route.
     // These routes are stored on appContext and merged into getAllRoutes().
     _registerPagesRoutes();
@@ -251,21 +251,29 @@ class MooseBootstrapper {
     );
   }
 
-  /// Reads the `pages` array from [ConfigManager] and populates
+  /// Reads the `pages` object from [ConfigManager] and populates
   /// [MooseAppContext.pagesRoutes] with a [PageScreen] builder per active entry.
+  ///
+  /// Format — object keyed by route path:
+  /// ```json
+  /// "pages": {
+  ///   "/home": { "active": true, "appBar": {}, "sections": [] }
+  /// }
+  /// ```
   ///
   /// A fallback `/home` route is added when no page entry claims that path.
   void _registerPagesRoutes() {
     final pages = appContext.configManager.get('pages');
     final routes = appContext.pagesRoutes;
 
-    if (pages is List) {
-      for (final entry in pages.whereType<Map>()) {
-        final e = entry.cast<String, dynamic>();
-        if (e['active'] == false) continue;
-        final route = e['route'] as String? ?? '';
+    if (pages is Map) {
+      for (final entry in pages.entries) {
+        final route = entry.key as String;
         if (route.isEmpty) continue;
-        final config = Map<String, dynamic>.from(e);
+        if (entry.value is! Map) continue;
+        final e = (entry.value as Map).cast<String, dynamic>();
+        if (e['active'] == false) continue;
+        final config = {'route': route, ...e};
         routes[route] = (_) => PageScreen(pageConfig: config);
       }
     }

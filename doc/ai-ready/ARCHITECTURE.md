@@ -63,7 +63,7 @@ class MooseAppContext {
   /// Also restored from PersistentCache on cold start by MooseBootstrapper.
   final ValueNotifier<User?> currentUser;
 
-  /// Routes built from the 'pages' array in environment.json.
+  /// Routes built from the 'pages' object in environment.json.
   /// Populated by MooseBootstrapper (Step 1b) before any plugin runs.
   /// Pass to PluginRegistry.getAllRoutes(extraRoutes: appContext.pagesRoutes).
   final Map<String, WidgetBuilder> pagesRoutes;
@@ -131,8 +131,8 @@ Step 1   configManager.initialize(config)
          ↓ loads environment.json / config map
 
 Step 1b  MooseBootstrapper._registerPagesRoutes()
-         ↓ reads top-level 'pages' array from config
-         ↓ → each active entry with a non-empty 'route' key → PageScreen(pageConfig: config)
+         ↓ reads top-level 'pages' object from config (key = route path)
+         ↓ → each active entry → PageScreen(pageConfig: {route: key, ...value})
          ↓ → stored in appContext.pagesRoutes; passed to PluginRegistry.getAllRoutes() at startup
          ↓ → '/home' fallback added if no page entry claims it
 
@@ -897,9 +897,8 @@ AppNavigator.pop(context);
       "settings": {}
     }
   },
-  "pages": [
-    {
-      "route": "/home",
+  "pages": {
+    "/home": {
       "active": true,
       "appBar": {
         "title": "Home",
@@ -910,7 +909,7 @@ AppNavigator.pop(context);
         { "name": "products.featured", "active": true, "settings": { "title": "Hot Picks" } }
       ]
     }
-  ],
+  },
   "theme": "default"
 }
 ```

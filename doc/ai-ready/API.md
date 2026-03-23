@@ -60,7 +60,7 @@ class MooseAppContext {
   final AppLogger logger;
   final CacheManager cache;   // NOTE: field is 'cache', not 'cacheManager'
 
-  // Routes generated from environment.json 'pages' array.
+  // Routes generated from environment.json 'pages' object (key = route path).
   // Populated by MooseBootstrapper (Step 1b). Pass to getAllRoutes(extraRoutes: ...).
   final Map<String, WidgetBuilder> pagesRoutes;
 
@@ -170,7 +170,7 @@ class MooseBootstrapper {
 **Bootstrap sequence:**
 
 1. `configManager.initialize(config)` — loads the config map
-1b. `_registerPagesRoutes()` — reads top-level `pages` array from config; builds `PageScreen` route entries into `appContext.pagesRoutes`; adds `/home` fallback if absent
+1b. `_registerPagesRoutes()` — reads top-level `pages` object from config (key = route path); builds `PageScreen` route entries into `appContext.pagesRoutes`; adds `/home` fallback if absent
 0. Resolve active `MooseTheme` — reads `config['theme']`, wires `theme:palette_*` and `styles:*` hooks
 2. `cache.initPersistent()` — initializes `SharedPreferences` layer
 2b. `appContext.restoreAuthState()` — restores last-known user from persistent cache (instant UI on first frame)
