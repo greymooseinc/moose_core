@@ -5,6 +5,35 @@ All notable changes to moose_core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`environment.json` — array format for top-level keys:** `"adapters"`, `"plugins"`, `"pages"`, and `"tabs"` are now arrays instead of maps. Each entry carries an explicit `"id"` (or `"route"` for pages) field. `ConfigManager.initialize()` normalises each array into the keyed-map format internally via the new `_normalizeArrays()` method, so all downstream code (`getSetting`, `initializeFromConfig`, `WidgetRegistry.getSections`, `_registerPagesRoutes`, `BottomTabsPlugin.bottomTabs`) continues to work without modification. Plugin-owned pages use a `"plugin"` field instead of the legacy `"plugin:<name>:<route>"` map key — the normaliser reconstructs the key automatically.
+
+  New format:
+  ```json
+  {
+    "adapters": [
+      { "id": "woocommerce", "active": true, "settings": { "baseUrl": "...", "consumerKey": "...", "consumerSecret": "..." } }
+    ],
+    "plugins": [
+      { "id": "products", "active": true, "settings": { "cache": { "productsTTL": 300 } } }
+    ],
+    "pages": [
+      { "route": "/home", "active": true, "sections": [] },
+      { "route": "/products/item", "plugin": "products", "active": true, "sections": [] }
+    ],
+    "tabs": [
+      { "id": "home", "label": "Home", "icon": "home_outlined", "route": "/home", "order": 0, "enabled": true }
+    ]
+  }
+  ```
+
+- **`BackendAdapter.initializeFromConfig()` — envelope config format:** Adapters in `environment.json` can now use an `active`/`settings` envelope (matching the plugin block structure). When a `settings` key is present in the adapter block, `initializeFromConfig()` unwraps the inner map before passing it to `initialize()`. The legacy flat format (settings at the top level of the adapter block) remains fully supported for backwards compatibility — no adapter implementation changes are required.
+
+---
+
 ## [2.3.0] - 2026-03-19
 
 ### Changed

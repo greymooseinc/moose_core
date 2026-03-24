@@ -108,8 +108,12 @@ abstract class BackendAdapter {
   Future<void> initialize(Map<String, dynamic> config);
 
   /// Called automatically by AdapterRegistry (via MooseBootstrapper).
-  /// Reads adapters.<name> from environment.json, validates against configSchema,
-  /// then calls initialize(). The configManager parameter is required — no global fallback.
+  /// Reads the adapter entry from the `"adapters"` array in environment.json
+  /// (matched by `id == name`). ConfigManager normalises the array to a keyed
+  /// map before this runs. Supports the envelope format
+  /// ({ active, settings: {...} }) and the legacy flat format — unwraps
+  /// settings automatically before validating against configSchema and calling
+  /// initialize(). The configManager parameter is required — no global fallback.
   Future<void> initializeFromConfig({required ConfigManager configManager});
 
   /// Validates config against configSchema. Called automatically inside
@@ -374,28 +378,37 @@ if (!report.succeeded) {
 
 ```json
 {
-  "adapters": {
-    "woocommerce": {
-      "baseUrl": "https://mystore.example.com",
-      "consumerKey": "ck_xxxxxxxxxxxx",
-      "consumerSecret": "cs_xxxxxxxxxxxx",
-      "apiVersion": "wc/v3",
-      "timeout": 30
+  "adapters": [
+    {
+      "id": "woocommerce",
+      "active": true,
+      "settings": {
+        "baseUrl": "https://mystore.example.com",
+        "consumerKey": "ck_xxxxxxxxxxxx",
+        "consumerSecret": "cs_xxxxxxxxxxxx",
+        "apiVersion": "wc/v3",
+        "timeout": 30
+      }
     },
-    "fcm": {
-      "projectId": "my-firebase-project"
+    {
+      "id": "fcm",
+      "active": true,
+      "settings": {
+        "projectId": "my-firebase-project"
+      }
     }
-  },
-  "plugins": {
-    "products": {
+  ],
+  "plugins": [
+    {
+      "id": "products",
       "active": true,
       "settings": {}
     }
-  }
+  ]
 }
 ```
 
-The framework validates `adapters.woocommerce` against `WooCommerceAdapter.configSchema` automatically before calling `initialize()`.
+`ConfigManager.initialize()` normalises the `"adapters"` array to a keyed map before `initializeFromConfig()` runs. The framework then validates the unwrapped settings map against `WooCommerceAdapter.configSchema` automatically before calling `initialize()`.
 
 ---
 

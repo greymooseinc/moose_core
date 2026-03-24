@@ -611,15 +611,35 @@ abstract class BackendAdapter {
   /// - [ArgumentError]: If [configManager] is null.
   /// - [Exception]: If configuration is not found or validation fails.
   ///
-  /// **Example:**
-  /// ```dart
-  /// // In environment.json:
-  /// // {
-  /// //   "adapters": {
-  /// //     "shopify": { "storeUrl": "...", "token": "..." },
-  /// //   }
-  /// // }
+  /// **Config format (array — canonical):**
   ///
+  /// `environment.json` uses an array for `"adapters"`. Each entry carries an
+  /// `"id"` field that must match [name]. Wrap settings in a `"settings"` key
+  /// alongside an optional `"active"` flag:
+  ///
+  /// ```json
+  /// {
+  ///   "adapters": [
+  ///     {
+  ///       "id": "shopify",
+  ///       "active": true,
+  ///       "settings": { "storeUrl": "...", "storefrontAccessToken": "..." }
+  ///     }
+  ///   ]
+  /// }
+  /// ```
+  ///
+  /// `ConfigManager.initialize()` normalises the array into a keyed map
+  /// (`{ "shopify": { "active": true, "settings": {...} } }`) before this
+  /// method runs — adapter implementations do not need to handle the array
+  /// directly. When a `settings` key is present, this method unwraps the inner
+  /// map before passing it to [initialize] — adapter `initialize()`
+  /// implementations are identical for both formats.
+  ///
+  /// The legacy flat format (settings at the top level with no `settings` key)
+  /// is still accepted for backwards compatibility.
+  ///
+  /// ```dart
   /// // Called automatically by AdapterRegistry when autoInitialize: true:
   /// await adapter.initializeFromConfig(configManager: appContext.configManager);
   /// ```
@@ -646,7 +666,15 @@ abstract class BackendAdapter {
           'Available adapters: ${adaptersConfig.keys.join(", ")}'
         );
       }
-      final adapterConfig = Map<String, dynamic>.from(rawAdapterConfig as Map);
+      final adapterBlock = Map<String, dynamic>.from(rawAdapterConfig as Map);
+
+      // Support both the legacy flat format and the new `active`/`settings`
+      // envelope format. When a `settings` key is present the inner map is
+      // used; otherwise the entire block is treated as the settings map for
+      // backwards compatibility.
+      final adapterConfig = adapterBlock.containsKey('settings')
+          ? Map<String, dynamic>.from(adapterBlock['settings'] as Map)
+          : adapterBlock;
 
       // Validate configuration against schema
       validateConfig(adapterConfig);

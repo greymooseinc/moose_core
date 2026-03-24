@@ -14,6 +14,7 @@ import '../repositories/auth_repository.dart';
 import '../repositories/repository.dart';
 import '../utils/logger.dart';
 import '../widgets/widget_registry.dart';
+import 'page_screen.dart';
 
 /// The dependency-injection container for a running moose_core application.
 ///
@@ -412,6 +413,55 @@ class MooseAppContext {
     await adapterRegistry.signOutAll();
     currentUser.value = null;
     await cache.persistent.remove(_kCurrentUserCacheKey);
+  }
+
+  /// Reloads the app configuration at runtime without restarting the app.
+  ///
+  /// Orchestrates a full plugin re-init cycle using [newConfig]:
+  ///
+  /// 1. Stops all plugins in reverse registration order via [PluginRegistry.stopAll].
+  /// 2. Re-initializes [ConfigManager] with [newConfig].
+  /// 3. Re-populates [pagesRoutes] from the new config's `pages` key.
+  /// 4. Re-initializes all plugins sequentially via [PluginRegistry.initAll].
+  /// 5. Re-starts all plugins sequentially via [PluginRegistry.startAll].
+  ///
+  /// Visible screens are not interrupted — widgets react to changes the next
+  /// time their BLoC or section rebuilds. To show a blocking overlay during
+  /// reload, subscribe to `config:before_refresh` / `config:refreshed` events
+  /// on [eventBus] from a UI plugin.
+  ///
+  /// Typically called by `ConfigRefreshPlugin` after it has downloaded and
+  /// persisted a new `environment.json`. Callers are responsible for firing
+  /// the `config:refreshed` event after this method returns.
+  Future<void> reloadConfig(Map<String, dynamic> newConfig) async {
+    await pluginRegistry.stopAll();
+    configManager.initialize(newConfig);
+    _rebuildPagesRoutes(newConfig);
+    await pluginRegistry.initAll();
+    await pluginRegistry.startAll();
+  }
+
+  /// Re-populates [pagesRoutes] from the `pages` key in [config].
+  ///
+  /// Mirrors the logic in [MooseBootstrapper._registerPagesRoutes] but operates
+  /// on an already-running context. Clears the existing routes map before
+  /// rebuilding so stale entries from the previous config are removed.
+  void _rebuildPagesRoutes(Map<String, dynamic> config) {
+    pagesRoutes.clear();
+    final pages = config['pages'];
+    if (pages is Map) {
+      for (final entry in pages.entries) {
+        final key = entry.key as String;
+        if (key.isEmpty || key.startsWith('plugin:')) continue;
+        if (entry.value is! Map) continue;
+        final e = (entry.value as Map).cast<String, dynamic>();
+        if (e['active'] == false) continue;
+        pagesRoutes[key] = (_) => PageScreen(pageConfig: {'route': key, ...e});
+      }
+    }
+    if (!pagesRoutes.containsKey('/home')) {
+      pagesRoutes['/home'] = (_) => const PageScreen(pageConfig: {});
+    }
   }
 
   /// Releases all resources owned by this context.

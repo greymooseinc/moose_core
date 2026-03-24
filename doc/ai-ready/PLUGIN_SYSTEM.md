@@ -320,10 +320,13 @@ if (!report.succeeded) {
 
 ### environment.json structure
 
+`"plugins"` is a top-level array. Each entry carries an `"id"` that must match the plugin's `name` getter. `ConfigManager.initialize()` normalises the array into a keyed map before any plugin code runs — `getSetting<T>()` paths are unchanged.
+
 ```json
 {
-  "plugins": {
-    "products": {
+  "plugins": [
+    {
+      "id": "products",
       "active": true,
       "settings": {
         "perPage": 20,
@@ -350,10 +353,11 @@ if (!report.succeeded) {
         ]
       }
     },
-    "analytics": {
+    {
+      "id": "analytics",
       "active": false
     }
-  }
+  ]
 }
 ```
 
@@ -429,25 +433,21 @@ List<BottomTab> get bottomTabs => const [
 
 ### Tab order and enablement via environment.json
 
-Order and visibility are configuration, not code. Adjust them in environment.json without touching any plugin:
+Tabs are defined in the top-level `"tabs"` array. Order and visibility are configuration — no plugin code changes needed.
 
 ```json
 {
-  "plugins": {
-    "bottom_tabs": {
-      "settings": {
-        "tabs": [
-          { "id": "home",     "order": 10,  "enabled": true  },
-          { "id": "products", "order": 30,  "enabled": true  },
-          { "id": "search",   "order": 50,  "enabled": true  },
-          { "id": "cart",     "order": 80,  "enabled": true  },
-          { "id": "profile",  "order": 100, "enabled": false }
-        ]
-      }
-    }
-  }
+  "tabs": [
+    { "id": "home",     "label": "Home",     "icon": "home_outlined",          "activeIcon": "home",          "route": "/home",     "order": 0,   "enabled": true  },
+    { "id": "products", "label": "Shop",     "icon": "shopping_bag_outlined",  "activeIcon": "shopping_bag",  "route": "/products", "order": 1,   "enabled": true  },
+    { "id": "search",   "label": "Search",   "icon": "search_outlined",        "activeIcon": "search",        "route": "/search",   "order": 2,   "enabled": true  },
+    { "id": "cart",     "label": "Cart",     "icon": "shopping_cart_outlined", "activeIcon": "shopping_cart", "route": "/cart",     "order": 3,   "enabled": true  },
+    { "id": "profile",  "label": "Profile",  "icon": "person_outline",         "activeIcon": "person",        "route": "/profile",  "order": 4,   "enabled": false }
+  ]
 }
 ```
+
+`BottomTabsPlugin` reads the normalised map from `ConfigManager` and sorts by `"order"`. Plugin `bottomTabs` overrides are still supported but tab definitions in `environment.json` are the recommended approach.
 
 ### Runtime conditional tabs (using a hook)
 

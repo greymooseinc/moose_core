@@ -23,11 +23,17 @@ import '../app/moose_app_context.dart';
 /// 7. **Stop**: onStop() is called during app teardown
 ///
 /// ## Configuration:
-/// Plugins can be configured in environment.json under the `plugins` key:
+/// Plugins are configured in `environment.json` under the top-level `"plugins"`
+/// array. Each entry carries an `"id"` matching the plugin's [name], plus
+/// optional `"active"`, `"settings"`, and `"sections"` keys.
+/// `ConfigManager.initialize()` normalises the array into a keyed map
+/// internally, so [getSetting] continues to work without changes.
+///
 /// ```json
 /// {
-///   "plugins": {
-///     "products": {
+///   "plugins": [
+///     {
+///       "id": "products",
 ///       "active": true,
 ///       "settings": {
 ///         "cache": {
@@ -39,7 +45,7 @@ import '../app/moose_app_context.dart';
 ///         "main": [...]
 ///       }
 ///     }
-///   }
+///   ]
 /// }
 /// ```
 ///

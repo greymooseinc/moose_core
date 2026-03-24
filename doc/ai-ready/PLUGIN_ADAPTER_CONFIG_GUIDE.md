@@ -165,15 +165,10 @@ plugins:cart:settings:checkout:requirePhone
 
 ```json
 {
-  "plugins": {
-    "products": {
-      "active": true,
-      "settings": { ... }
-    },
-    "reviews": {
-      "active": false
-    }
-  }
+  "plugins": [
+    { "id": "products", "active": true, "settings": { ... } },
+    { "id": "reviews", "active": false }
+  ]
 }
 ```
 
@@ -297,37 +292,58 @@ adapters:onesignal:debug
 
 ### Adapter config in environment.json
 
+`"adapters"` is a top-level array. Each entry must have an `"id"` field that exactly matches `adapter.name`, an optional `"active"` flag, and a `"settings"` envelope containing the actual config values. `ConfigManager.initialize()` normalises the array to a keyed map before `initializeFromConfig()` runs.
+
 ```json
 {
-  "adapters": {
-    "woocommerce": {
-      "baseUrl": "https://mystore.example.com",
-      "consumerKey": "ck_xxxxxxxxxxxx",
-      "consumerSecret": "cs_xxxxxxxxxxxx"
+  "adapters": [
+    {
+      "id": "woocommerce",
+      "active": true,
+      "settings": {
+        "baseUrl": "https://mystore.example.com",
+        "consumerKey": "ck_xxxxxxxxxxxx",
+        "consumerSecret": "cs_xxxxxxxxxxxx"
+      }
     },
-    "shopify": {
-      "storeUrl": "mystore.myshopify.com",
-      "storefrontAccessToken": "xxxxxxxxxxxx"
+    {
+      "id": "shopify",
+      "active": true,
+      "settings": {
+        "storeUrl": "mystore.myshopify.com",
+        "storefrontAccessToken": "xxxxxxxxxxxx"
+      }
     }
-  }
+  ]
 }
 ```
 
-The key under `adapters` must exactly match `adapter.name`.
+The legacy flat format (settings at the top level of the adapter block, without a `settings` key) is still accepted for backwards compatibility. `initializeFromConfig()` detects which format is in use: when a `settings` key is present, it unwraps the inner map before passing it to `initialize()` — so adapter implementation code is identical for both formats.
 
 ---
 
 ## Full environment.json Structure
 
+`"adapters"`, `"plugins"`, `"pages"`, and `"tabs"` are top-level arrays. `ConfigManager.initialize()` normalises each to a keyed map before any plugin or adapter code runs. `"sections"` inside plugin/page entries remain objects (not arrays).
+
 ```json
 {
-  "adapters": {
-    "<adapter.name>": {
-      "<key>": "<value>"
+  "version": "1.0.0",
+  "theme": "default",
+
+  "adapters": [
+    {
+      "id": "<adapter.name>",
+      "active": true,
+      "settings": {
+        "<key>": "<value>"
+      }
     }
-  },
-  "plugins": {
-    "<plugin.name>": {
+  ],
+
+  "plugins": [
+    {
+      "id": "<plugin.name>",
       "active": true,
       "settings": {
         "<key>": "<value>"
@@ -343,7 +359,34 @@ The key under `adapters` must exactly match `adapter.name`.
         ]
       }
     }
-  }
+  ],
+
+  "pages": [
+    {
+      "route": "<path>",
+      "active": true,
+      "appBar": { "title": "...", "buttonsLeft": [], "buttonsRight": [] },
+      "sections": []
+    },
+    {
+      "route": "<path>",
+      "plugin": "<plugin.name>",
+      "active": true,
+      "sections": []
+    }
+  ],
+
+  "tabs": [
+    {
+      "id": "<tab_id>",
+      "label": "...",
+      "icon": "...",
+      "activeIcon": "...",
+      "route": "<path>",
+      "order": 0,
+      "enabled": true
+    }
+  ]
 }
 ```
 
@@ -455,8 +498,9 @@ Corresponding environment.json:
 
 ```json
 {
-  "plugins": {
-    "products": {
+  "plugins": [
+    {
+      "id": "products",
       "active": true,
       "settings": {
         "cache": {
@@ -467,7 +511,7 @@ Corresponding environment.json:
         }
       }
     }
-  }
+  ]
 }
 ```
 
@@ -529,13 +573,17 @@ Corresponding environment.json:
 
 ```json
 {
-  "adapters": {
-    "woocommerce": {
-      "baseUrl": "https://mystore.example.com",
-      "consumerKey": "ck_xxxxxxxxxxxx",
-      "consumerSecret": "cs_xxxxxxxxxxxx"
+  "adapters": [
+    {
+      "id": "woocommerce",
+      "active": true,
+      "settings": {
+        "baseUrl": "https://mystore.example.com",
+        "consumerKey": "ck_xxxxxxxxxxxx",
+        "consumerSecret": "cs_xxxxxxxxxxxx"
+      }
     }
-  }
+  ]
 }
 ```
 
@@ -552,8 +600,8 @@ Corresponding environment.json:
 | `getDefaultSettings()` | Optional but recommended | Optional but recommended |
 | Defaults auto-registered | Yes, by `PluginRegistry` | Yes, by `AdapterRegistry` |
 | Preferred access method | `getSetting<T>(key)` | `config` map in `initialize()` |
-| ConfigManager path prefix | `plugins:<name>:settings:` | `adapters:<name>:` (no `settings`) |
-| Activation flag | `plugins:<name>:active` (default true) | N/A |
+| ConfigManager path prefix | `plugins:<name>:settings:` | `adapters:<name>:settings:` |
+| Activation flag | `plugins:<name>:active` (default true) | `adapters:<name>:active` (informational — not enforced by framework) |
 | `additionalProperties: false` | Optional | Recommended |
 
 ---

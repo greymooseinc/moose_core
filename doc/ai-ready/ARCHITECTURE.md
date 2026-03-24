@@ -308,10 +308,13 @@ class ProductsPlugin extends FeaturePlugin {
 
 ### Plugin Configuration (environment.json)
 
+`"plugins"` is a top-level array. Each entry requires an `"id"` matching the plugin's `name` getter. `ConfigManager.initialize()` normalises the array to a keyed map before any plugin code runs.
+
 ```json
 {
-  "plugins": {
-    "products": {
+  "plugins": [
+    {
+      "id": "products",
       "active": true,
       "settings": {
         "cache": { "productsTTL": 600 },
@@ -327,7 +330,7 @@ class ProductsPlugin extends FeaturePlugin {
         ]
       }
     }
-  }
+  ]
 }
 ```
 
@@ -465,15 +468,21 @@ class WooCommerceAdapter extends BackendAdapter {
 
 **Adapter configuration in `environment.json`:**
 
+`"adapters"` is a top-level array. Each entry carries an `"id"` matching the adapter's `name` getter. Settings are wrapped in a `"settings"` envelope.
+
 ```json
 {
-  "adapters": {
-    "woocommerce": {
-      "baseUrl": "https://mystore.com/wp-json/wc/v3",
-      "consumerKey": "ck_xxx",
-      "consumerSecret": "cs_xxx"
+  "adapters": [
+    {
+      "id": "woocommerce",
+      "active": true,
+      "settings": {
+        "baseUrl": "https://mystore.com/wp-json/wc/v3",
+        "consumerKey": "ck_xxx",
+        "consumerSecret": "cs_xxx"
+      }
     }
-  }
+  ]
 }
 ```
 
@@ -713,14 +722,18 @@ data: {'settings': sectionSettings, ...extraData}
 
 Sections access injected values via `data['product']`, `data['selectedVariation']`, etc., and static config via `data['settings']`.
 
-**Plugin-owned page config (`plugin:<name>:<route>`)** — when a plugin needs config-driven layout but also controls the route (e.g. to wrap a BLoC), use a `plugin:` prefixed key. The bootstrapper skips route registration for it; the plugin reads the config manually:
+**Plugin-owned page config** — when a plugin needs config-driven layout but also controls the route (e.g. to wrap a BLoC), add a `"plugin"` field to the page entry. `ConfigManager` normalises this to the key `plugin:<name>:<route>` internally; the bootstrapper skips route registration for it and the plugin reads the config via that key:
 
 ```json
-"pages": {
-  "plugin:products:/product": {
-    "sections": [...],
-    "bottomBar": { "name": "product.detail.action_bar" }
-  }
+{
+  "pages": [
+    {
+      "route": "/product",
+      "plugin": "products",
+      "sections": [],
+      "bottomBar": { "name": "product.detail.action_bar" }
+    }
+  ]
 }
 ```
 
@@ -921,18 +934,29 @@ AppNavigator.pop(context);
 
 ## Configuration File Structure
 
+`"adapters"`, `"plugins"`, `"pages"`, and `"tabs"` are all top-level arrays. `ConfigManager.initialize()` normalises each array to a keyed map before any plugin or adapter code runs — all downstream paths (`getSetting`, `initializeFromConfig`, `WidgetRegistry.getSections`, `_registerPagesRoutes`) remain unchanged.
+
 ```json
 {
-  "adapters": {
-    "woocommerce": {
-      "baseUrl": "https://mystore.com/wp-json/wc/v3",
-      "consumerKey": "ck_xxx",
-      "consumerSecret": "cs_xxx",
-      "timeout": 30
+  "version": "1.0.0",
+  "theme": "default",
+
+  "adapters": [
+    {
+      "id": "woocommerce",
+      "active": true,
+      "settings": {
+        "baseUrl": "https://mystore.com/wp-json/wc/v3",
+        "consumerKey": "ck_xxx",
+        "consumerSecret": "cs_xxx",
+        "timeout": 30
+      }
     }
-  },
-  "plugins": {
-    "products": {
+  ],
+
+  "plugins": [
+    {
+      "id": "products",
       "active": true,
       "settings": {
         "cache": { "productsTTL": 300 },
@@ -952,13 +976,16 @@ AppNavigator.pop(context);
         ]
       }
     },
-    "cart": {
+    {
+      "id": "cart",
       "active": true,
       "settings": {}
     }
-  },
-  "pages": {
-    "/home": {
+  ],
+
+  "pages": [
+    {
+      "route": "/home",
       "active": true,
       "appBar": {
         "title": "Home",
@@ -969,8 +996,11 @@ AppNavigator.pop(context);
         { "name": "products.featured", "active": true, "settings": { "title": "Hot Picks" } }
       ]
     }
-  },
-  "theme": "default"
+  ],
+
+  "tabs": [
+    { "id": "home", "label": "Home", "icon": "home_outlined", "activeIcon": "home", "route": "/home", "order": 0, "enabled": true }
+  ]
 }
 ```
 
