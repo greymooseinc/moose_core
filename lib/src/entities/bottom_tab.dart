@@ -157,6 +157,21 @@ class BottomTab {
         return Icons.more_horiz;
       case 'more_vert':
         return Icons.more_vert;
+      case 'shopping_cart':
+      case 'shopping_cart_outlined':
+        return Icons.shopping_cart_outlined;
+      case 'shopping_cart_filled':
+        return Icons.shopping_cart;
+      case 'auto_awesome':
+      case 'auto_awesome_outlined':
+        return Icons.auto_awesome_outlined;
+      case 'auto_awesome_filled':
+        return Icons.auto_awesome;
+      case 'new_releases':
+      case 'new_releases_outlined':
+        return Icons.new_releases_outlined;
+      case 'new_releases_filled':
+        return Icons.new_releases;
       default:
         return Icons.home_outlined;
     }
@@ -183,6 +198,12 @@ class BottomTab {
     if (icon == Icons.menu) return 'menu';
     if (icon == Icons.more_horiz) return 'more_horiz';
     if (icon == Icons.more_vert) return 'more_vert';
+    if (icon == Icons.shopping_cart_outlined) return 'shopping_cart_outlined';
+    if (icon == Icons.shopping_cart) return 'shopping_cart_filled';
+    if (icon == Icons.auto_awesome_outlined) return 'auto_awesome_outlined';
+    if (icon == Icons.auto_awesome) return 'auto_awesome_filled';
+    if (icon == Icons.new_releases_outlined) return 'new_releases_outlined';
+    if (icon == Icons.new_releases) return 'new_releases_filled';
     return 'home_outlined';
   }
 }
