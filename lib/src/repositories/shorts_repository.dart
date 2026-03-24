@@ -19,15 +19,21 @@ import '../entities/short.dart';
 ///     int page = 1,
 ///     int perPage = 20,
 ///     String? status,
+///     String? placement,
 ///     Map<String, dynamic>? filters,
+///     RepositoryOptions? options,
 ///   }) async {
+///     final queryParams = {'page': page, 'per_page': perPage};
+///     if (status != null) queryParams['status'] = status;
+///     if (placement != null) queryParams['placement'] = placement;
+///     if (filters != null) queryParams.addAll(filters);
 ///     // Fetch from WordPress REST API with post_type=shorts
 ///     final response = await http.get(...);
 ///     return PaginatedResult<Short>(...);
 ///   }
 ///
 ///   @override
-///   Future<Short> getShortById(String id) async {
+///   Future<Short> getShortById(String id, {RepositoryOptions? options}) async {
 ///     final response = await http.get('/wp-json/wp/v2/shorts/$id');
 ///     return Short.fromJson(response.data);
 ///   }
@@ -41,6 +47,9 @@ abstract class ShortsRepository extends CoreRepository {
   /// - [page]: Current page number (1-indexed)
   /// - [perPage]: Number of items per page
   /// - [status]: Filter by publication status ('publish', 'draft', etc.)
+  /// - [placement]: Optional placement key passed to the backend as a query
+  ///   parameter (e.g. 'home', 'product', 'sale'). Use this to serve different
+  ///   shorts in different locations. Omit to fetch all shorts regardless of placement.
   /// - [filters]: Additional adapter-specific filters
   ///   - 'category': Filter by category ID or slug
   ///   - 'tag': Filter by tag ID or slug
@@ -48,6 +57,7 @@ abstract class ShortsRepository extends CoreRepository {
   ///   - 'search': Search query string
   ///   - 'sortBy': Sort field ('date', 'title', 'order', etc.)
   ///   - 'sortOrder': Sort direction ('asc' or 'desc')
+  /// - [options]: Repository options (e.g. [RepositoryOptions.forceRefresh])
   ///
   /// Returns a [PaginatedResult] containing shorts and pagination metadata.
   Future<PaginatedResult<Short>> getShorts({
