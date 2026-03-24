@@ -54,6 +54,7 @@ abstract class ShortsRepository extends CoreRepository {
     int page = 1,
     int perPage = 20,
     String? status,
+    String? placement,
     Map<String, dynamic>? filters,
     RepositoryOptions? options,
   });
