@@ -254,10 +254,26 @@ class MooseBootstrapper {
   /// Reads the `pages` object from [ConfigManager] and populates
   /// [MooseAppContext.pagesRoutes] with a [PageScreen] builder per active entry.
   ///
-  /// Format — object keyed by route path:
+  /// ## Auto-route pages
+  ///
+  /// Keys that are plain route paths register a [PageScreen] route automatically:
+  ///
   /// ```json
   /// "pages": {
   ///   "/home": { "active": true, "appBar": {}, "sections": [] }
+  /// }
+  /// ```
+  ///
+  /// ## Plugin-owned pages (`plugin:<name>:<route>`)
+  ///
+  /// Keys prefixed with `plugin:` are **config-only** entries — the bootstrapper
+  /// skips route registration for them. The owning plugin declares the route in
+  /// its `getRoutes()` (typically wrapping a BLoC or other stateful setup), and
+  /// reads the layout config via `configManager.get('pages')['plugin:name:/route']`.
+  ///
+  /// ```json
+  /// "pages": {
+  ///   "plugin:products:/product": { "sections": [...], "bottomBar": {...} }
   /// }
   /// ```
   ///
@@ -268,13 +284,18 @@ class MooseBootstrapper {
 
     if (pages is Map) {
       for (final entry in pages.entries) {
-        final route = entry.key as String;
-        if (route.isEmpty) continue;
+        final key = entry.key as String;
+        if (key.isEmpty) continue;
         if (entry.value is! Map) continue;
+        // Keys prefixed with "plugin:" (e.g. "plugin:products:/product") are
+        // plugin-owned routes. The bootstrapper stores their config for plugin
+        // code to read but does NOT register an auto PageScreen route for them
+        // — the owning plugin's getRoutes() is responsible for the route.
+        if (key.startsWith('plugin:')) continue;
         final e = (entry.value as Map).cast<String, dynamic>();
         if (e['active'] == false) continue;
-        final config = {'route': route, ...e};
-        routes[route] = (_) => PageScreen(pageConfig: config);
+        final config = {'route': key, ...e};
+        routes[key] = (_) => PageScreen(pageConfig: config);
       }
     }
 

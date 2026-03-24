@@ -685,6 +685,66 @@ Widget build(BuildContext context) {
 
 `buildSectionGroup` reads `plugins:home:sections:main` from `ConfigManager`, filters to `active: true` items, and invokes each registered builder with that section's `settings`.
 
+### PageScreen: Config-driven Screens with Live Data
+
+`PageScreen` is the widget rendered for every `pages` entry in `environment.json`. It reads `sections`, `appBar`, and `bottomBar` from the page config and builds them via `WidgetRegistry`.
+
+**Static sections (no live data)** — the bootstrapper handles this automatically. Sections receive only `data['settings']` from their JSON config.
+
+**Live data injection via `dataProvider`** — use when a screen's sections need runtime values (e.g. a product loaded by a BLoC). Construct `PageScreen` manually in your plugin route:
+
+```dart
+// In a plugin's getRoutes() / WidgetBuilder:
+PageScreen(
+  pageConfig: context.moose.configManager.get('pages')['/product']
+      as Map<String, dynamic>? ?? {},
+  dataProvider: (_) => {
+    'product': state.product,
+    'selectedVariation': state.selectedVariation,
+  },
+)
+```
+
+`dataProvider` is called **once per `build()`** and its result is shallow-merged into every section's `data` map:
+
+```dart
+data: {'settings': sectionSettings, ...extraData}
+```
+
+Sections access injected values via `data['product']`, `data['selectedVariation']`, etc., and static config via `data['settings']`.
+
+**Plugin-owned page config (`plugin:<name>:<route>`)** — when a plugin needs config-driven layout but also controls the route (e.g. to wrap a BLoC), use a `plugin:` prefixed key. The bootstrapper skips route registration for it; the plugin reads the config manually:
+
+```json
+"pages": {
+  "plugin:products:/product": {
+    "sections": [...],
+    "bottomBar": { "name": "product.detail.action_bar" }
+  }
+}
+```
+
+```dart
+// In the plugin route (or ProductDetailView):
+final pages = context.moose.configManager.get('pages');
+final pageConfig = (pages as Map)['plugin:products:/product']
+    as Map<String, dynamic>? ?? {};
+return PageScreen(pageConfig: pageConfig, dataProvider: ...);
+```
+
+**`bottomBar` config key** — renders a `Scaffold.bottomNavigationBar` from a named widget:
+
+```json
+"bottomBar": {
+  "name": "product.detail.action_bar",
+  "settings": {}
+}
+```
+
+The named widget receives the same merged `data` map. If the registry returns a zero-size `SizedBox` (unknown widget), the bottom bar slot is left null.
+
+**`appBar` config key** — `buttonsLeft`/`buttonsRight` arrays are resolved via `WidgetRegistry` and receive the merged `data` as well, so app bar buttons can also react to live injected state.
+
 ### WidgetRegistry: Multi-Slot Widget Injection
 
 Beyond full section ownership, `WidgetRegistry` also supports slot-based widget injection — where multiple plugins contribute widgets to a named slot owned by another plugin.

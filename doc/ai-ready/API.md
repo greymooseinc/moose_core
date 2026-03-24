@@ -219,6 +219,72 @@ class BootstrapReport {
 
 ---
 
+### PageScreen
+
+Config-driven screen widget rendered for entries in the top-level `pages` object of `environment.json`. Used directly by `MooseBootstrapper` to build route handlers for each page, and also constructable manually for plugin-owned screens that need config-driven layouts with live data.
+
+```dart
+class PageScreen extends StatelessWidget {
+  final Map<String, dynamic> pageConfig;
+
+  /// Optional. Called once per build. The returned map is shallow-merged into
+  /// the `data` passed to every section, appBar button, and bottomBar widget:
+  ///   data: {'settings': sectionSettings, ...extraData}
+  /// Use this to inject live BLoC/state data that cannot come from static JSON.
+  final Map<String, dynamic>? Function(BuildContext)? dataProvider;
+
+  const PageScreen({
+    super.key,
+    required this.pageConfig,
+    this.dataProvider,
+  });
+}
+```
+
+**Supported `pageConfig` keys:**
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `sections` | `List` | Section entries (`name`, `settings`, `active`). Active sections are built via `WidgetRegistry`. |
+| `appBar` | `Map` | App bar config passed to `MooseAppBar`. May include `buttonsLeft`/`buttonsRight` widget arrays, plus `title`, `floating`, `pinned`. |
+| `bottomBar` | `Map` | Bottom bar config (`name`, `settings`). Built via `WidgetRegistry`; passed to `Scaffold.bottomNavigationBar`. |
+
+**Plugin-owned page config** — when the plugin also controls the route (e.g. to provide a BLoC), use a `plugin:<name>:<route>` key in `pages`. The bootstrapper skips it for auto-registration; the plugin reads it directly. See `MooseBootstrapper._registerPagesRoutes` for details.
+
+**`dataProvider` — injecting live BLoC data:**
+
+```dart
+// In a plugin route or screen:
+PageScreen(
+  pageConfig: (context.moose.configManager.get('pages') as Map)['plugin:products:/product']
+      as Map<String, dynamic>? ?? {},
+  dataProvider: (_) => {
+    'product': state.product,
+    'selectedVariation': state.selectedVariation,
+  },
+)
+
+// In a section builder registered in the same plugin:
+widgetRegistry.registerWidget('product.detail.price_section', (ctx, {data, onEvent}) {
+  final product = data?['product'] as Product?;       // injected by dataProvider
+  final settings = data?['settings'] as Map? ?? {};   // from JSON config
+  // ...
+});
+```
+
+**`bottomBar` config format:**
+
+```json
+"bottomBar": {
+  "name": "product.detail.action_bar",
+  "settings": {}
+}
+```
+
+The `name` is resolved via `WidgetRegistry` and receives the same merged `data` map as every other section. If the registry returns a zero-size `SizedBox` (unknown widget), `bottomNavigationBar` is left null.
+
+---
+
 ## Plugin System
 
 ### FeaturePlugin

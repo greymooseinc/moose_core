@@ -141,23 +141,56 @@ void main() async {
 
 `MooseApp` creates `MooseAppContext`, runs `MooseBootstrapper`, wraps the tree in `MooseScope`, and shows a spinner until bootstrap completes — no boilerplate required.
 
-Page-screen routes are registered automatically from the top-level `pages` array in `environment.json`. No plugin or Dart code is needed to add a new page:
+Page-screen routes are registered automatically from the top-level `pages` object in `environment.json` (key = route path). No plugin or Dart code is needed to add a new page:
 
 ```json
 {
   "theme": "default",
-  "pages": [
-    {
-      "route": "/home",
+  "pages": {
+    "/home": {
       "active": true,
       "appBar": { "title": "Home", "buttonsLeft": [], "buttonsRight": [] },
       "sections": [
         { "name": "products.featured", "active": true, "settings": { "title": "Hot Picks" } }
       ]
     }
-  ]
+  }
 }
 ```
+
+Pages also support a `bottomBar` key to render a `Scaffold.bottomNavigationBar` from a named widget:
+
+```json
+"/product": {
+  "active": true,
+  "bottomBar": { "name": "product.detail.action_bar" },
+  "sections": [...]
+}
+```
+
+For plugin-owned routes that need layout config but also require BLoC wiring, use the `plugin:<name>:<route>` key convention. The bootstrapper skips auto-route registration for these keys — the plugin's `getRoutes()` registers the route, and reads the config manually:
+
+```json
+"pages": {
+  "plugin:products:/product": {
+    "sections": [...],
+    "bottomBar": { "name": "product.detail.action_bar" }
+  }
+}
+```
+
+```dart
+PageScreen(
+  pageConfig: (context.moose.configManager.get('pages') as Map)
+      ['plugin:products:/product'] as Map<String, dynamic>? ?? {},
+  dataProvider: (_) => {
+    'product': state.product,
+    'selectedVariation': state.selectedVariation,
+  },
+)
+```
+
+Sections access injected values via `data['product']` and static config via `data['settings']`.
 
 Supply `loadingWidget` for a custom splash screen:
 
