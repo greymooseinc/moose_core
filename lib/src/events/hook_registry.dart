@@ -13,11 +13,14 @@ class HookRegistry {
   final _logger = AppLogger('HookRegistry');
 
   void register(String hookName, dynamic Function(dynamic) callback, {int priority = 1}) {
-    _hooks.putIfAbsent(hookName, () => []);
-    _hooks[hookName]!.add(Hook(priority, callback));
+    final hooks = _hooks.putIfAbsent(hookName, () => []);
+    // Deduplicate by callback identity — same closure registered twice (e.g.
+    // during a config reload) is silently ignored, matching WidgetRegistry.
+    if (hooks.any((h) => h.callback == callback)) return;
+    hooks.add(Hook(priority, callback));
 
     // sort highest priority first
-    _hooks[hookName]!.sort((a, b) => b.priority.compareTo(a.priority));
+    hooks.sort((a, b) => b.priority.compareTo(a.priority));
     _logger.debug('\'$hookName\' hook registered with priority $priority');
   }
 
@@ -81,6 +84,14 @@ class HookRegistry {
     if (_hooks.containsKey(hookName)) {
       _hooks[hookName]!.removeWhere((hook) => hook.callback == callback);
     }
+  }
+
+  /// Removes all registered hooks across every hook name.
+  ///
+  /// Called by [MooseAppContext.reloadConfig] before re-running plugin
+  /// registration so that hooks don't accumulate across reloads.
+  void clearAll() {
+    _hooks.clear();
   }
 
   void clearHooks(String hookName) {

@@ -109,14 +109,23 @@ class PluginRegistry {
   }
 
   /// Asynchronously stops every registered plugin in reverse registration order.
+  ///
+  /// Each plugin's [FeaturePlugin.onStop] is isolated in a try/catch — a
+  /// failure in one plugin is logged and execution continues with the remaining
+  /// plugins, mirroring the error-isolation behaviour of [initAll]/[startAll].
   Future<void> stopAll({Map<String, Duration>? timings}) async {
     final pluginsInReverse = _plugins.values.toList().reversed;
     for (final plugin in pluginsInReverse) {
       final sw = Stopwatch()..start();
-      await plugin.onStop();
-      sw.stop();
-      timings?[plugin.name] = sw.elapsed;
-      _logger.success('Stopped plugin: ${plugin.name} (onStop)');
+      try {
+        await plugin.onStop();
+        sw.stop();
+        timings?[plugin.name] = sw.elapsed;
+        _logger.success('Stopped plugin: ${plugin.name} (onStop)');
+      } catch (e, stack) {
+        sw.stop();
+        _logger.error('Plugin "${plugin.name}" onStop failed', e, stack);
+      }
     }
   }
 

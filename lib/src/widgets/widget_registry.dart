@@ -83,6 +83,14 @@ class WidgetRegistry {
     return _registry.keys.toList();
   }
 
+  /// Removes all registered builders across every widget name.
+  ///
+  /// Called by [MooseAppContext.reloadConfig] before re-running plugin
+  /// registration so that widget builders don't accumulate across reloads.
+  void clearAll() {
+    _registry.clear();
+  }
+
   /// Removes all builders registered under [name].
   void unregister(String name) {
     _registry.remove(name);

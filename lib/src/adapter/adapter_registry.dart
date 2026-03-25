@@ -146,6 +146,10 @@ class AdapterRegistry {
             'got ${result.runtimeType}');
       }
 
+      // Clear any repository factories/instances from a previous bootstrap
+      // cycle. This is a no-op on first bootstrap (repos map is empty).
+      adapter.resetRepositories();
+
       // Inject scoped app context before initialization.
       if (_appContext != null) adapter.appContext = _appContext!;
 
@@ -380,6 +384,19 @@ class AdapterRegistry {
         } catch (_) {}
       }
     }
+  }
+
+  /// Clears only the resolved repository instance cache.
+  ///
+  /// Adapter registrations and their lazy factories are preserved — the next
+  /// [getRepository] call will create a fresh repository instance from the
+  /// existing factory. Call this during a config reload so that repositories
+  /// are recreated with up-to-date configuration rather than returning stale
+  /// cached instances.
+  void clearInstanceCache() {
+    _instances.clear();
+    _wiredAuthRepo = null;
+    _logger.debug('Repository instance cache cleared (adapters retained)');
   }
 
   /// Clears all adapters, factories, and instances (for testing).

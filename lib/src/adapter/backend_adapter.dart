@@ -141,6 +141,16 @@ abstract class BackendAdapter {
   /// Key: repository Type → ordered list of registered entries (last = default).
   final Map<Type, List<_RepoEntry>> _repos = {};
 
+  /// Clears all registered repository factories and cached instances.
+  ///
+  /// Called by [AdapterRegistry.registerAdapter] before re-initializing an
+  /// adapter that has already been bootstrapped (e.g. after a config reload
+  /// that reuses the same adapter instance). This ensures factories and cached
+  /// repo instances from the previous context do not leak into the new one.
+  void resetRepositories() {
+    _repos.clear();
+  }
+
   /// Register a synchronous factory for a repository type.
   ///
   /// The factory function will be called only when the repository is first
