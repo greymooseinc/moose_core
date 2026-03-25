@@ -159,6 +159,18 @@ class AdapterRegistry {
             'autoInitialize: false and initialize the adapter manually.',
           );
         }
+
+        // Skip registration when the adapter's config block explicitly sets
+        // "active": false. A missing or true value registers normally.
+        final activeFlag = _appContext!.configManager
+            .get('adapters:${adapter.name}:active');
+        if (activeFlag == false) {
+          _logger.info(
+            'Adapter "${adapter.name}" is inactive (active: false) — skipping',
+          );
+          return;
+        }
+
         await adapter.initializeFromConfig(configManager: _appContext!.configManager);
       }
 
