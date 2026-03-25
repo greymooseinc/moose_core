@@ -133,25 +133,64 @@ class MooseApp extends StatefulWidget {
 }
 
 class _MooseAppState extends State<MooseApp> {
-  late final MooseAppContext _appContext;
+  late MooseAppContext _appContext;
   bool _ready = false;
 
   @override
   void initState() {
     super.initState();
     _appContext = MooseAppContext();
-    _bootstrap();
+    _appContext.setReloadHandler(_handleReload);
+    _bootstrap(_appContext, widget.config);
   }
 
-  Future<void> _bootstrap() async {
-    final report = await MooseBootstrapper(appContext: _appContext).run(
-      config: widget.config,
+  Future<void> _bootstrap(
+    MooseAppContext ctx,
+    Map<String, dynamic> config, {
+    bool setReady = true,
+  }) async {
+    final report = await MooseBootstrapper(appContext: ctx).run(
+      config: config,
       themes: widget.themes,
       adapters: widget.adapters,
       plugins: widget.plugins,
     );
     widget.onBootstrapComplete?.call(report);
-    if (mounted) setState(() => _ready = true);
+    if (setReady && mounted) setState(() => _ready = true);
+  }
+
+  /// Called by [MooseAppContext.reloadConfig] when a new config is available.
+  ///
+  /// Disposes the current context and bootstraps a brand-new one, then swaps
+  /// it into the widget tree via [setState]. [MooseScope.didUpdateWidget]
+  /// handles stopping the old context's plugins and attaching lifecycle
+  /// observers to the new one.
+  Future<void> _handleReload(
+    Map<String, dynamic> newConfig, {
+    bool showLoadingScreen = true,
+  }) async {
+    final oldCtx = _appContext;
+
+    final newCtx = MooseAppContext();
+    newCtx.setReloadHandler(_handleReload);
+
+    // Wait for the current frame to finish before swapping the context.
+    // Calling setState mid-build triggers an assertion on Flutter Web.
+    await Future.delayed(Duration.zero);
+
+    if (showLoadingScreen) {
+      // Swap context and show loading screen while bootstrapping.
+      // Dispose old context only after it leaves the widget tree.
+      if (mounted) setState(() { _appContext = newCtx; _ready = false; });
+      oldCtx.dispose();
+      await _bootstrap(newCtx, newConfig);
+    } else {
+      // Bootstrap silently — old context stays in the tree (and alive) until
+      // the new one is ready, then swap and dispose in one atomic update.
+      await _bootstrap(newCtx, newConfig, setReady: false);
+      if (mounted) setState(() { _appContext = newCtx; _ready = true; });
+      oldCtx.dispose();
+    }
   }
 
   @override
@@ -161,8 +200,7 @@ class _MooseAppState extends State<MooseApp> {
       child: Builder(
         builder: (ctx) {
           if (!_ready) {
-            return widget.loadingWidget ??
-                const _DefaultLoadingWidget();
+            return widget.loadingWidget ?? const _DefaultLoadingWidget();
           }
           return widget.builder(ctx, _appContext);
         },
