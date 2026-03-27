@@ -61,6 +61,7 @@
       "doc/ai-ready/README.md",
       "doc/ai-ready/ARCHITECTURE.md",
       "doc/ai-ready/PLUGIN_SYSTEM.md",
+      "doc/ai-ready/PAGE_SYSTEM.md",
       "doc/ai-ready/ADAPTER_SYSTEM.md",
       "doc/ai-ready/REPOSITORIES.md",
       "doc/ai-ready/FEATURE_SECTION.md",
@@ -236,6 +237,234 @@
       ]
     }
   ],
+  "pageSystem": {
+    "description": "Decision guide for adding pages and routes. Three forms exist — choose based on criteria below. Full guide: doc/ai-ready/PAGE_SYSTEM.md",
+    "decisionTree": {
+      "description": "Answer each question in order. Stop at the first 'yes' and use the recommended form.",
+      "questions": [
+        {
+          "id": "q1",
+          "question": "Does the screen need a BLoC or repository instance set up at route creation time?",
+          "no": "q2",
+          "yes": "q3"
+        },
+        {
+          "id": "q2",
+          "question": "Does the screen need navigation arguments (e.g. productId, postId) at build time?",
+          "no": "PLAIN_AUTO_ROUTE",
+          "yes": "q3"
+        },
+        {
+          "id": "q3",
+          "question": "Do you need multiple routes backed by the same plugin logic (different filters, different section layouts, different settings per route)?",
+          "no": "PLUGIN_OWNED_ROUTE",
+          "yes": "PAGE_SLOT"
+        }
+      ],
+      "forms": {
+        "PLAIN_AUTO_ROUTE": {
+          "summary": "No Dart code needed. Bootstrapper registers route and renders sections via PageScreen.",
+          "requiredEnvJsonFields": ["route", "sections"],
+          "forbiddenFields": ["plugin", "pageSlotIdentifier"],
+          "typicalUse": ["Static content pages", "Brand story / about page", "Promotional pages with only section widgets"]
+        },
+        "PLUGIN_OWNED_ROUTE": {
+          "summary": "Plugin calls getRoutes() and returns WidgetBuilder. Set 'plugin':'<name>' in env.json entry — bootstrapper stores it under 'plugin:<name>:<route>' and skips route registration. Plugin registers route itself.",
+          "requiredEnvJsonFields": ["route", "plugin"],
+          "dartChange": "Add route to getRoutes() in plugin class",
+          "typicalUse": ["Login / sign-up screens", "User profile page", "Checkout flow", "Search screen"]
+        },
+        "PAGE_SLOT": {
+          "summary": "Plugin declares pageSlots getter with PageSlotBuilder. Bootstrapper registers each env.json route that references the pageSlotIdentifier. One slot can back unlimited routes.",
+          "requiredEnvJsonFields": ["route", "pageSlotIdentifier", "sections"],
+          "forbiddenFields": ["plugin"],
+          "pageSlotBuilderSignature": "Widget Function(BuildContext context, Map<String, dynamic> pageConfig, Map<String, dynamic> settings, Object? routeArgs)",
+          "dartChange": "Override pageSlots getter; clean up BLoCs in onStop()",
+          "typicalUse": ["Product list pages with different per-route filters", "Product detail page (needs productId from routeArgs)", "Category-specific layouts", "Seasonal campaign pages"]
+        }
+      }
+    },
+    "appBarButtonWidgets": [
+      { "key": "core_ui.back_button", "description": "Standard back / pop button" },
+      { "key": "cart.app_bar_button", "description": "Cart icon with item count badge" },
+      { "key": "search.app_bar_button", "description": "Search icon" },
+      { "key": "auth.app_bar_button", "description": "Login icon or user avatar" }
+    ],
+    "availableSlots": [
+      {
+        "identifier": "plugins/products/slots/product_list",
+        "plugin": "products",
+        "description": "Filterable product list screen. settings.filters = ProductFilters fields (categoryId, onSale, orderBy, order, tag, search, perPage). routeArgs not used.",
+        "routeArgsUsed": false
+      },
+      {
+        "identifier": "plugins/products/slots/product_detail",
+        "plugin": "products",
+        "description": "Product detail screen. Requires productId in routeArgs (String or Map{productId:String}). Each productId gets its own BLoC.",
+        "routeArgsUsed": true,
+        "routeArgsShape": "String  OR  Map<String, dynamic> { 'productId': String }"
+      }
+    ],
+    "availableSections": {
+      "products": [
+        { "key": "moose.products.section.categories", "description": "Category list. Settings: showTitle(bool), layout(scroll|grid)." },
+        { "key": "moose.products.section.collections", "description": "Collections carousel. Settings: filters.page(int), filters.perPage(int)." },
+        { "key": "moose.products.section.products", "description": "Home-page product list/carousel. Settings: filters(object), title(string), layout(string)." },
+        { "key": "moose.products.section.list_filter_bar", "description": "Filter/sort bar. Requires ProductsBloc context." },
+        { "key": "moose.products.section.list_grid", "description": "Product grid. Requires ProductsBloc context. Settings: columns(int)." },
+        { "key": "moose.products.section.detail:image_gallery", "description": "Product image carousel." },
+        { "key": "moose.products.section.detail:product_info", "description": "Product name and short description." },
+        { "key": "moose.products.section.detail:price", "description": "Regular and sale price." },
+        { "key": "moose.products.section.detail:attribute_selector", "description": "Variation attribute selectors." },
+        { "key": "moose.products.section.detail:stock_and_sku", "description": "Stock status and SKU." },
+        { "key": "moose.products.section.detail:rating", "description": "Aggregate star rating." },
+        { "key": "moose.products.section.detail:categories_and_tags", "description": "Linked categories and tags." },
+        { "key": "moose.products.section.detail:product_sections", "description": "Long-form content / accordion tabs." },
+        { "key": "moose.products.section.detail:reviews", "description": "Customer reviews list." },
+        { "key": "moose.products.section.detail:metadata", "description": "Custom metadata fields." },
+        { "key": "moose.products.section.detail:action_bar", "description": "Add-to-cart / buy-now bar. Use as bottomBar." }
+      ],
+      "banner": [
+        { "key": "moose.banner.section.banner", "description": "Auto-play banner carousel. Settings: key(string, required), height(double), autoPlay(bool), showIndicators(bool)." }
+      ],
+      "blog": [
+        { "key": "moose.blog.section.latest_posts", "description": "Latest posts list or carousel. Settings: title(string), limit(int), filter(string), layout(list|carousel)." }
+      ]
+    },
+    "pageExamples": [
+      {
+        "id": "example_1",
+        "name": "Brand Story / About Page",
+        "scenario": "Static marketing page with hero banner and blog posts. No BLoC, no navigation arguments.",
+        "recommendedForm": "PLAIN_AUTO_ROUTE",
+        "reasoning": "No state setup or runtime args needed. Zero Dart code required.",
+        "envJsonSnippet": {
+          "route": "/about",
+          "appBar": { "title": "Our Story", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [] },
+          "sections": [
+            { "name": "moose.banner.section.banner", "settings": { "key": "brand_hero", "height": 320 } },
+            { "name": "moose.blog.section.latest_posts", "settings": { "title": "In the Press", "limit": 4 } }
+          ]
+        },
+        "dartSketch": "// No Dart changes required."
+      },
+      {
+        "id": "example_2",
+        "name": "User Profile Page",
+        "scenario": "Loads authenticated user orders and settings. Needs AuthRepository and a ProfileBloc wired at route creation. Single route.",
+        "recommendedForm": "PLUGIN_OWNED_ROUTE",
+        "reasoning": "Needs BLoC wiring at screen creation. Single route — no multi-instance requirement.",
+        "envJsonSnippet": {
+          "route": "/profile",
+          "plugin": "profile",
+          "appBar": { "title": "My Account", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [] },
+          "sections": [
+            { "name": "profile.section.avatar_header" },
+            { "name": "profile.section.recent_orders" },
+            { "name": "profile.section.account_settings" }
+          ]
+        },
+        "dartSketch": "class ProfilePlugin extends FeaturePlugin {\n  @override\n  Map<String, WidgetBuilder>? getRoutes() => {\n    '/profile': (_) => BlocProvider(\n      create: (_) => ProfileBloc(adapterRegistry.getRepository<AuthRepository>())..add(LoadProfileEvent()),\n      child: ProfileScreen(),\n    ),\n  };\n}"
+      },
+      {
+        "id": "example_3",
+        "name": "Multiple Category Product Lists",
+        "scenario": "/products, /products/new, /products/sale — same list screen and BLoC, different filters and appBar titles per route.",
+        "recommendedForm": "PAGE_SLOT",
+        "reasoning": "Same plugin logic, multiple config-driven instances. Adding a new list route requires only environment.json.",
+        "envJsonSnippet": [
+          {
+            "route": "/products",
+            "pageSlotIdentifier": "plugins/products/slots/product_list",
+            "appBar": { "title": "All Products", "floating": true, "pinned": false, "buttonsLeft": [], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "sections": [{ "name": "moose.products.section.list_filter_bar" }, { "name": "moose.products.section.list_grid" }]
+          },
+          {
+            "route": "/products/sale",
+            "pageSlotIdentifier": "plugins/products/slots/product_list",
+            "settings": { "filters": { "onSale": true } },
+            "appBar": { "title": "Sale", "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "sections": [{ "name": "moose.products.section.list_grid" }]
+          }
+        ],
+        "dartSketch": "// No new Dart needed if products plugin already declares 'plugins/products/slots/product_list'."
+      },
+      {
+        "id": "example_4",
+        "name": "Product Detail Page (needs productId)",
+        "scenario": "/products/item and /products/electronics show the same product with different section layouts. productId only known at navigation time.",
+        "recommendedForm": "PAGE_SLOT",
+        "reasoning": "routeArgs needed for productId at route-build time. Multiple routes with different section arrays.",
+        "envJsonSnippet": [
+          {
+            "route": "/products/item",
+            "pageSlotIdentifier": "plugins/products/slots/product_detail",
+            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "bottomBar": { "name": "moose.products.section.detail:action_bar" },
+            "sections": [
+              { "name": "moose.products.section.detail:image_gallery" },
+              { "name": "moose.products.section.detail:product_info" },
+              { "name": "moose.products.section.detail:price" },
+              { "name": "moose.products.section.detail:reviews" }
+            ]
+          },
+          {
+            "route": "/products/electronics",
+            "pageSlotIdentifier": "plugins/products/slots/product_detail",
+            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "bottomBar": { "name": "moose.products.section.detail:action_bar" },
+            "sections": [
+              { "name": "moose.products.section.detail:image_gallery" },
+              { "name": "moose.products.section.detail:product_info" },
+              { "name": "moose.products.section.detail:price" },
+              { "name": "moose.products.section.detail:stock_and_sku" },
+              { "name": "moose.products.section.detail:metadata" }
+            ]
+          }
+        ],
+        "navigationCall": "AppNavigator.pushNamed(context, '/products/electronics', arguments: {'productId': product.id});",
+        "dartSketch": "final productId = routeArgs is Map ? routeArgs['productId'] as String : routeArgs as String;\nif (!_detailBlocs.containsKey(productId)) {\n  _detailBlocs[productId] = ProductsBloc(...)..add(LoadProductDetailEvent(productId));\n}\nreturn BlocProvider.value(value: _detailBlocs[productId]!, child: ProductDetailScreen(pageConfig: pageConfig));"
+      },
+      {
+        "id": "example_5",
+        "name": "Seasonal Campaign Landing Pages",
+        "scenario": "/summer-sale, /black-friday — each with a different hero banner, different product sections, custom appBar title. Layouts changeable via environment.json only.",
+        "recommendedForm": "PAGE_SLOT",
+        "reasoning": "Multiple routes with completely different sections, all backed by the same ProductsBloc. Config drives everything. No routeArgs needed.",
+        "envJsonSnippet": [
+          {
+            "route": "/summer-sale",
+            "pageSlotIdentifier": "plugins/products/slots/product_list",
+            "settings": { "filters": { "onSale": true, "tag": "summer" } },
+            "appBar": { "title": "Summer Sale", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "sections": [
+              { "name": "moose.banner.section.banner", "settings": { "key": "summer_hero", "height": 260 } },
+              { "name": "moose.products.section.list_grid", "settings": { "columns": 2 } }
+            ]
+          },
+          {
+            "route": "/black-friday",
+            "pageSlotIdentifier": "plugins/products/slots/product_list",
+            "settings": { "filters": { "onSale": true, "orderBy": "popularity" } },
+            "appBar": { "title": "Black Friday", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "sections": [
+              { "name": "moose.banner.section.banner", "settings": { "key": "bf_hero", "height": 200 } },
+              { "name": "moose.products.section.list_filter_bar" },
+              { "name": "moose.products.section.list_grid", "settings": { "columns": 3 } }
+            ]
+          }
+        ],
+        "dartSketch": "// No new Dart code. Both routes reuse the existing 'plugins/products/slots/product_list' handler."
+      }
+    ],
+    "pitfalls": [
+      "Adding 'plugin':'<name>' to a slot entry causes the bootstrapper to store it under 'plugin:<name>:<route>' and skip route registration — the route will 404.",
+      "Calling ModalRoute.of(context) in the outer WidgetBuilder returns null. routeArgs is already extracted and forwarded to PageSlotBuilder by the bootstrapper.",
+      "Not closing BLoCs created inside slot handlers in onStop() causes memory leaks.",
+      "Not guarding BLoC creation with containsKey causes duplicate network requests on every rebuild."
+    ]
+  },
+
   "examples": {
     "addSection": [
       "1. Create lib/plugins/blog/presentation/sections/latest_posts_section.dart extending FeatureSection.",

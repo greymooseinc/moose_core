@@ -532,6 +532,7 @@ moose locale add si
 | Document | What it covers |
 |---|---|
 | [PLUGIN_SYSTEM.md](./PLUGIN_SYSTEM.md) | Full plugin lifecycle, config, routes, bottom tabs |
+| [PAGE_SYSTEM.md](./PAGE_SYSTEM.md) | **How to add a page** — decision guide for plain auto-route vs plugin-owned route vs page slot; 5 use case examples |
 | [FEATURE_SECTION.md](./FEATURE_SECTION.md) | FeatureSection pattern, getSetting coercions, widget slots |
 | [REPOSITORIES.md](./REPOSITORIES.md) | All 11 repository interfaces and their full method signatures |
 | [ENTITY_EXTENSIONS.md](./ENTITY_EXTENSIONS.md) | CoreEntity extensions map, copyWith vs copyWithExtensions |
