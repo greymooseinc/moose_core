@@ -90,6 +90,29 @@ import '../app/moose_app_context.dart';
 ///   }
 /// }
 /// ```
+
+/// Signature for a plugin-provided page slot builder.
+///
+/// Called by [MooseBootstrapper] when navigating to a route whose
+/// `environment.json` entry carries a `"pageSlotIdentifier"` that matches
+/// a key in [FeaturePlugin.pageSlots].
+///
+/// - [pageConfig] — the full page entry map from `environment.json`
+///   (includes `route`, `sections`, `appBar`, `pageSlotIdentifier`, etc.).
+/// - [settings] — the top-level `"settings"` map from that entry
+///   (empty map when absent). Use this for static filter presets and other
+///   per-page configuration that does not belong in `sections`.
+/// - [routeArgs] — the value of `ModalRoute.of(context)?.settings.arguments`
+///   at route-build time, or `null` if the route was pushed without arguments.
+///   Use this for runtime data that cannot be known at config time, such as
+///   the `productId` passed when navigating to a detail screen.
+typedef PageSlotBuilder = Widget Function(
+  BuildContext context,
+  Map<String, dynamic> pageConfig,
+  Map<String, dynamic> settings,
+  Object? routeArgs,
+);
+
 abstract class FeaturePlugin {
   String get name;
   String get version;
@@ -188,6 +211,61 @@ abstract class FeaturePlugin {
   /// defined in `environment.json` under the `pages` key are registered
   /// automatically by [MooseBootstrapper] and do not require a plugin override.
   Map<String, WidgetBuilder>? getRoutes() => null;
+
+  /// Optional: Plugin-provided page slot handlers.
+  ///
+  /// A page slot is a reusable screen factory that `environment.json` can
+  /// instantiate any number of times by declaring a page entry with a
+  /// `"pageSlotIdentifier"` field matching one of the keys in this map.
+  /// Each instantiation gets its own route path, `sections` array, `appBar`
+  /// config, and optional `settings` map — allowing multiple distinct pages
+  /// to share the same plugin-provided screen logic without duplicating
+  /// Dart routes.
+  ///
+  /// The identifier is an opaque string; by convention use a path-like format
+  /// such as `"plugins/<name>/slots/<slot>"` (e.g.
+  /// `"plugins/products/slots/product_list"`), but any unique string works.
+  ///
+  /// Static filters example (no runtime args needed):
+  /// ```dart
+  /// @override
+  /// Map<String, PageSlotBuilder>? get pageSlots => {
+  ///   'plugins/products/slots/product_list': (context, pageConfig, settings, routeArgs) {
+  ///     final filters = settings['filters'] != null
+  ///         ? ProductFilters.fromJson(Map<String, dynamic>.from(settings['filters'] as Map))
+  ///         : null;
+  ///     return BlocProvider.value(
+  ///       value: _freshListBloc(filters),
+  ///       child: ProductsListScreen(filters: filters, pageConfig: pageConfig),
+  ///     );
+  ///   },
+  /// };
+  /// ```
+  ///
+  /// Runtime argument example (e.g. product detail needing a `productId`):
+  /// ```dart
+  /// @override
+  /// Map<String, PageSlotBuilder>? get pageSlots => {
+  ///   'plugins/products/slots/product_detail': (context, pageConfig, settings, routeArgs) {
+  ///     final productId = _extractProductId(routeArgs); // reads from routeArgs
+  ///     return BlocProvider.value(
+  ///       value: _detailBlocFor(productId),
+  ///       child: ProductDetailScreen(pageConfig: pageConfig),
+  ///     );
+  ///   },
+  /// };
+  /// ```
+  ///
+  /// In `environment.json`:
+  /// ```json
+  /// {
+  ///   "route": "/products/item",
+  ///   "pageSlotIdentifier": "plugins/products/slots/product_detail",
+  ///   "appBar": { "title": "" },
+  ///   "sections": [ { "name": "moose.products.section.detail:image_gallery" } ]
+  /// }
+  /// ```
+  Map<String, PageSlotBuilder>? get pageSlots => null;
 
   /// Optional: Bottom navigation tabs exposed by this plugin.
   ///

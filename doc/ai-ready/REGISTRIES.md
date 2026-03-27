@@ -17,6 +17,119 @@ Access in plugins via convenience getters (`hookRegistry`, `eventBus`, `widgetRe
 
 ---
 
+## Naming Conventions
+
+All registry keys — widget sections, slots, hooks, events, and commands — follow a consistent naming grammar. Understanding this grammar lets you predict, discover, and validate any registration name without reading source code.
+
+### Four-Segment Grammar
+
+```
+<provider>.<plugin>.<type>.<name>
+```
+
+| Segment | Values | Rules |
+|---|---|---|
+| `<provider>` | `moose` (system), or your vendor prefix | `moose.` is reserved for system-owned registrations. Third-party plugins must use their own prefix. |
+| `<plugin>` | Plugin identifier (`products`, `banner`, `cart`, `auth`, …) | Must match the plugin's `name` getter. `snake_case`. |
+| `<type>` | `section`, `slot`, `widget`, `hook`, `event`, `cmd` | Always one of these six. See table below. |
+| `<name>` | Descriptive name — `snake_case` with optional `:` sub-paths | Dots separate structural segments; colons are used only within `<name>` for hierarchy. |
+
+### Type Segment Values
+
+| `<type>` | Registry | Direction | Description |
+|---|---|---|---|
+| `section` | `WidgetRegistry.registerSection` | — | A named `FeatureSection` that can appear in `environment.json` page layouts |
+| `slot` | `WidgetRegistry.registerWidget` | — | An injection or override point inside a section or widget |
+| `widget` | `WidgetRegistry.registerWidget` | — | A reusable named widget instance (not a layout section) |
+| `hook` | `HookRegistry.register` | Sync — bidirectional data transform | Intercept and modify data flowing through a named pipeline point |
+| `event` | `EventBus.fire` / `EventBus.on` | Outbound — state notification | Fired by the plugin when something happens; external plugins subscribe |
+| `cmd` | `EventBus.fire` / `EventBus.on` | Inbound — command bus | Fired by external plugins to drive a BLoC; the owning plugin subscribes and forwards |
+
+### `<name>` Sub-Path Rules
+
+- **Dots** are reserved for separating the four structural segments — never appear inside `<name>`.
+- **Colons** are used inside `<name>` for hierarchy: `detail:price`, `section:{key}:loading`.
+- **`{key}`** is a runtime placeholder substituted with the section instance's `key` setting: `section:home_banner:loading`, `slot.home_banner:build_overlay`.
+
+### Complete Examples
+
+```
+# Widget sections — reference in environment.json
+moose.products.section.categories
+moose.products.section.detail:image_gallery
+moose.banner.section.banner
+
+# Widget slots — injection / override points
+moose.products.slot.product_card:sale_badge
+moose.products.slot.product_card:after_media
+moose.products.slot.detail:price
+moose.products.slot.section:{key}:loading
+moose.products.slot.section:{key}:build_product_card
+moose.banner.slot.{key}:build_banner_item
+moose.banner.slot.{key}:build_banner_overlay
+
+# Named widgets — reusable across plugins
+moose.products.widget.product_card
+
+# Hooks — synchronous data pipelines
+moose.products.hook.before_load_products
+moose.products.hook.after_load_products
+moose.products.hook.get_current_filters       # read-only snapshot
+moose.banner.hook.before_load_banners
+moose.banner.hook.after_load_banners
+moose.banner.hook.before_banner_tap
+moose.banner.hook.get_current_state           # read-only snapshot
+
+# Events — outbound state notifications
+moose.products.event.list.loaded
+moose.products.event.list.filters_changed
+moose.products.event.product.viewed
+moose.products.event.detail.variation_selected
+moose.banner.event.banner.loaded
+moose.banner.event.banner.tapped
+moose.banner.event.banner.index_changed
+moose.banner.event.banner.error
+
+# Commands — inbound command bus
+moose.products.cmd.apply_filters
+moose.products.cmd.refresh_products
+moose.products.cmd.clear_filters
+moose.banner.cmd.refresh
+moose.banner.cmd.go_to_index
+```
+
+### Third-Party Plugin Naming
+
+Third-party plugins use their own `<provider>` prefix — never `moose.`:
+
+```
+acme.wishlist.slot.product_card:after_price      # wishlist button after price
+acme.loyalty.hook.after_load_products            # enrich products with loyalty data
+shopify.promotions.event.coupon.applied          # promotions plugin fires coupon event
+```
+
+### manifest.json and environment.json
+
+`moose.manifest.json` declares every name a plugin owns under `widget_sections`, `widget_slots`, `widget_widgets`, `hooks`, `events`, `commands`, and `actions`. This is the single source of truth for tooling and AI agents.
+
+`environment.json` references section names in page layouts. Names must match exactly (including provider prefix):
+
+```json
+{ "name": "moose.banner.section.banner" }
+{ "name": "moose.products.section.categories" }
+```
+
+### Quick Rule Summary
+
+1. `moose.` prefix = system-owned. Third-party plugins must not use it.
+2. Dots separate the four structural segments. Never use dots inside `<name>`.
+3. Colons are for hierarchy within `<name>` only.
+4. `{key}` is a runtime placeholder — substitute the actual `key` value at registration time.
+5. `event` = fired by plugin (outbound). `cmd` = fired by external plugins (inbound).
+6. `hook` = synchronous, returns a value. `event`/`cmd` = asynchronous, no return.
+
+---
+
 ## HookRegistry
 
 ### Purpose
@@ -143,16 +256,42 @@ class AnalyticsPlugin extends FeaturePlugin {
 
 ### Hook naming convention
 
-Use `<domain>:<action>` dot notation for sub-paths if needed:
+System plugins use the four-segment `moose.<plugin>.hook.<verb>_<object>` convention:
 
 ```
-product:transform          // transform a product entity
-cart:item.added           // observe/modify a cart item being added
-checkout:before.submit    // intercept a checkout request before submission
-bottom_tabs:filter_tabs   // built-in: modify the bottom navigation tab list
+moose.products.hook.before_load_products    // transform filters before products fetch
+moose.products.hook.after_load_products     // filter/enrich product list after fetch
+moose.products.hook.get_current_filters     // read-only: returns active filter state
+moose.banner.hook.before_load_banners       // modify load params before banner fetch
+moose.banner.hook.after_load_banners        // filter/reorder/enrich banner list
+moose.banner.hook.before_banner_tap         // intercept tap data before event fires
+moose.banner.hook.get_current_state         // read-only: returns active banner state
 ```
 
-Hook names are defined by the adapter or plugin that executes them — `moose_core` itself only defines `bottom_tabs:filter_tabs` (used by `PluginRegistry` for bottom navigation).
+**Grammar:**
+- `moose` — provider prefix; system-owned hooks always start with `moose.`
+- `<plugin>` — the plugin that executes (owns) the hook point (`products`, `banner`, `cart`)
+- `hook` — type segment — always `hook` for `HookRegistry` entries
+- `<verb>_<object>` — what the hook does: `before_load_products`, `after_load_banners`, `get_current_filters`
+
+**Third-party plugins** use their own prefix:
+```
+acme.loyalty.hook.after_load_products       // acme's loyalty plugin enriches product data
+shopify.promotions.hook.before_load_banners // promotions plugin injects placement filter
+```
+
+**Read-only vs transform hooks:**
+- `before_*` / `after_*` — receive data, transform it, return modified value
+- `get_*` — read-only snapshot; registered handler should return the provided value unchanged
+
+**Adapter-level hooks** (not owned by plugins) may use the legacy `<domain>:<action>` form:
+```
+product:transform          // adapter-level product enrichment
+cart:item.added            // adapter-level cart modification
+bottom_tabs:filter_tabs    // built-in: modify the bottom navigation tab list
+```
+
+Hook names are defined by whoever executes them — `moose_core` itself only defines `bottom_tabs:filter_tabs` (used by `PluginRegistry` for bottom navigation).
 
 ### Built-in hook: bottom_tabs:filter_tabs
 
@@ -319,16 +458,56 @@ eventBus.stream('search.query.changed')
 
 ### Event naming convention
 
-Use dot notation: `<domain>.<action>` or `<domain>.<entity>.<action>`:
+System plugins use the four-segment `<provider>.<plugin>.<noun>.<verb>` convention.
+
+#### Outbound events (state notifications)
+
+```
+moose.products.event.list.loaded            // product list finished loading
+moose.products.event.list.filters_changed   // active filters changed
+moose.products.event.list.refreshed         // pull-to-refresh completed
+moose.products.event.product.viewed         // product detail screen opened
+moose.products.event.detail.variation_selected // user picked a variant attribute
+moose.products.event.categories.loaded      // category list loaded
+moose.products.event.collections.loaded     // collections list loaded
+moose.banner.event.banner.loaded            // banners finished loading
+moose.banner.event.banner.tapped            // user tapped a banner slide
+moose.banner.event.banner.index_changed     // carousel moved to a new slide
+moose.banner.event.banner.error             // banner load failed
+```
+
+#### Inbound commands (command bus)
+
+Commands are fired by external plugins to drive a BLoC without importing it. Use `cmd` as the type segment to distinguish them clearly from outbound state notifications:
+
+```
+moose.products.cmd.apply_filters            // apply a filter set to the product list BLoC
+moose.products.cmd.refresh_products         // trigger a product list refresh
+moose.products.cmd.clear_filters            // clear all active filters
+moose.banner.cmd.refresh                    // reload banners
+moose.banner.cmd.go_to_index               // jump carousel to a slide index
+```
+
+#### Third-party events
+
+Third-party plugins use their own prefix for any events they own:
+
+```
+acme.wishlist.event.product.added           // product added to wishlist
+shopify.promotions.event.coupon.applied     // coupon applied from a promotion
+```
+
+#### Legacy / adapter-level events
+
+Adapters and non-system plugins may use the legacy `<domain>.<noun>.<verb>` form without a provider prefix. These predate the four-segment convention and remain supported:
 
 ```
 cart.item.added
 cart.coupon.applied
 order.placed
-order.payment.completed
 user.logged.in
 user.logged.out
-search.query.changed
+locale.changed
 notification.received
 ```
 
@@ -592,24 +771,69 @@ class ProductCard extends StatelessWidget {
 
 ### Widget builder naming convention
 
-Use `<plugin_name>.<section_name>` for section builders and `<component>:<slot>` or `<plugin>.<component>:<slot>` for widget builders registered via `registerWidget`:
+System plugins follow the four-segment `<provider>.<plugin>.<type>.<name>` convention.
+
+#### Grammar
+
+| Segment | Meaning | Examples |
+|---|---|---|
+| `<provider>` | Who owns the name | `moose` (system), `acme` (third-party), `shopify` (vendor plugin) |
+| `<plugin>` | Which plugin registers it | `products`, `banner`, `cart`, `auth` |
+| `<type>` | Registration category | `section`, `slot`, `widget` |
+| `<name>` | What it is | `categories`, `product_card`, `detail:price` |
+
+**Dots** separate the four structural segments.
+**Colons** are used only *within* the `<name>` segment for sub-path hierarchy.
+`{key}` within a name is a runtime placeholder substituted per instance.
+
+#### `registerSection` keys
 
 ```
-// registerSection keys
-products.featured_section
-products.categories_section
-cart.mini_cart_widget
-home.hero_section
-checkout.order_summary_section
-
-// registerWidget keys (slot injection)
-product.card:badge        // badge slot on product cards
-product.card:overlay      // overlay slot on product cards
-cart.item:actions         // action button slot on cart line items
-checkout:summary.extras   // extra rows in the checkout summary
-pdp:above.price           // slot above the price on the product detail page
-home.hero:overlay         // overlay on the home hero section
+moose.products.section.categories           // grid of product categories
+moose.products.section.collections         // horizontal collections carousel
+moose.products.section.products            // configurable products carousel
+moose.products.section.detail:image_gallery // product detail — image gallery section
+moose.products.section.detail:price        // product detail — price section
+moose.products.section.list_filter_bar     // product list — filter bar
+moose.banner.section.banner                // swipeable promotional banner carousel
 ```
+
+#### `registerWidget` keys — named widgets
+
+Named widgets are reusable instances callable by any plugin via `widgetRegistry.build(...)`:
+
+```
+moose.products.widget.product_card         // renders a ProductCard — no ProductCard import needed
+core_ui.close_button                       // core UI close/back button
+```
+
+#### `registerWidget` keys — slot injection
+
+Slots allow injection and override. Colon separates the component path from the slot name within `<name>`:
+
+```
+moose.products.slot.product_card:media             // replace media gallery in ProductCard
+moose.products.slot.product_card:sale_badge        // replace sale badge in ProductCard
+moose.products.slot.product_card:after_media       // inject after media (buildAll)
+moose.products.slot.detail:image_gallery           // override detail image gallery section
+moose.products.slot.detail:action_bar              // override detail action bar
+moose.products.slot.section:{key}:loading          // override loading state per section instance
+moose.products.slot.section:{key}:build_product_card // override individual product card in carousel
+moose.banner.slot.{key}:build_banner_item          // override individual banner slide
+moose.banner.slot.{key}:build_banner_overlay       // override per-slide title overlay
+```
+
+#### Third-party naming
+
+Third-party plugins prefix with their own vendor + plugin identifiers:
+
+```
+acme.wishlist.slot.product_card:after_price    // wishlist button after price in ProductCard
+acme.loyalty.section.points_banner            // loyalty points section
+shopify.promotions.slot.home_banner:build_banner_overlay // custom overlay on home banner
+```
+
+**Rule**: Never register a `moose.*` name from a third-party plugin. The `moose.` prefix is reserved for system-owned extensions.
 
 ---
 

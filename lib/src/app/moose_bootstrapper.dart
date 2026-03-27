@@ -252,19 +252,11 @@ class MooseBootstrapper {
   }
 
   /// Reads the `pages` object from [ConfigManager] and populates
-  /// [MooseAppContext.pagesRoutes] with a [PageScreen] builder per active entry.
+  /// [MooseAppContext.pagesRoutes] with a route builder per active entry.
   ///
-  /// ## Auto-route pages
+  /// Three kinds of page entries are handled:
   ///
-  /// Keys that are plain route paths register a [PageScreen] route automatically:
-  ///
-  /// ```json
-  /// "pages": {
-  ///   "/home": { "active": true, "appBar": {}, "sections": [] }
-  /// }
-  /// ```
-  ///
-  /// ## Plugin-owned pages (`plugin:<name>:<route>`)
+  /// ## 1. Plugin-owned pages (`plugin:<name>:<route>`)
   ///
   /// Keys prefixed with `plugin:` are **config-only** entries — the bootstrapper
   /// skips route registration for them. The owning plugin declares the route in
@@ -274,6 +266,35 @@ class MooseBootstrapper {
   /// ```json
   /// "pages": {
   ///   "plugin:products:/product": { "sections": [...], "bottomBar": {...} }
+  /// }
+  /// ```
+  ///
+  /// ## 2. Plugin-provided page slots (`"pageSlotIdentifier"` field)
+  ///
+  /// Plain-route entries that carry a `"pageSlotIdentifier"` field are dispatched
+  /// to the matching plugin's [FeaturePlugin.pageSlots] handler. Each entry gets
+  /// its own route, `sections`, `appBar`, and optional `settings` map. The plugin
+  /// lookup is deferred to route-build time via [Builder], so plugin registration
+  /// order does not matter.
+  ///
+  /// ```json
+  /// "pages": {
+  ///   "/products/sale": {
+  ///     "pageSlotIdentifier": "plugins/products/slots/product_list",
+  ///     "settings": { "filters": { "onSale": true } },
+  ///     "appBar": { "title": "SALE" },
+  ///     "sections": [{ "name": "moose.products.section.list_grid" }]
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// ## 3. Auto-route pages
+  ///
+  /// All other active plain-route entries register a [PageScreen] route:
+  ///
+  /// ```json
+  /// "pages": {
+  ///   "/home": { "active": true, "appBar": {}, "sections": [] }
   /// }
   /// ```
   ///
@@ -287,13 +308,32 @@ class MooseBootstrapper {
         final key = entry.key as String;
         if (key.isEmpty) continue;
         if (entry.value is! Map) continue;
-        // Keys prefixed with "plugin:" (e.g. "plugin:products:/product") are
-        // plugin-owned routes. The bootstrapper stores their config for plugin
-        // code to read but does NOT register an auto PageScreen route for them
-        // — the owning plugin's getRoutes() is responsible for the route.
+        // Keys prefixed with "plugin:" are plugin-owned config-only entries.
+        // The owning plugin's getRoutes() registers the actual Flutter route.
         if (key.startsWith('plugin:')) continue;
         final e = (entry.value as Map).cast<String, dynamic>();
         if (e['active'] == false) continue;
+
+        // Plugin-provided page slot: dispatch to the plugin's pageSlots handler.
+        final slotId = e['pageSlotIdentifier'] as String?;
+        if (slotId != null) {
+          final pageConfig = {'route': key, ...e};
+          final settings =
+              (e['settings'] as Map?)?.cast<String, dynamic>() ?? {};
+          routes[key] = (_) => Builder(
+                builder: (ctx) {
+                  final builder =
+                      appContext.pluginRegistry.getPageSlotBuilder(slotId);
+                  if (builder == null) return const SizedBox.shrink();
+                  // ModalRoute.of(ctx) works here because Builder provides a
+                  // context that is a descendant of the ModalRoute element.
+                  final routeArgs = ModalRoute.of(ctx)?.settings.arguments;
+                  return builder(ctx, pageConfig, settings, routeArgs);
+                },
+              );
+          continue;
+        }
+
         final config = {'route': key, ...e};
         routes[key] = (_) => PageScreen(pageConfig: config);
       }

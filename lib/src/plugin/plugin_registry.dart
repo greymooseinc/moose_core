@@ -182,6 +182,19 @@ class PluginRegistry {
     return _plugins[name] as T;
   }
 
+  /// Returns the [PageSlotBuilder] registered under [identifier] by any plugin.
+  ///
+  /// Iterates registered plugins in registration order and returns the first
+  /// handler whose [FeaturePlugin.pageSlots] map contains [identifier].
+  /// Returns `null` when no plugin handles the identifier.
+  PageSlotBuilder? getPageSlotBuilder(String identifier) {
+    for (final plugin in _plugins.values) {
+      final builder = plugin.pageSlots?[identifier];
+      if (builder != null) return builder;
+    }
+    return null;
+  }
+
   bool hasPlugin(String name) => _plugins.containsKey(name);
 
   List<String> getRegisteredPlugins() => _plugins.keys.toList();

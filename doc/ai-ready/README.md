@@ -549,7 +549,7 @@ moose locale add si
 
 | Document | What it covers |
 |---|---|
-| [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, HookRegistry, ActionRegistry, EventBus |
+| [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, HookRegistry, ActionRegistry, EventBus — **includes Naming Conventions** (four-segment grammar, `section`/`slot`/`widget`/`hook`/`event`/`cmd` type segments, `moose.` prefix rules, third-party naming) |
 | [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) | EventBus vs HookRegistry decision matrix, patterns, BLoC integration |
 | [CACHE_SYSTEM.md](./CACHE_SYSTEM.md) | CacheManager, MemoryCache, PersistentCache, TTL configuration |
 | [API.md](./API.md) | Public API reference — exported classes, type definitions |

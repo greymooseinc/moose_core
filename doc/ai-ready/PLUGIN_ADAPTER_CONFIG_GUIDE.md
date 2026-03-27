@@ -373,6 +373,13 @@ The legacy flat format (settings at the top level of the adapter block, without 
       "plugin": "<plugin.name>",
       "active": true,
       "sections": []
+    },
+    {
+      "route": "<path>",
+      "pageSlotIdentifier": "<plugin-declared slot identifier>",
+      "settings": { "<key>": "<value>" },
+      "appBar": { "title": "...", "floating": false, "pinned": true },
+      "sections": []
     }
   ],
 
@@ -389,6 +396,22 @@ The legacy flat format (settings at the top level of the adapter block, without 
   ]
 }
 ```
+
+### Page entry forms
+
+Three distinct forms are supported in the `"pages"` array. They differ in **who registers the Flutter route** and **where the screen widget comes from**:
+
+| Form | Distinguishing field | Route registered by | Screen widget |
+|------|---------------------|--------------------|----|
+| **Plain auto-route** | none (just `"route"`) | `MooseBootstrapper` | `PageScreen` — sections driven by `WidgetRegistry` |
+| **Plugin-owned** | `"plugin": "<name>"` | The plugin itself (via `getRoutes()`) | Plugin-controlled; config stored under `plugin:<name>:<route>` key |
+| **Plugin-provided page slot** | `"pageSlotIdentifier": "<id>"` | `MooseBootstrapper` | `PageSlotBuilder` returned by the plugin's `pageSlots` map |
+
+**Plain auto-route** — the bootstrapper wraps the entry in `PageScreen` automatically. Use this for purely config-driven screens with no BLoC setup.
+
+**Plugin-owned** — the bootstrapper stores the entry under the key `plugin:<name>:<route>` and does **not** register a Flutter route. The plugin reads the config via that key and calls `PageScreen(pageConfig: ...)` itself (e.g. to wrap a BLoC). No auto-route is created.
+
+**Plugin-provided page slot** — the bootstrapper registers the Flutter route but delegates widget construction to `pluginRegistry.getPageSlotBuilder(pageSlotIdentifier)`. The lookup is deferred to route build time via a `Builder`, so plugins are always registered before the lookup runs. Inside that `Builder`, `routeArgs` (`ModalRoute.of(ctx)?.settings.arguments`) is extracted and forwarded as the fourth argument to the slot builder. The builder receives the full `pageConfig` map, the `"settings"` sub-map, and `routeArgs` (the navigation arguments passed when pushing the route — e.g. `AppNavigator.pushNamed(context, '/products/item', arguments: {'productId': '123'})`; `null` when none were passed), and returns whatever widget it likes (typically a BLoC-wrapped screen). One slot identifier can back multiple routes with different `"settings"`.
 
 ---
 

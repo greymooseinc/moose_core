@@ -89,6 +89,12 @@ abstract class FeaturePlugin {
   /// Return named routes this plugin owns. Return null if the plugin owns none.
   Map<String, WidgetBuilder>? getRoutes();
 
+  /// Map of slot identifier → PageSlotBuilder. Each entry in environment.json
+  /// with a matching "pageSlotIdentifier" gets its own Flutter route; the builder
+  /// receives pageConfig (full page entry) and settings (the "settings" sub-map).
+  /// Default: null (no page slots contributed).
+  Map<String, PageSlotBuilder>? get pageSlots => null;
+
   /// Bottom navigation tabs contributed by this plugin. Default: empty.
   List<BottomTab> get bottomTabs => const [];
 
@@ -258,6 +264,19 @@ class ProductsPlugin extends FeaturePlugin {
     '/product': (ctx) => ProductDetailScreen(
       productId: ModalRoute.of(ctx)?.settings.arguments as String?,
     ),
+  };
+
+  @override
+  Map<String, PageSlotBuilder>? get pageSlots => {
+    'plugins/products/slots/product_list': (context, pageConfig, settings, routeArgs) {
+      final filters = settings['filters'] != null
+          ? ProductFilters.fromJson(Map<String, dynamic>.from(settings['filters'] as Map))
+          : null;
+      return BlocProvider.value(
+        value: _freshListBloc(filters),
+        child: ProductsListScreen(filters: filters, pageConfig: pageConfig),
+      );
+    },
   };
 
   @override
@@ -480,6 +499,89 @@ void onRegister() {
   );
 }
 ```
+
+---
+
+## Plugin-Provided Page Slots
+
+Page slots are **reusable screen factories declared by a plugin**. Instead of hardcoding a Flutter route in `getRoutes()`, the plugin exposes a named builder that `environment.json` can instantiate with arbitrary configuration. This lets a single Dart class back multiple distinct routes (e.g. a "Sale" page and a "New Arrivals" page that both use `ProductsListScreen` with different filters), without any additional plugin code.
+
+### How it works
+
+1. The plugin overrides `pageSlots` and maps an identifier string to a `PageSlotBuilder`.
+2. Each page entry in `environment.json` that has `"pageSlotIdentifier"` triggers a slot lookup instead of creating a `PageScreen`.
+3. `MooseBootstrapper._registerPagesRoutes()` calls `pluginRegistry.getPageSlotBuilder(slotId)` at route **build time** (inside a `Builder` widget), so the plugin is guaranteed to be registered before the lookup runs.
+4. The builder receives `pageConfig` (the full page entry map), `settings` (the `"settings"` sub-map, defaulting to `{}`), and `routeArgs` (`ModalRoute.of(context)?.settings.arguments`, extracted inside the `Builder` — `null` when the route was pushed without arguments).
+
+### `PageSlotBuilder` typedef
+
+```dart
+typedef PageSlotBuilder = Widget Function(
+  BuildContext context,
+  Map<String, dynamic> pageConfig,
+  Map<String, dynamic> settings,
+  Object? routeArgs,  // ModalRoute.of(context)?.settings.arguments
+);
+```
+
+### Worked example
+
+**Plugin Dart code:**
+
+```dart
+@override
+Map<String, PageSlotBuilder>? get pageSlots => {
+  'plugins/products/slots/product_list': (context, pageConfig, settings, routeArgs) {
+    final filters = settings['filters'] != null
+        ? ProductFilters.fromJson(Map<String, dynamic>.from(settings['filters'] as Map))
+        : null;
+    return BlocProvider.value(
+      value: _freshListBloc(filters),
+      child: ProductsListScreen(filters: filters, pageConfig: pageConfig),
+    );
+  },
+};
+```
+
+**Corresponding `environment.json` entries:**
+
+```json
+{
+  "pages": [
+    {
+      "route": "/products/sale",
+      "pageSlotIdentifier": "plugins/products/slots/product_list",
+      "settings": { "filters": { "onSale": true } },
+      "appBar": { "title": "SALE", "floating": false, "pinned": true },
+      "sections": [{ "name": "moose.products.section.list_grid" }]
+    },
+    {
+      "route": "/products/new",
+      "pageSlotIdentifier": "plugins/products/slots/product_list",
+      "settings": { "filters": { "orderBy": "date" } },
+      "appBar": { "title": "NEW ARRIVALS" },
+      "sections": [{ "name": "moose.products.section.list_grid" }]
+    }
+  ]
+}
+```
+
+Both entries use the same slot identifier and the same plugin class, but produce separate Flutter routes with different filters.
+
+### Key behaviour
+
+- **Identifier is opaque** — `PluginRegistry.getPageSlotBuilder()` does a map-key lookup against each plugin's `pageSlots`; only the owning plugin interprets the string format.
+- **Lookup is deferred** — the `Builder` wrapper ensures the lookup happens at widget build time, after all plugins have completed `onRegister()`.
+- **`pageSlotIdentifier` bypasses `PageScreen`** — the builder is responsible for the entire widget tree. `pageConfig` is passed through so the builder can still read `sections`, `appBar`, etc. if it chooses to delegate back to `PageScreen`.
+- **`settings` defaults to `{}`** — if the `environment.json` entry omits `"settings"`, the builder receives an empty map.
+- **`routeArgs` carries navigation arguments** — `ModalRoute.of(context)?.settings.arguments` is extracted inside the `Builder` and forwarded as `routeArgs`. It is `null` when the route was pushed without arguments. This is the canonical way to receive data passed via `AppNavigator.pushNamed(context, '/products/item', arguments: {'productId': '123'})`. The product detail slot is the primary use case: the caller pushes a product ID (or a full product object) as the route argument, and the slot builder reads it from `routeArgs` to load the correct product:
+
+  ```dart
+  'plugins/products/slots/product_detail': (context, pageConfig, settings, routeArgs) {
+    final productId = (routeArgs as Map<String, dynamic>?)?['productId'] as String?;
+    return ProductDetailScreen(productId: productId, pageConfig: pageConfig);
+  },
+  ```
 
 ---
 

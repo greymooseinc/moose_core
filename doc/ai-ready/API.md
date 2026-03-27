@@ -170,7 +170,10 @@ class MooseBootstrapper {
 **Bootstrap sequence:**
 
 1. `configManager.initialize(config)` — loads the config map
-1b. `_registerPagesRoutes()` — reads top-level `pages` object from config (key = route path); builds `PageScreen` route entries into `appContext.pagesRoutes`; adds `/home` fallback if absent
+1b. `_registerPagesRoutes()` — reads top-level `pages` object from config (key = route path); three cases:
+    - Keys starting with `plugin:` → skipped (plugin-owned config only; plugin registers its own route)
+    - Entries with `"pageSlotIdentifier"` → calls `pluginRegistry.getPageSlotBuilder(slotId)` via `Builder` (deferred to route build time so all plugins are registered first); `routeArgs` (`ModalRoute.of(ctx)?.settings.arguments`) is extracted inside the `Builder` and forwarded as the fourth argument to the slot builder
+    - Plain entries → `PageScreen` route built into `appContext.pagesRoutes`; `/home` fallback added if absent
 0. Resolve active `MooseTheme` — reads `config['theme']`, wires `theme:palette_*` and `styles:*` hooks
 2. `cache.initPersistent()` — initializes `SharedPreferences` layer
 2b. `appContext.restoreAuthState()` — restores last-known user from persistent cache (instant UI on first frame)
@@ -331,6 +334,14 @@ abstract class FeaturePlugin {
   // Page-screen routes from environment.json['pages'] are registered by MooseBootstrapper
   // and do not require a plugin override.
   Map<String, WidgetBuilder>? getRoutes() => null;
+
+  // Plugin-provided page slots — optional; returns null by default.
+  // Map of slot identifier → PageSlotBuilder. Each environment.json 'pages' entry with a
+  // matching "pageSlotIdentifier" gets its own Flutter route; the builder receives the full
+  // pageConfig, the "settings" sub-map, and routeArgs
+  // (ModalRoute.of(context)?.settings.arguments — null when no arguments were passed).
+  // Looked up at route build time.
+  Map<String, PageSlotBuilder>? get pageSlots => null;
 }
 ```
 
@@ -422,6 +433,11 @@ class PluginRegistry {
   // Collects routes from all plugins plus extraRoutes; adds '/home' fallback if none provided.
   // Pass appContext.pagesRoutes as extraRoutes to include page-screen routes from environment.json.
   Map<String, WidgetBuilder> getAllRoutes({Map<String, WidgetBuilder> extraRoutes = const {}});
+
+  // Plugin-provided page slot lookup. Iterates registered plugins and returns the first
+  // PageSlotBuilder whose key matches identifier, or null if none is found.
+  // Called by MooseBootstrapper at route build time for 'pageSlotIdentifier' page entries.
+  PageSlotBuilder? getPageSlotBuilder(String identifier);
 
   void clearAll(); // tests only
 }

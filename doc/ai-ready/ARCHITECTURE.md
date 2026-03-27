@@ -132,7 +132,12 @@ Step 1   configManager.initialize(config)
 
 Step 1b  MooseBootstrapper._registerPagesRoutes()
          ↓ reads top-level 'pages' object from config (key = route path)
-         ↓ → each active entry → PageScreen(pageConfig: {route: key, ...value})
+         ↓ → keys starting with 'plugin:' → skip (plugin-owned config only; plugin registers route itself)
+         ↓ → entries with "pageSlotIdentifier" → call pluginRegistry.getPageSlotBuilder(slotId) via Builder
+         │     (lookup is deferred to route build time so plugins are guaranteed to be registered first)
+         │     routeArgs = ModalRoute.of(ctx)?.settings.arguments is extracted inside the Builder and
+         │     forwarded as the fourth argument to the slot builder
+         ↓ → plain entries → PageScreen(pageConfig: {route: key, ...value})
          ↓ → stored in appContext.pagesRoutes; passed to PluginRegistry.getAllRoutes() at startup
          ↓ → '/home' fallback added if no page entry claims it
 
@@ -242,6 +247,14 @@ abstract class FeaturePlugin {
   // override this. Page-screen routes from environment.json['pages'] are
   // registered by MooseBootstrapper and do NOT require a plugin override.
   Map<String, WidgetBuilder>? getRoutes() => null;
+
+  // Optional — default returns null. Map of slot identifier → PageSlotBuilder.
+  // Entries in environment.json['pages'] with a matching "pageSlotIdentifier"
+  // get their own Flutter route; the builder receives the full pageConfig,
+  // the "settings" sub-map, and routeArgs (ModalRoute.of(context)?.settings.arguments,
+  // null when the route was pushed without arguments). Looked up at route build time via
+  // PluginRegistry.getPageSlotBuilder(identifier).
+  Map<String, PageSlotBuilder>? get pageSlots => null;
 }
 ```
 
@@ -721,6 +734,8 @@ data: {'settings': sectionSettings, ...extraData}
 ```
 
 Sections access injected values via `data['product']`, `data['selectedVariation']`, etc., and static config via `data['settings']`.
+
+**Plugin-provided page slots** — entries with `"pageSlotIdentifier"` bypass `PageScreen` entirely. The bootstrapper calls `pluginRegistry.getPageSlotBuilder(slotId)` at route build time inside a `Builder`; `routeArgs` (`ModalRoute.of(context)?.settings.arguments`) is extracted there and forwarded as the fourth argument. The plugin's `pageSlots` handler receives `pageConfig` (full page entry), `settings` (the `"settings"` sub-map), and `routeArgs` (`null` when the route was pushed without arguments), and returns whatever widget it likes (typically a BLoC-wrapped screen). The identifier string is opaque — only the owning plugin interprets it.
 
 **Plugin-owned page config** — when a plugin needs config-driven layout but also controls the route (e.g. to wrap a BLoC), add a `"plugin"` field to the page entry. `ConfigManager` normalises this to the key `plugin:<name>:<route>` internally; the bootstrapper skips route registration for it and the plugin reads the config via that key:
 
