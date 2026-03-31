@@ -12,6 +12,7 @@
 library app;
 
 export 'src/app/moose_app_context.dart';
+export 'src/app/moose_app_notifier.dart';
 export 'src/app/moose_scope.dart';
 export 'src/app/moose_bootstrapper.dart';
 export 'src/app/moose_lifecycle_observer.dart';

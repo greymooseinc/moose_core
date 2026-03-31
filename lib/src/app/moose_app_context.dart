@@ -12,6 +12,8 @@ import '../events/hook_registry.dart';
 import '../plugin/plugin_registry.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/repository.dart';
+import '../l10n/moose_l10n.dart';
+import 'moose_app_notifier.dart';
 import '../utils/logger.dart';
 import '../widgets/widget_registry.dart';
 
@@ -267,6 +269,24 @@ class MooseAppContext {
   /// is registered. These routes are merged into [PluginRegistry.getAllRoutes]
   /// so page-screen navigation works without any plugin owning the route table.
   final Map<String, WidgetBuilder> pagesRoutes = {};
+
+  /// Runtime localisation instance for this context.
+  ///
+  /// Plugins register default strings via [MooseL10n.registerDefaults] inside
+  /// [FeaturePlugin.onRegister]. The `LocalizationPlugin` loads JSON override
+  /// files and calls [MooseL10n.applyOverrides] to layer client translations
+  /// on top of those defaults.
+  ///
+  /// Use `context.moose.l10n('key')` in widgets instead of
+  /// `AppLocalizations.of(context)!.key`.
+  final MooseL10n l10n = MooseL10n();
+
+  /// Unified app-level notifier for [MaterialApp] rebuilds.
+  ///
+  /// Plugins push theme/locale/etc. changes here; `app.dart` listens once
+  /// via a single [ListenableBuilder] instead of nesting multiple
+  /// [ValueListenableBuilder]s.
+  final MooseAppNotifier appNotifier = MooseAppNotifier();
 
   // Cache key under which the authenticated user is persisted.
   // Reserved — other plugins must not write to this key.

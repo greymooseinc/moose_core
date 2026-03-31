@@ -150,13 +150,19 @@ class _MooseScopeState extends State<MooseScope> {
     super.initState();
     _lifecycleObserver = MooseLifecycleObserver(appContext: widget.appContext)
       ..attach();
+    widget.appContext.l10n.addListener(_onL10nChanged);
   }
+
+  void _onL10nChanged() { if (mounted) setState(() {}); }
 
   @override
   void didUpdateWidget(covariant MooseScope oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Skip the teardown-and-rewire if the context object has not changed.
     if (identical(oldWidget.appContext, widget.appContext)) return;
+
+    oldWidget.appContext.l10n.removeListener(_onL10nChanged);
+    widget.appContext.l10n.addListener(_onL10nChanged);
 
     // Detach the old lifecycle observer and stop all plugins on the old context.
     _lifecycleObserver?.detach();
@@ -169,6 +175,7 @@ class _MooseScopeState extends State<MooseScope> {
 
   @override
   void dispose() {
+    widget.appContext.l10n.removeListener(_onL10nChanged);
     _lifecycleObserver?.detach();
     unawaited(widget.appContext.pluginRegistry.stopAll());
     super.dispose();
@@ -178,6 +185,7 @@ class _MooseScopeState extends State<MooseScope> {
   Widget build(BuildContext context) {
     return _MooseScopeInherited(
       appContext: widget.appContext,
+      l10nGeneration: widget.appContext.l10n.generation,
       child: widget.child,
     );
   }
@@ -189,18 +197,21 @@ class _MooseScopeState extends State<MooseScope> {
 class _MooseScopeInherited extends InheritedWidget {
   final MooseAppContext appContext;
 
+  /// Mirrors [MooseL10n.generation] — incremented on every locale switch or
+  /// override load, causing all `context.moose` dependants to rebuild with
+  /// fresh l10n strings.
+  final int l10nGeneration;
+
   const _MooseScopeInherited({
     required this.appContext,
+    required this.l10nGeneration,
     required super.child,
   });
 
-  // Notify dependants only when the context object itself is replaced.
-  // Field-level changes inside an existing context (e.g. a new plugin
-  // registered) do not trigger a rebuild here — widgets react to those via
-  // ValueNotifier listeners or BLoC streams.
   @override
   bool updateShouldNotify(_MooseScopeInherited oldWidget) =>
-      !identical(oldWidget.appContext, appContext);
+      !identical(oldWidget.appContext, appContext) ||
+      oldWidget.l10nGeneration != l10nGeneration;
 }
 
 /// Convenience extension that adds `context.moose` to [BuildContext].

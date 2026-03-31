@@ -46,3 +46,6 @@ export 'src/services/app_navigator.dart';
 // Utilities
 export 'src/utils/logger.dart';
 export 'src/utils/currency_formatter.dart';
+
+// Localisation
+export 'src/l10n/moose_l10n.dart';

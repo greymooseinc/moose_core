@@ -285,7 +285,7 @@
       }
     },
     "appBarButtonWidgets": [
-      { "key": "core_ui.back_button", "description": "Standard back / pop button" },
+      { "key": "moose.ui.widget.back_button", "description": "Standard back / pop button" },
       { "key": "cart.app_bar_button", "description": "Cart icon with item count badge" },
       { "key": "search.app_bar_button", "description": "Search icon" },
       { "key": "auth.app_bar_button", "description": "Login icon or user avatar" }
@@ -340,7 +340,7 @@
         "reasoning": "No state setup or runtime args needed. Zero Dart code required.",
         "envJsonSnippet": {
           "route": "/about",
-          "appBar": { "title": "Our Story", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [] },
+          "appBar": { "title": "Our Story", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [] },
           "sections": [
             { "name": "moose.banner.section.banner", "settings": { "key": "brand_hero", "height": 320 } },
             { "name": "moose.blog.section.latest_posts", "settings": { "title": "In the Press", "limit": 4 } }
@@ -357,7 +357,7 @@
         "envJsonSnippet": {
           "route": "/profile",
           "plugin": "profile",
-          "appBar": { "title": "My Account", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [] },
+          "appBar": { "title": "My Account", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [] },
           "sections": [
             { "name": "profile.section.avatar_header" },
             { "name": "profile.section.recent_orders" },
@@ -383,7 +383,7 @@
             "route": "/products/sale",
             "pageSlotIdentifier": "plugins/products/slots/product_list",
             "settings": { "filters": { "onSale": true } },
-            "appBar": { "title": "Sale", "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "appBar": { "title": "Sale", "floating": true, "pinned": false, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
             "sections": [{ "name": "moose.products.section.list_grid" }]
           }
         ],
@@ -399,7 +399,7 @@
           {
             "route": "/products/item",
             "pageSlotIdentifier": "plugins/products/slots/product_detail",
-            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
             "bottomBar": { "name": "moose.products.section.detail:action_bar" },
             "sections": [
               { "name": "moose.products.section.detail:image_gallery" },
@@ -411,7 +411,7 @@
           {
             "route": "/products/electronics",
             "pageSlotIdentifier": "plugins/products/slots/product_detail",
-            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "appBar": { "floating": true, "pinned": false, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
             "bottomBar": { "name": "moose.products.section.detail:action_bar" },
             "sections": [
               { "name": "moose.products.section.detail:image_gallery" },
@@ -436,7 +436,7 @@
             "route": "/summer-sale",
             "pageSlotIdentifier": "plugins/products/slots/product_list",
             "settings": { "filters": { "onSale": true, "tag": "summer" } },
-            "appBar": { "title": "Summer Sale", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "appBar": { "title": "Summer Sale", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
             "sections": [
               { "name": "moose.banner.section.banner", "settings": { "key": "summer_hero", "height": 260 } },
               { "name": "moose.products.section.list_grid", "settings": { "columns": 2 } }
@@ -446,7 +446,7 @@
             "route": "/black-friday",
             "pageSlotIdentifier": "plugins/products/slots/product_list",
             "settings": { "filters": { "onSale": true, "orderBy": "popularity" } },
-            "appBar": { "title": "Black Friday", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "core_ui.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
+            "appBar": { "title": "Black Friday", "floating": false, "pinned": true, "buttonsLeft": [{ "name": "moose.ui.widget.back_button" }], "buttonsRight": [{ "name": "cart.app_bar_button" }] },
             "sections": [
               { "name": "moose.banner.section.banner", "settings": { "key": "bf_hero", "height": 200 } },
               { "name": "moose.products.section.list_filter_bar" },
