@@ -66,8 +66,7 @@ class ActionRegistry {
       return;
     }
 
-    AppNavigator.pushNamed(
-      context,
+    MooseNavigator.of(context).pushNamed(
       interaction.route!,
       arguments: interaction.parameters,
     );

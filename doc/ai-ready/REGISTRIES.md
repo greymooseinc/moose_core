@@ -843,7 +843,7 @@ shopify.promotions.slot.home_banner:build_banner_overlay // custom overlay on ho
 
 `ActionRegistry` handles `UserInteraction` entities — the standard way entities in `moose_core` carry tap/action data. It dispatches to the correct handler based on `UserInteractionType`:
 
-- `internal` → `AppNavigator.pushNamed` with the route and parameters
+- `internal` → `MooseNavigator.of(context).pushNamed()` with the route and parameters
 - `external` → external URL handler (default: shows a SnackBar; override in production with `url_launcher`)
 - `custom` → a custom handler registered with `registerCustomHandler`
 - `none` → no-op
@@ -941,7 +941,7 @@ GestureDetector(
 ### Building UserInteraction in adapters
 
 ```dart
-// Internal navigation (goes through AppNavigator.pushNamed)
+// Internal navigation (goes through MooseNavigator.of(context).pushNamed())
 UserInteraction.internal(
   route: '/products',
   parameters: {'categoryId': 'summer', 'filter': 'new'},

@@ -154,8 +154,7 @@ Step 2b  appContext.restoreAuthState()
          ↓ → if found: currentUser.value = User.fromJson(cached)  (instant UI on first frame)
          ↓ → authStateChanges stream will confirm/correct once adapter wires up
 
-Step 3   AppNavigator.setEventBus(eventBus)
-         ↓ wires navigation to scoped event bus
+Step 3   MooseNavigator ready — EventBus resolved from context.moose.eventBus at call time; no wiring step
 
 Step 4   adapterRegistry.registerAdapter() × N
          ↓ injects appContext → calls initializeFromConfig()
@@ -931,19 +930,19 @@ Defaults are registered automatically:
 - Plugin: `PluginRegistry.register()` → `configManager.registerPluginDefaults()`
 - Adapter: `AdapterRegistry.registerAdapter()` → `configManager.registerAdapterDefaults()`
 
-### AppNavigator
+### MooseNavigator
 
 Static navigation service. Routes navigation events through `EventBus` so plugins can intercept. Falls back to standard `Navigator` if no plugin handles the event.
 
-`MooseBootstrapper` calls `AppNavigator.setEventBus(eventBus)` in step 3. In tests, call `AppNavigator.setEventBus(EventBus())` in `setUp`.
+`MooseNavigator` resolves `EventBus` from `context.moose.eventBus` at call time — no setup step required. No test `setUp` needed either.
 
 ```dart
-AppNavigator.pushNamed(context, '/product', arguments: {'id': 'p-123'});
-AppNavigator.switchToTab(context, 'cart');
-AppNavigator.pop(context);
+MooseNavigator.of(context).pushNamed('/product', arguments: {'id': 'p-123'});
+MooseNavigator.of(context).switchToTab('cart');
+MooseNavigator.pop(context);
 ```
 
-**Always check `context.mounted`** after any `await` in navigation-related code. `AppNavigator` uses `await Future.delayed(Duration.zero)` internally to allow listeners to mark events as handled.
+**Always check `context.mounted`** after any `await` in navigation-related code. `MooseNavigator` uses `await Future.delayed(Duration.zero)` internally to allow listeners to mark events as handled.
 
 ---
 
@@ -1176,7 +1175,7 @@ void main() async {
 | `appContext` is `late` — only access from `onRegister()` / `initialize()` onwards | `LateInitializationError` at runtime |
 | `MooseAppContext.cache` is the field name (not `cacheManager`) | `NoSuchMethodError` at runtime |
 | `PersistentCache.get<T>()` is synchronous — requires prior `initPersistent()` | Throws `StateError` if called before init |
-| `AppNavigator.setEventBus()` must be called before any navigation | Assertion error — `MooseBootstrapper` does this automatically |
+| No `MooseNavigator` setup required — EventBus resolved from `context.moose.eventBus` at call time | N/A |
 | Always check `context.mounted` after `await` in navigation handlers | Widget tree errors if context is unmounted |
 | Repositories return **domain entities** only — never DTOs | Architecture breaks; BLoCs would depend on backend types |
 | Sections extend `FeatureSection` and use BLoC — no direct repo calls | Breaks layer separation; business logic leaks into UI |

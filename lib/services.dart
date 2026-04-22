@@ -27,6 +27,7 @@ export 'src/actions/action_registry.dart';
 
 // API Client
 export 'src/api/api_client.dart';
+export 'src/api/request_queued_error.dart';
 
 // Configuration
 export 'src/config/config_manager.dart';
@@ -41,7 +42,7 @@ export 'src/helpers/text_style_helper.dart';
 
 // Business Services
 export 'src/services/variation_selector_service.dart';
-export 'src/services/app_navigator.dart';
+export 'src/services/moose_navigator.dart';
 
 // Utilities
 export 'src/utils/logger.dart';

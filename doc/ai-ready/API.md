@@ -22,7 +22,7 @@ import 'package:moose_core/plugin.dart';      // FeaturePlugin, PluginRegistry
 import 'package:moose_core/widgets.dart';     // FeatureSection, WidgetRegistry, UnknownSectionWidget
 import 'package:moose_core/adapters.dart';    // BackendAdapter, AdapterRegistry
 import 'package:moose_core/cache.dart';       // CacheManager, MemoryCache, PersistentCache
-import 'package:moose_core/services.dart';    // HookRegistry, EventBus, ActionRegistry, ConfigManager, AppNavigator, AppLogger, ApiClient, etc.
+import 'package:moose_core/services.dart';    // HookRegistry, EventBus, ActionRegistry, ConfigManager, MooseNavigator, AppLogger, ApiClient, etc.
 import 'package:moose_core/ui.dart';          // AppTextStyles, AppButtonStyles, AppInputStyles, AppBackgroundStyles, AppCustomStyles
 ```
 
@@ -37,7 +37,7 @@ import 'package:moose_core/ui.dart';          // AppTextStyles, AppButtonStyles,
 | **widgets.dart** | `FeatureSection`, `WidgetRegistry`, `UnknownSectionWidget` |
 | **adapters.dart** | `BackendAdapter`, `AdapterRegistry`, `AdapterConfigValidationException`, `RepositoryNotRegisteredException`, `RepositoryTypeMismatchException`, `RepositoryFactoryException` |
 | **cache.dart** | `CacheManager`, `MemoryCache`, `PersistentCache`, `CacheStats`, `EvictionPolicy` |
-| **services.dart** | `HookRegistry`, `EventBus`, `Event`, `EventSubscription`, `ActionRegistry`, `ConfigManager`, `AppNavigator`, `AppLogger`, `ApiClient`, `ColorHelper`, `TextStyleHelper`, `CurrencyFormatter`, `VariationSelectorService` |
+| **services.dart** | `HookRegistry`, `EventBus`, `Event`, `EventSubscription`, `ActionRegistry`, `ConfigManager`, `MooseNavigator`, `MooseNavigatorProxy`, `AppLogger`, `ApiClient`, `RequestQueuedError`, `ColorHelper`, `TextStyleHelper`, `CurrencyFormatter`, `VariationSelectorService` |
 | **ui.dart** | `AppTextStyles`, `AppButtonStyles`, `AppInputStyles`, `AppBackgroundStyles`, `AppCustomStyles` |
 
 ---
@@ -177,7 +177,7 @@ class MooseBootstrapper {
 0. Resolve active `MooseTheme` — reads `config['theme']`, wires `theme:palette_*` and `styles:*` hooks
 2. `cache.initPersistent()` — initializes `SharedPreferences` layer
 2b. `appContext.restoreAuthState()` — restores last-known user from persistent cache (instant UI on first frame)
-3. `AppNavigator.setEventBus(eventBus)` — wires navigation to scoped event bus
+3. Navigation is ready — `MooseNavigator` resolves `EventBus` from `context.moose.eventBus` at call time; no wiring step needed
 4. Register each adapter via `adapterRegistry.registerAdapter()`
 5. Register each plugin via `pluginRegistry.register()` (sync; injects `appContext`, calls `onRegister`)
 6. `pluginRegistry.initAll()` — calls `onInit()` on all plugins (async)
@@ -999,7 +999,7 @@ class ActionRegistry {
   void unregisterCustomHandler(String actionId);
 
   // Dispatches UserInteraction:
-  //   internal → AppNavigator.pushNamed()
+  //   internal → MooseNavigator.of(context).pushNamed()
   //   external → URL handling (url_launcher in production)
   //   custom   → registered handler lookup
   //   none     → no-op
@@ -1062,29 +1062,50 @@ actionRegistry.handleInteraction(context, interaction);
 
 ## Navigation
 
-### AppNavigator
+### MooseNavigator
 
-Static navigation service. Fires navigation events through `EventBus` so plugins can intercept. Falls back to standard `Navigator` if no listener handles it.
+Navigation service that fires `EventBus` events so plugins can intercept, then falls back to standard Flutter `Navigator`. Resolves `EventBus` from `context.moose.eventBus` — no initialization step required.
 
-**Must be initialized before use** — `MooseBootstrapper.run()` calls `AppNavigator.setEventBus(appContext.eventBus)` automatically.
+**Two equivalent call styles:**
 
 ```dart
-class AppNavigator {
-  // Called automatically by MooseBootstrapper
-  static void setEventBus(EventBus eventBus);
+// Fluent (preferred) — MooseNavigator.of(context) returns a MooseNavigatorProxy
+MooseNavigator.of(context).pushNamed('/cart');
+MooseNavigator.of(context).pop();
+MooseNavigator.of(context).pushNamedAndRemoveUntil('/', (r) => false);
 
+// Static shortcuts (convenience) — identical behaviour
+MooseNavigator.pushNamed(context, '/cart');
+MooseNavigator.pop(context);
+```
+
+**Full API:**
+
+```dart
+class MooseNavigator {
+  // Fluent API — resolves EventBus from context.moose.eventBus
+  static MooseNavigatorProxy of(BuildContext context);
+
+  // Static shortcuts (delegate to .of(context))
   static Future<T?> pushNamed<T>(BuildContext context, String routeName, {Object? arguments});
   static Future<T?> pushReplacementNamed<T, TO>(BuildContext context, String routeName, {TO? result, Object? arguments});
+  static Future<T?> pushNamedAndRemoveUntil<T>(BuildContext context, String routeName, RoutePredicate predicate, {Object? arguments});
   static Future<T?> push<T>(BuildContext context, Route<T> route);
   static void pop<T>(BuildContext context, [T? result]);
   static bool canPop(BuildContext context);
-
-  // Tab switching — intercepted by BottomTabbedHomePlugin if active
   static Future<void> switchToTab(BuildContext context, String tabId);
   static Future<void> switchToTabIndex(BuildContext context, int index);
+}
 
-  // Advanced: access the wired EventBus
-  static EventBus get eventBus;
+class MooseNavigatorProxy {
+  // Instance methods — same names, no context parameter
+  Future<T?> pushNamed<T>(String routeName, {Object? arguments});
+  Future<T?> pushReplacementNamed<T, TO>(String routeName, {TO? result, Object? arguments});
+  Future<T?> pushNamedAndRemoveUntil<T>(String routeName, RoutePredicate predicate, {Object? arguments});
+  Future<T?> push<T>(Route<T> route);
+  void pop<T>([T? result]);
+  Future<void> switchToTab(String tabId);
+  Future<void> switchToTabIndex(int index);
 }
 ```
 
@@ -1094,6 +1115,7 @@ class AppNavigator {
 |-------|-----------|
 | `navigation.push_named` | `routeName`, `arguments`, `context`, `_markHandled`, `onSwitched` |
 | `navigation.push_replacement_named` | `routeName`, `arguments`, `result`, `context`, `_markHandled`, `onSwitched` |
+| `navigation.push_named_and_remove_until` | `routeName`, `arguments`, `context`, `_markHandled`, `onSwitched` |
 | `navigation.push` | `route`, `context`, `_markHandled`, `onSwitched` |
 | `navigation.pop` | `result`, `context`, `_markHandled`, `onSwitched` |
 | `navigation.switch_to_tab` | `tabId`, `context`, `_markHandled` |
@@ -1101,7 +1123,22 @@ class AppNavigator {
 
 Call `_markHandled(result)` in your listener to prevent the default `Navigator` fallback.
 
-**Important:** Check `context.mounted` after every `await` in navigation handlers — `AppNavigator` uses `await Future.delayed(Duration.zero)` internally.
+**Intercepting navigation in a plugin:**
+
+```dart
+// In onInit():
+eventBus.on('navigation.push_named', (event) {
+  final routeName = event.data['routeName'] as String?;
+  final markHandled = event.data['_markHandled'] as Function?;
+
+  if (routeName == '/cart' && _isTabRoute(routeName)) {
+    _switchToCartTab();
+    markHandled?.call(null); // prevents Navigator.pushNamed fallback
+  }
+});
+```
+
+**Important:** Check `context.mounted` after every `await` — `MooseNavigator` uses `await Future.delayed(Duration.zero)` internally to allow event listeners to run synchronously before navigation proceeds.
 
 ---
 
@@ -1375,8 +1412,7 @@ These rules are enforced by the design. Violating them causes compile errors, ru
 4. **`appContext` is `late`** — don't access it before the registry injects it (before `onRegister` for plugins, before `initialize` for adapters).
 5. **`cache` not `cacheManager`** — `MooseAppContext` field is `.cache`; `BackendAdapter` exposes both `.cache` and `.cacheManager` (alias).
 6. **PersistentCache.get\<T\>() is synchronous** — requires `initPersistent()` to be called first (done by `MooseBootstrapper`).
-7. **`context.mounted` after every `await`** — especially in `AppNavigator` handlers that use `Future.delayed(Duration.zero)`.
-8. **`AppNavigator.setEventBus()` before use** — `MooseBootstrapper.run()` does this; in tests call `AppNavigator.setEventBus(EventBus())` in `setUp`.
+7. **`context.mounted` after every `await`** — especially in `MooseNavigator` event handlers that use `Future.delayed(Duration.zero)` internally.
 
 ---
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../adapter/backend_adapter.dart';
 import '../plugin/feature_plugin.dart';
-import '../services/app_navigator.dart';
 import '../theme/moose_theme.dart';
 import '../ui/style_hook_data.dart';
 import 'moose_app_context.dart';
@@ -96,9 +95,7 @@ class BootstrapReport {
 /// 2b. **Auth restore** — [MooseAppContext.restoreAuthState] reads the last
 ///    persisted user from the persistent cache so the UI can render
 ///    user-specific content on the very first frame.
-/// 3. **Navigator wiring** — [AppNavigator.setEventBus] connects navigation
-///    helpers to this context's scoped [EventBus].
-/// 4. **Adapter registration** — each [BackendAdapter] is registered via
+/// 3. **Adapter registration** — each [BackendAdapter] is registered via
 ///    [AdapterRegistry.registerAdapter]; adapter factories are evaluated lazily.
 /// 5. **Plugin registration** — each plugin factory is called, the resulting
 ///    [FeaturePlugin] is registered via [PluginRegistry.register], which
@@ -187,10 +184,6 @@ class MooseBootstrapper {
     //          can show user-specific content on the first frame, before any
     //          adapter's authStateChanges stream confirms the session.
     await appContext.restoreAuthState();
-
-    // Step 3: Wire AppNavigator to the scoped EventBus so that navigation
-    //         events flow through this context's bus (not a global singleton).
-    AppNavigator.setEventBus(appContext.eventBus);
 
     // Step 4: Register and initialize adapters.
     for (final adapter in adapters) {

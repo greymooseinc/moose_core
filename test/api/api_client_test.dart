@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moose_core/app.dart';
 import 'package:moose_core/services.dart';
 
 class _RecordingAdapter implements HttpClientAdapter {
@@ -51,7 +52,7 @@ void main() {
         return headers;
       });
 
-      final client = ApiClient(dio, hookRegistry: hooks);
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
       await client.get('/products');
 
       expect(adapter.lastRequestOptions, isNotNull);
@@ -68,7 +69,7 @@ void main() {
         return headers;
       });
 
-      final client = ApiClient(dio, hookRegistry: hooks);
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
       await client.get(
         '/products',
         headers: {
@@ -80,7 +81,7 @@ void main() {
       expect(adapter.lastRequestOptions!.headers['X-Locale'], 'fr-FR');
     });
 
-    test('hook does not run when hookRegistry is null', () async {
+    test('hook does not run when appContext is null', () async {
       final client = ApiClient(dio);
       await client.get('/products', headers: {'X-Test': '1'});
 
@@ -100,7 +101,7 @@ void main() {
         return headers;
       });
 
-      final client = ApiClient(dio, hookRegistry: hooks);
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
       final file = File(
         '${Directory.systemTemp.path}/moose_api_client_download_${DateTime.now().microsecondsSinceEpoch}.tmp',
       );
@@ -130,7 +131,7 @@ void main() {
         (data) => throw Exception('hook failed'),
       );
 
-      final client = ApiClient(dio, hookRegistry: hooks);
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
       await client.get('/products', headers: {'X-Test': 'ok'});
 
       expect(adapter.lastRequestOptions, isNotNull);
@@ -145,7 +146,7 @@ void main() {
         return headers;
       });
 
-      final client = ApiClient(dio, hookRegistry: hooks);
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
       client.addInterceptor(
         InterceptorsWrapper(
           onRequest: (options, handler) {
@@ -163,6 +164,66 @@ void main() {
         adapter.lastRequestOptions!.headers['X-From-Interceptor'],
         'interceptor',
       );
+    });
+  });
+
+  group('ApiClient intercept_request hook (outbox pattern)', () {
+    late Dio dio;
+    late _RecordingAdapter adapter;
+
+    setUp(() {
+      dio = Dio(BaseOptions(baseUrl: 'https://example.com'));
+      adapter = _RecordingAdapter();
+      dio.httpClientAdapter = adapter;
+    });
+
+    test('pass-through hook proceeds normally', () async {
+      final hooks = HookRegistry();
+      hooks.register('api:intercept_request', (data) => data); // pass-through
+
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
+      await client.get('/products');
+
+      expect(adapter.requestCount, 1);
+    });
+
+    test('hook returning null throws RequestQueuedError', () async {
+      final hooks = HookRegistry();
+      hooks.register('api:intercept_request', (data) => null);
+
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
+
+      expect(
+        () => client.get('/products'),
+        throwsA(isA<RequestQueuedError>()),
+      );
+      // No HTTP request should be made
+      expect(adapter.requestCount, 0);
+    });
+
+    test('hook can modify queryParams before dispatch', () async {
+      final hooks = HookRegistry();
+      hooks.register('api:intercept_request', (data) {
+        final descriptor = Map<String, dynamic>.from(data as Map<String, dynamic>);
+        final qp = Map<String, dynamic>.from(
+            descriptor['queryParams'] as Map<String, dynamic>? ?? {});
+        qp['injected'] = 'yes';
+        descriptor['queryParams'] = qp;
+        return descriptor;
+      });
+
+      final client = ApiClient(dio, appContext: MooseAppContext(hookRegistry: hooks));
+      await client.get('/products', queryParams: {'page': '1'});
+
+      expect(adapter.lastRequestOptions!.queryParameters['injected'], 'yes');
+      expect(adapter.lastRequestOptions!.queryParameters['page'], '1');
+    });
+
+    test('no intercept hook registered proceeds normally', () async {
+      final client = ApiClient(dio, appContext: MooseAppContext());
+      await client.get('/products');
+
+      expect(adapter.requestCount, 1);
     });
   });
 }

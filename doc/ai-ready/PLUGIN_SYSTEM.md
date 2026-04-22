@@ -120,7 +120,7 @@ MooseBootstrapper.run()
 │
 ├─ 1. configManager.initialize(config)
 ├─ 2. cache.initPersistent()
-├─ 3. AppNavigator.setEventBus(appContext.eventBus)
+├─ 3. Navigation ready — MooseNavigator.of(context) resolves EventBus automatically
 ├─ 4. Register adapters (adapterRegistry.registerAdapter per adapter)
 │
 ├─ 5. For each plugin factory:
@@ -574,7 +574,7 @@ Both entries use the same slot identifier and the same plugin class, but produce
 - **Lookup is deferred** — the `Builder` wrapper ensures the lookup happens at widget build time, after all plugins have completed `onRegister()`.
 - **`pageSlotIdentifier` bypasses `PageScreen`** — the builder is responsible for the entire widget tree. `pageConfig` is passed through so the builder can still read `sections`, `appBar`, etc. if it chooses to delegate back to `PageScreen`.
 - **`settings` defaults to `{}`** — if the `environment.json` entry omits `"settings"`, the builder receives an empty map.
-- **`routeArgs` carries navigation arguments** — `ModalRoute.of(context)?.settings.arguments` is extracted inside the `Builder` and forwarded as `routeArgs`. It is `null` when the route was pushed without arguments. This is the canonical way to receive data passed via `AppNavigator.pushNamed(context, '/products/item', arguments: {'productId': '123'})`. The product detail slot is the primary use case: the caller pushes a product ID (or a full product object) as the route argument, and the slot builder reads it from `routeArgs` to load the correct product:
+- **`routeArgs` carries navigation arguments** — `ModalRoute.of(context)?.settings.arguments` is extracted inside the `Builder` and forwarded as `routeArgs`. It is `null` when the route was pushed without arguments. This is the canonical way to receive data passed via `MooseNavigator.of(context).pushNamed('/products/item', arguments: {'productId': '123'})`. The product detail slot is the primary use case: the caller pushes a product ID (or a full product object) as the route argument, and the slot builder reads it from `routeArgs` to load the correct product:
 
   ```dart
   'plugins/products/slots/product_detail': (context, pageConfig, settings, routeArgs) {

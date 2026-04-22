@@ -175,7 +175,7 @@ final ctx = MooseAppContext(
 1. `ConfigManager.initialize(config)` — loads `environment.json` map
 2. `CacheManager.initPersistent()` — opens persistent cache
 2b. `appContext.restoreAuthState()` — populates `currentUser` from `PersistentCache` (instant UI on first frame before any adapter wires up)
-3. `AppNavigator.setEventBus(eventBus)` — wires navigation to scoped event bus
+3. `MooseNavigator` ready — EventBus resolved from `context.moose.eventBus` at call time; no wiring step
 4. Register each adapter — `AdapterRegistry.registerAdapter()` → validates config schema → calls `adapter.initialize(config)`
 5. Register each plugin (sync) — injects `MooseAppContext`, calls `plugin.onRegister()`
 6. Initialize all plugins (async) — calls `plugin.onInit()` in registration order
@@ -552,6 +552,8 @@ moose locale add si
 |---|---|
 | [REGISTRIES.md](./REGISTRIES.md) | WidgetRegistry, HookRegistry, ActionRegistry, EventBus — **includes Naming Conventions** (four-segment grammar, `section`/`slot`/`widget`/`hook`/`event`/`cmd` type segments, `moose.` prefix rules, third-party naming) |
 | [EVENT_SYSTEM_GUIDE.md](./EVENT_SYSTEM_GUIDE.md) | EventBus vs HookRegistry decision matrix, patterns, BLoC integration |
+| [L10N.md](./L10N.md) | **Localization** — two-layer string system, `registerDefaults()`, JSON override files, locale switching, `MooseL10n.resolve()` for config strings, adding a new language |
+| [API_CLIENT.md](./API_CLIENT.md) | **ApiClient** — constructor, HTTP methods, `api:request_headers` hook, `api:intercept_request` hook (outbox pattern), EventBus lifecycle events, `replay()`, `RequestQueuedError`, testing |
 | [CACHE_SYSTEM.md](./CACHE_SYSTEM.md) | CacheManager, MemoryCache, PersistentCache, TTL configuration |
 | [API.md](./API.md) | Public API reference — exported classes, type definitions |
 | [UI_STYLES.md](./UI_STYLES.md) | `package:moose_core/ui.dart` — AppTextStyles, AppButtonStyles, AppInputStyles, AppCustomStyles, palette plugins |

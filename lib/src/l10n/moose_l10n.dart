@@ -188,6 +188,25 @@ class MooseL10n extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // Config string resolution
+  // ---------------------------------------------------------------------------
+
+  /// Resolves [value] as an l10n key if a translation exists; otherwise returns [value] as-is.
+  ///
+  /// Allows config strings (e.g. from `environment.json`) to be either literal
+  /// text or l10n key references — no special prefix required.
+  ///
+  /// ```dart
+  /// MooseL10n.resolve('tabs.home', l10n)    // → 'Home'        (key registered)
+  /// MooseL10n.resolve('Home', l10n)          // → 'Home'        (literal pass-through)
+  /// MooseL10n.resolve('unknown.key', l10n)   // → 'unknown.key' (unregistered key)
+  /// ```
+  static String resolve(String value, MooseL10n l10n) {
+    final resolved = l10n(value);
+    return resolved != value ? resolved : value;
+  }
+
+  // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
 

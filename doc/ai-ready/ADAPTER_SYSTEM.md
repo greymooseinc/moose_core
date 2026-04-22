@@ -368,7 +368,7 @@ if (!report.succeeded) {
 
 1. `configManager.initialize(config)` — loads `environment.json` map
 2. `cache.initPersistent()` — opens SharedPreferences
-3. `AppNavigator.setEventBus(appContext.eventBus)` — wires navigation
+3. `Navigation is ready — MooseNavigator resolves EventBus from context.moose.eventBus at call time
 4. For each adapter: `adapterRegistry.registerAdapter(() => adapter)` — injects `appContext`, calls `initializeFromConfig()`
 5. For each plugin factory: `pluginRegistry.register(plugin, appContext: appContext)` — injects `appContext`, calls `onRegister()`
 6. `pluginRegistry.initAll()` — calls `initialize()` on all plugins

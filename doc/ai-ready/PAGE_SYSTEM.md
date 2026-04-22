@@ -201,7 +201,7 @@ typedef PageSlotBuilder = Widget Function(
 
 - `pageConfig` — the complete page entry object (includes `route`, `appBar`, `sections`, etc.)
 - `settings` — convenience: the `"settings"` key from the page entry (for per-instance config like filters)
-- `routeArgs` — the navigation arguments passed at `AppNavigator.pushNamed()` time (`null` when none)
+- `routeArgs` — the navigation arguments passed at `MooseNavigator.of(context).pushNamed()` time (`null` when none)
 
 ### How to implement
 
@@ -323,14 +323,14 @@ A single slot identifier can back any number of routes. Each route entry in `env
 
 ```dart
 // Navigate to product detail — pass productId as routeArgs
-AppNavigator.pushNamed(
+MooseNavigator.of(context).pushNamed(
   context,
   '/products/item',
   arguments: {'productId': product.id},
 );
 
 // Also works with a plain String
-AppNavigator.pushNamed(context, '/products/item', arguments: product.id);
+MooseNavigator.of(context).pushNamed('/products/item', arguments: product.id);
 ```
 
 ---
@@ -547,7 +547,7 @@ class ProfilePlugin extends FeaturePlugin {
 
 **Navigation call:**
 ```dart
-AppNavigator.pushNamed(
+MooseNavigator.of(context).pushNamed(
   context,
   '/products/electronics',
   arguments: {'productId': product.id},

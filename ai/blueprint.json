@@ -485,7 +485,81 @@
       "doc/ai-ready/ADAPTER_SYSTEM.md",
       "doc/ai-ready/REPOSITORIES.md",
       "doc/ai-ready/REGISTRIES.md",
+      "doc/ai-ready/L10N.md",
       "doc/ai-ready/API.md"
+    ]
+  },
+
+  "l10n": {
+    "description": "Runtime two-layer localization system. Plugins register English defaults; LocalizationPlugin overlays per-locale JSON files. Full guide: doc/ai-ready/L10N.md",
+    "keyClass": "MooseL10n (moose_core/lib/src/l10n/moose_l10n.dart)",
+    "accessPath": "appContext.l10n  OR  context.moose.l10n",
+    "import": "package:moose_core/services.dart",
+    "keyConvention": "<pluginId>.<camelCaseKey>  e.g.  auth.signIn  cart.emptyMessage  tabs.home",
+    "lookupOrder": [
+      "1. Override for active locale (from assets/l10n/<locale>.json)",
+      "2. English default registered by the plugin via registerDefaults()",
+      "3. fallback parameter if provided",
+      "4. The key string itself (prevents blank UI)"
+    ],
+    "rebuildMechanism": "MooseL10n extends ChangeNotifier. MooseScope listens to l10n and passes l10nGeneration to _MooseScopeInherited. Every context.moose dependant rebuilds automatically on setLocale() or applyOverrides().",
+    "pluginRegistration": {
+      "where": "onRegister() — always before any other registration; never in onInit()",
+      "method": "appContext.l10n.registerDefaults(pluginId, bareKeyMap)",
+      "example": "appContext.l10n.registerDefaults('loyalty', { 'title': 'Loyalty Points', 'pointsBalance': '{points} points', 'redeemButton': 'Redeem' });"
+    },
+    "widgetUsage": {
+      "simple": "context.moose.l10n('cart.checkout')",
+      "withParams": "context.moose.l10n('cart.itemCount', params: {'count': '3'})",
+      "withFallback": "context.moose.l10n('myPlugin.title', fallback: 'My Plugin')",
+      "configStringResolve": "MooseL10n.resolve(value, context.moose.l10n)  // transparent: returns translation if key registered, else value as-is"
+    },
+    "hooks": {
+      "l10n:translate": "Registered by LocalizationPlugin. data: String key OR Map{key, fallback?, params?}. Returns translated string.",
+      "l10n:get_locale": "Registered by LocalizationPlugin. Returns active locale code as String (e.g. 'ja')."
+    },
+    "overrideFiles": {
+      "location": "assets/l10n/<localeCode>.json",
+      "pubspecEntry": "flutter: assets: - assets/l10n/",
+      "format": "Flat map of fully-qualified key → translated string. No nesting.",
+      "example": "{ \"auth.signIn\": \"ログイン\", \"cart.checkout\": \"レジへ進む\", \"products.minimumRatingChip\": \"⭐ {rating}以上\" }",
+      "rules": [
+        "Only include keys that differ from English — missing keys fall back silently.",
+        "Preserve {placeholder} markers exactly as they appear in the English default.",
+        "English apps need no JSON file — plugin defaults cover everything."
+      ]
+    },
+    "localizationPlugin": {
+      "class": "LocalizationPlugin",
+      "location": "lib/plugins/localization/localization_plugin.dart",
+      "registrationOrder": "Must come after LocaleManagerPlugin in main.dart plugins list.",
+      "event": "Subscribes to moose.locale.event.changed (fired by LocaleManagerPlugin).",
+      "startup": "Reads initial locale from moose.locale.hook.get_locale, calls setLocale() + loads JSON file.",
+      "onLocaleChange": "setLocale() → instant rebuild with English defaults (first rebuild); _loadOverrides() async → applyOverrides() → second rebuild with translated strings."
+    },
+    "configStringResolution": {
+      "description": "Any string setting from environment.json can transparently be either a literal or an l10n key. Use MooseL10n.resolve() at render time.",
+      "howItWorks": "MooseL10n.resolve(value, l10n) calls l10n(value). If result != value, a translation was found. Otherwise returns value unchanged.",
+      "examples": [
+        "MooseL10n.resolve('tabs.home', l10n)  // → 'Home' or 'ホーム' depending on locale",
+        "MooseL10n.resolve('MY STORE', l10n)   // → 'MY STORE' (no key match, pass-through)",
+        "MooseL10n.resolve('tabs.shop', l10n)  // → 'Shop' or 'ショップ'"
+      ],
+      "usedBy": ["MooseAppBar._buildTitle() for the 'title' setting", "BottomTabsScreen for tab label rendering"]
+    },
+    "addingANewLanguage": [
+      "1. Create assets/l10n/<localeCode>.json with flat key→value map (only keys that differ from English).",
+      "2. Ensure assets/l10n/ is listed under flutter.assets in pubspec.yaml.",
+      "3. Add the locale code to LocaleManagerPlugin settings.supportedLocales in environment.json.",
+      "4. No Dart code changes needed — LocalizationPlugin loads the file automatically."
+    ],
+    "commonMistakes": [
+      "Calling registerDefaults() in onInit() instead of onRegister() — other plugins may query strings before onInit() runs.",
+      "Using plugin-prefixed keys in registerDefaults() — prefix is added automatically; 'myPlugin.title' becomes 'myPlugin.myPlugin.title'.",
+      "Nesting keys in JSON override file — MooseL10n expects a flat map.",
+      "Omitting {placeholder} in translated string — interpolation silently produces empty substitutions.",
+      "Not adding LocalizationPlugin after LocaleManagerPlugin in main.dart.",
+      "Calling context.moose.l10n() during plugin onRegister() and expecting translated strings — overrides load during onInit(), so only English defaults are available at registration time."
     ]
   }
 }

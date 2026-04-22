@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../app/moose_scope.dart';
 import '../helpers/color_helper.dart';
 import '../helpers/text_style_helper.dart';
+import '../l10n/moose_l10n.dart';
 import '../widgets/feature_section.dart';
 
 /// A sliver app bar section that renders configurable button lists on the left
@@ -100,7 +102,7 @@ class MooseAppBar extends FeatureSection {
         : '';
     if (title.isEmpty) return const SizedBox.shrink();
     return Text(
-      title,
+      MooseL10n.resolve(title, context.moose.l10n),
       style: TextStyleHelper.fromJson(
           getSetting<Map<String, dynamic>>('titleStyle')),
     );

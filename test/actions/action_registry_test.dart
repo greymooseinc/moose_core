@@ -11,8 +11,6 @@ void main() {
       registry = ActionRegistry();
       // Clear any previously registered handlers
       registry.clearCustomHandlers();
-      // AppNavigator requires a scoped EventBus in tests
-      AppNavigator.setEventBus(EventBus());
     });
 
     tearDown(() {
