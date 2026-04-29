@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/app.dart';
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/repositories.dart';
 
 /// Mock repository for testing
@@ -90,6 +91,287 @@ class OverridingAdapter extends BackendAdapter {
   Future<void> initialize(Map<String, dynamic> config) async {
     // Registers the same repository type as TestAdapter1
     registerRepositoryFactory<MockRepository>(() => MockRepository());
+  }
+}
+
+/// Stub AuthRepository that throws on signOut
+class _ThrowingAuthRepository extends AuthRepository {
+  bool signOutCalled = false;
+
+  @override
+  void initialize() {}
+
+  @override
+  Future<void> signOut({RepositoryOptions? options}) async {
+    signOutCalled = true;
+    throw Exception('network error during signOut');
+  }
+
+  @override
+  Stream<User?> get authStateChanges => const Stream.empty();
+
+  @override
+  Future<AuthResult> signIn(AuthCredentials credentials,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> signUp(AuthCredentials credentials,
+          {String? displayName,
+          String? photoUrl,
+          Map<String, dynamic>? metadata,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User?> getCurrentUser({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> sendPasswordResetEmail(String email,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> confirmPasswordReset(
+          {required String code,
+          required String newPassword,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> changePassword(
+          {required String currentPassword,
+          required String newPassword,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendEmailVerification({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmailVerificationResult> verifyEmail(String code,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendPhoneVerificationCode(String phoneNumber,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmailVerificationResult> verifyPhoneNumber(
+          {required String phoneNumber,
+          required String verificationCode,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> updateProfile(
+          {String? displayName,
+          String? photoUrl,
+          Map<String, dynamic>? metadata,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> updateEmail(String newEmail, {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deleteAccount({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String?> getIdToken(
+          {bool forceRefresh = false, RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> refreshToken(String refreshToken,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> linkCredential(AuthCredentials credentials,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> unlinkProvider(String providerId,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> enrollMFA(
+          {required String phoneNumber, RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> unenrollMFA({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+}
+
+/// Stub AuthRepository that records signOut calls and succeeds
+class _TrackingAuthRepository extends AuthRepository {
+  bool signOutCalled = false;
+
+  @override
+  void initialize() {}
+
+  @override
+  Future<void> signOut({RepositoryOptions? options}) async {
+    signOutCalled = true;
+  }
+
+  @override
+  Stream<User?> get authStateChanges => const Stream.empty();
+
+  @override
+  Future<AuthResult> signIn(AuthCredentials credentials,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> signUp(AuthCredentials credentials,
+          {String? displayName,
+          String? photoUrl,
+          Map<String, dynamic>? metadata,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User?> getCurrentUser({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> sendPasswordResetEmail(String email,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> confirmPasswordReset(
+          {required String code,
+          required String newPassword,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PasswordResetResult> changePassword(
+          {required String currentPassword,
+          required String newPassword,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendEmailVerification({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmailVerificationResult> verifyEmail(String code,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendPhoneVerificationCode(String phoneNumber,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmailVerificationResult> verifyPhoneNumber(
+          {required String phoneNumber,
+          required String verificationCode,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> updateProfile(
+          {String? displayName,
+          String? photoUrl,
+          Map<String, dynamic>? metadata,
+          RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> updateEmail(String newEmail, {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deleteAccount({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String?> getIdToken(
+          {bool forceRefresh = false, RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> refreshToken(String refreshToken,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AuthResult> linkCredential(AuthCredentials credentials,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> unlinkProvider(String providerId,
+          {RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> enrollMFA(
+          {required String phoneNumber, RepositoryOptions? options}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> unenrollMFA({RepositoryOptions? options}) =>
+      throw UnimplementedError();
+}
+
+/// Adapter that registers a throwing AuthRepository
+class _ThrowingAuthAdapter extends BackendAdapter {
+  final _ThrowingAuthRepository repo = _ThrowingAuthRepository();
+
+  @override
+  String get name => 'throwing_auth';
+
+  @override
+  String get version => '1.0.0';
+
+  @override
+  Map<String, dynamic> get configSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    registerRepositoryFactory<AuthRepository>(() => repo);
+  }
+}
+
+/// Adapter that registers a tracking (succeeding) AuthRepository
+class _TrackingAuthAdapter extends BackendAdapter {
+  final _TrackingAuthRepository repo = _TrackingAuthRepository();
+
+  @override
+  String get name => 'tracking_auth';
+
+  @override
+  String get version => '1.0.0';
+
+  @override
+  Map<String, dynamic> get configSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    registerRepositoryFactory<AuthRepository>(() => repo);
   }
 }
 
@@ -635,6 +917,59 @@ void main() {
         expect(registry.adapterCount, 0);
         expect(registry.repositoryCount, 0);
         expect(registry.isInitialized, false);
+      });
+    });
+
+    group('signOutAll', () {
+      /// Sets up an [AdapterRegistry] backed by a [MooseAppContext] whose
+      /// [ConfigManager] is pre-seeded with entries for [adapterNames].
+      ///
+      /// Using [autoInitialize: true] ensures [initialize] is called after
+      /// [resetRepositories], which is the only path that correctly registers
+      /// repository factories in the current adapter lifecycle.
+      AdapterRegistry makeRegistryWithContext(List<String> adapterNames) {
+        final appContext = MooseAppContext();
+        appContext.configManager.initialize({
+          'adapters': {for (final n in adapterNames) n: {}},
+        });
+        final registry = AdapterRegistry();
+        registry.setDependencies(appContext: appContext);
+        return registry;
+      }
+
+      test('signOutAll does not rethrow when an auth repository signOut throws',
+          () async {
+        final throwingAdapter = _ThrowingAuthAdapter();
+
+        final registry = makeRegistryWithContext(['throwing_auth']);
+        await registry.registerAdapter(() => throwingAdapter);
+
+        // Force the auth repo into the instance cache.
+        registry.getRepository<AuthRepository>();
+
+        await expectLater(registry.signOutAll(), completes);
+      });
+
+      test(
+          'signOutAll continues signing out other providers after one throws',
+          () async {
+        final throwingAdapter = _ThrowingAuthAdapter();
+        final trackingAdapter = _TrackingAuthAdapter();
+
+        final registry =
+            makeRegistryWithContext(['throwing_auth', 'tracking_auth']);
+        await registry.registerAdapter(() => throwingAdapter);
+        await registry.registerAdapter(() => trackingAdapter);
+
+        // Force both auth repos into the instance cache using named lookups
+        // so both are present in _instances simultaneously.
+        registry.getRepository<AuthRepository>('throwing_auth');
+        registry.getRepository<AuthRepository>('tracking_auth');
+
+        await registry.signOutAll();
+
+        expect(throwingAdapter.repo.signOutCalled, isTrue);
+        expect(trackingAdapter.repo.signOutCalled, isTrue);
       });
     });
 

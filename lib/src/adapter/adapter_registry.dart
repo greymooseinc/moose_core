@@ -373,7 +373,7 @@ class AdapterRegistry {
   ///
   /// Multiple cache keys (unnamed + named) may point to the same instance, so
   /// a [Set] is used to avoid calling [AuthRepository.signOut] twice on the
-  /// same object. Errors from individual repositories are swallowed so that
+  /// same object. Errors from individual repositories are logged so that
   /// a failure in one provider does not block sign-out from others.
   Future<void> signOutAll() async {
     final seen = <AuthRepository>{};
@@ -381,7 +381,13 @@ class AdapterRegistry {
       if (instance is AuthRepository && seen.add(instance)) {
         try {
           await instance.signOut();
-        } catch (_) {}
+        } catch (e, stack) {
+          _logger.error(
+            'signOut failed for one auth provider — other providers will still be signed out',
+            e,
+            stack,
+          );
+        }
       }
     }
   }
