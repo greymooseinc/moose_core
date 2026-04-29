@@ -85,6 +85,10 @@ class MooseAppContext {
 }
 ```
 
+> **Fault tolerance (v2.3+):** If the cached user JSON is corrupt (e.g. after a schema migration), `restoreAuthState` logs a warning, clears the entry, and treats the user as unauthenticated. The app starts normally; the user signs in again. No reinstall is required.
+
+> **Race safety (v2.3+):** Persistent cache writes inside the auth state listener are `await`-ed, preventing a sign-out from being overwritten by an in-flight sign-in write. Note: Dart async stream listeners do not serialise successive events — intra-event writes are ordered, but inter-event ordering requires an explicit queue if needed.
+
 Create one `MooseAppContext` per app. In tests, create a new one per test — isolation is free.
 
 ```dart

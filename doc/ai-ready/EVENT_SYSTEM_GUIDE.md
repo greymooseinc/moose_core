@@ -20,6 +20,29 @@
 - **Pattern**: Synchronous callbacks with priority
 - **Example**: Calculate price with discounts, filter search results
 
+### ⚠️ Sync hooks must not return a Future
+
+If a callback registered with `register()` returns a `Future`, `execute()` will (v2.3+):
+1. Log an error in **both debug and release mode**.
+2. **Skip** the hook's return value — the previous hook's result carries forward.
+3. Fire an `assert` in **debug mode** to catch this during development.
+
+**Always use `executeAsync()` if any hook in the chain is async.**
+
+```dart
+// ❌ Wrong — Future result will be skipped and an error logged
+hookRegistry.register('price:format', (price) async {
+  return await formatPrice(price);
+});
+final result = hookRegistry.execute<String>('price:format', rawPrice);
+
+// ✅ Correct
+hookRegistry.register('price:format', (price) async {
+  return await formatPrice(price);
+});
+final result = await hookRegistry.executeAsync<String>('price:format', rawPrice);
+```
+
 ### EventBus - Notifications
 - **Use when**: Fire-and-forget notifications and side effects
 - **Pattern**: Asynchronous pub/sub messaging with string-based events

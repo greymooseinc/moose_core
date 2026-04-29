@@ -412,6 +412,14 @@ test('api:intercept_request returning null throws RequestQueuedError', () async 
 
 ---
 
+## Sign-out behaviour
+
+`AdapterRegistry.signOutAll()` is the recommended way to terminate authenticated sessions across every cached `AuthRepository` (e.g. when a user signs out and you want to clear all SSO providers at once).
+
+> **Sign-out error handling (v2.3+):** `AdapterRegistry.signOutAll()` calls `signOut()` on every cached `AuthRepository`. If an individual provider throws, the error is **logged** (not rethrown) and sign-out continues for other providers. `currentUser` is always cleared regardless of provider failures — local sign-out is guaranteed even when the server-side call fails.
+
+---
+
 ## See Also
 
 - [EVENT_SYSTEM_GUIDE.md](EVENT_SYSTEM_GUIDE.md) — HookRegistry vs EventBus decision matrix

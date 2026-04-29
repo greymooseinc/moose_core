@@ -10,7 +10,8 @@
 3. [Configuration Anti-Patterns](#configuration-anti-patterns)
 4. [Structure Anti-Patterns](#structure-anti-patterns)
 5. [Type Anti-Patterns](#type-anti-patterns)
-6. [Quick Reference Checklist](#quick-reference-checklist)
+6. [Reliability Anti-Patterns](#reliability-anti-patterns)
+7. [Quick Reference Checklist](#quick-reference-checklist)
 
 ## State Management Anti-Patterns
 
@@ -692,6 +693,108 @@ await appContext.cache.persistent.getString('pref');
 
 // ✅ In widgets
 context.moose.cache.memory.set('key', value);
+```
+
+## Reliability Anti-Patterns
+
+### ❌ ANTI-PATTERN 17: Trusting the Auth Cache Blindly on Cold Start
+
+**Why it's wrong:**
+- `User.fromJson()` throws if the JSON schema changed between app versions.
+- An unhandled exception in `restoreAuthState()` crashes the app on every subsequent launch.
+- The only recovery is a full reinstall.
+
+**Wrong:**
+```dart
+final data = await cache.persistent.getJson<Map<String, dynamic>>(key);
+if (data != null) {
+  currentUser.value = User.fromJson(data); // ❌ throws on corrupt/migrated data
+}
+```
+
+**Correct:**
+The framework now wraps `User.fromJson` in a try/catch. If your own code caches and restores custom entity types from `persistent`, always do the same:
+```dart
+try {
+  entity = MyEntity.fromJson(data);
+} catch (e) {
+  await cache.persistent.remove(key); // clean slate
+}
+```
+
+### ❌ ANTI-PATTERN 18: Fire-and-Forget Persistent Cache Writes in Auth Listeners
+
+**Why it's wrong:**
+- A rapid sign-in → sign-out sequence can persist stale user data.
+- After an app restart the user appears signed-in when they aren't.
+
+**Wrong:**
+```dart
+repo.authStateChanges.listen((user) {
+  currentUser.value = user;
+  cache.persistent.setJson(key, user.toJson()); // ❌ not awaited
+});
+```
+
+**Correct:**
+```dart
+repo.authStateChanges.listen((user) async {
+  currentUser.value = user;
+  await cache.persistent.setJson(key, user.toJson()); // ✅ awaited
+});
+```
+
+### ❌ ANTI-PATTERN 19: Assuming getRepositoryAsync is Safe to Call Concurrently Without a Guard
+
+**Why it's wrong (pre-v2.3):**
+- Without a guard, two concurrent calls would create two repository instances.
+- `initialize()` ran twice, doubling side-effects like cache warming or listener setup.
+
+**Correct (v2.3+):**
+The framework handles this transparently with a `Completer` guard. You never need to add your own mutex — just call `getRepositoryAsync` normally from any context.
+
+### ❌ ANTI-PATTERN 20: Swallowing signOut Errors Completely
+
+**Why it's wrong:**
+- The user believes they signed out; the server session remains active.
+- There is no indication in logs that the backend sign-out failed.
+
+**Wrong:**
+```dart
+try {
+  await authRepo.signOut();
+} catch (_) {} // ❌ total silence
+```
+
+**Correct:**
+```dart
+try {
+  await authRepo.signOut();
+} catch (e, stack) {
+  logger.error('Sign-out failed — session may still be active on the server', e, stack);
+}
+```
+
+### ❌ ANTI-PATTERN 21: Registering an Async Hook with execute() Instead of executeAsync()
+
+**Why it's wrong:**
+- Pre-v2.3: the Future leaked through and downstream code received a `Future<T>` instead of `T`.
+- v2.3+: the async hook's output is **logged and skipped** — the hook runs but its return value is discarded.
+
+**Wrong:**
+```dart
+hookRegistry.register('cart:total', (cart) async {
+  return await calculateDiscount(cart); // ❌ returns Future in sync hook slot
+});
+final total = hookRegistry.execute<Cart>('cart:total', cart); // async hook skipped
+```
+
+**Correct:**
+```dart
+hookRegistry.register('cart:total', (cart) async {
+  return await calculateDiscount(cart);
+});
+final total = await hookRegistry.executeAsync<Cart>('cart:total', cart); // ✅
 ```
 
 ## Quick Reference Checklist

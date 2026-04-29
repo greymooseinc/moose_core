@@ -474,6 +474,10 @@ final repo = await appContext.getRepositoryAsync<ReviewRepository>(provider: 'wo
 
 > Calling `getRepository<T>()` (sync) on an async factory throws `RepositoryNotRegisteredException`. Always use `getRepositoryAsync<T>()` for async factories.
 
+> **Concurrency safety (v2.3+):** Concurrent calls to `getRepositoryAsync<T>()` for the same type are deduplicated via a `Completer<T>` guard. Only one factory call is ever made; all concurrent callers await the same result. `initialize()` is called exactly once.
+
+> **`isRepositoryCached<T>()`** returns `true` only when a fully resolved instance of type `T` is cached. It returns `false` while an async factory is in-flight (i.e., while a `Completer` is installed), so callers can safely branch on this to avoid calling the sync `getRepository` prematurely.
+
 ### Introspection and cache management
 
 ```dart
@@ -545,6 +549,8 @@ final wooAdapter = appContext.adapterRegistry.getAdapter<WooCommerceAdapter>('wo
 // Test teardown
 appContext.adapterRegistry.clearAll();
 ```
+
+> **Error handling (v2.3+):** If one auth provider's `signOut()` throws, the error is logged (not rethrown) and sign-out continues for remaining providers. `currentUser` is always cleared regardless of provider failures.
 
 ### Manual registration (without MooseBootstrapper)
 
