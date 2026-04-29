@@ -380,6 +380,33 @@ void main() {
         ctx.dispose();
       });
 
+      test('wireAuthRepository awaits persistent cache write before returning',
+          () async {
+        final writeCompleter = Completer<void>();
+        final trackingCache = _TrackingPersistentCache(writeCompleter.future);
+        final ctx = MooseAppContext(
+          cache: CacheManager(persistent: trackingCache),
+        );
+
+        final authController = StreamController<User?>();
+        ctx.wireAuthRepository(_StubAuthRepository(authController.stream));
+
+        authController.add(testUser);
+
+        // Yield to the microtask queue so the listener is invoked.
+        await Future.microtask(() {});
+
+        // setJson should have been called but the future is still pending.
+        expect(trackingCache.setJsonCallCount, equals(1));
+
+        // Complete the write and let the async listener finish.
+        writeCompleter.complete();
+        await Future.microtask(() {});
+
+        await authController.close();
+        ctx.dispose();
+      });
+
       test('wireAuthRepository replaces previous subscription', () async {
         final ctx = MooseAppContext(cache: mockCacheManager);
         ctx.wireAuthRepository(stubRepo);
@@ -484,6 +511,28 @@ class _MockPersistentCache extends PersistentCache {
 
   @override
   Future<bool> setJson(String key, dynamic value) async => true;
+
+  @override
+  Future<bool> remove(String key) async => true;
+}
+
+/// A persistent cache stub that blocks [setJson] until [writeFuture] completes,
+/// and counts how many times [setJson] has been called.
+class _TrackingPersistentCache extends PersistentCache {
+  final Future<void> writeFuture;
+  int setJsonCallCount = 0;
+
+  _TrackingPersistentCache(this.writeFuture);
+
+  @override
+  Future<T?> getJson<T>(String key) async => null;
+
+  @override
+  Future<bool> setJson(String key, dynamic value) async {
+    setJsonCallCount++;
+    await writeFuture;
+    return true;
+  }
 
   @override
   Future<bool> remove(String key) async => true;

@@ -406,12 +406,12 @@ class MooseAppContext {
   ///  * [getRepository], which calls this method automatically.
   void wireAuthRepository(AuthRepository repo) {
     _authStateSubscription?.cancel();
-    _authStateSubscription = repo.authStateChanges.listen((user) {
+    _authStateSubscription = repo.authStateChanges.listen((user) async {
       currentUser.value = user;
       if (user != null) {
-        cache.persistent.setJson(_kCurrentUserCacheKey, user.toJson());
+        await cache.persistent.setJson(_kCurrentUserCacheKey, user.toJson());
       } else {
-        cache.persistent.remove(_kCurrentUserCacheKey);
+        await cache.persistent.remove(_kCurrentUserCacheKey);
       }
     });
   }
