@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/adapters.dart';
 import 'package:moose_core/repositories.dart';
@@ -385,6 +387,36 @@ void main() {
             reason: 'Both concurrent calls must return the same instance');
         // initialize() sets _initialized = true — verify it was called on the instance
         expect(results[0].isInitialized, isTrue);
+      });
+
+      test('isRepositoryCached returns false while async factory is in-flight', () async {
+        final factoryStarted = Completer<void>();
+        final factoryGate = Completer<void>();
+
+        adapter.registerAsyncRepositoryFactory<MockRepository>(
+          () async {
+            factoryStarted.complete();
+            await factoryGate.future; // hold open until test is ready
+            return MockRepository();
+          },
+        );
+
+        // Start the async fetch but don't await it yet
+        final fetchFuture = adapter.getRepositoryAsync<MockRepository>();
+
+        // Wait until factory has started (Completer is now in entry.instance)
+        await factoryStarted.future;
+
+        // isRepositoryCached must return false — the Completer is not a T
+        expect(adapter.isRepositoryCached<MockRepository>(), isFalse,
+            reason: 'isRepositoryCached must return false while factory is in-flight');
+
+        // Let the factory complete
+        factoryGate.complete();
+        await fetchFuture;
+
+        // Now it should be true
+        expect(adapter.isRepositoryCached<MockRepository>(), isTrue);
       });
     });
 

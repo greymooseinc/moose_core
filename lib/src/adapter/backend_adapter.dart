@@ -417,9 +417,9 @@ abstract class BackendAdapter {
     final entries = _repos[T];
     if (entries == null || entries.isEmpty) return false;
     if (provider != null) {
-      return entries.any((e) => e.provider == provider && e.instance != null);
+      return entries.any((e) => e.provider == provider && e.instance is T);
     }
-    return entries.last.instance != null;
+    return entries.last.instance is T;
   }
 
   /// Clear the cache for a specific repository type.
