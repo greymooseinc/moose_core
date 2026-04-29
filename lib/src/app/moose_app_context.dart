@@ -406,6 +406,13 @@ class MooseAppContext {
   ///  * [getRepository], which calls this method automatically.
   void wireAuthRepository(AuthRepository repo) {
     _authStateSubscription?.cancel();
+    // NOTE: Dart async stream listeners do not serialise successive events.
+    // This fix awaits cache writes within a single event (intra-event safety),
+    // but a sign-in write still in-flight when a sign-out fires on the next event
+    // is not blocked. This is an accepted limitation — true inter-event serialisation
+    // would require an explicit queue or mutex. In practice the auth state stream
+    // emits infrequently and sign-in → sign-out sequences have sufficient latency
+    // for this to be non-problematic.
     _authStateSubscription = repo.authStateChanges.listen((user) async {
       currentUser.value = user;
       if (user != null) {

@@ -399,11 +399,33 @@ void main() {
         // setJson should have been called but the future is still pending.
         expect(trackingCache.setJsonCallCount, equals(1));
 
-        // Complete the write and let the async listener finish.
+        // Complete the write and await the future directly — more robust than
+        // relying on a single microtask yield, which can be fragile across
+        // Dart SDK versions.
         writeCompleter.complete();
-        await Future.microtask(() {});
+        await writeCompleter.future;
 
         await authController.close();
+        ctx.dispose();
+      });
+
+      test('wireAuthRepository awaits persistent cache remove on sign-out',
+          () async {
+        final trackingCache = _TrackingPersistentCache(Future<void>.value());
+        final ctx = MooseAppContext(
+          cache: CacheManager(persistent: trackingCache),
+        );
+
+        final signOutController = StreamController<User?>();
+        ctx.wireAuthRepository(_StubAuthRepository(signOutController.stream));
+
+        // Emit null (sign-out).
+        signOutController.add(null);
+        await Future.delayed(Duration.zero);
+
+        expect(trackingCache.removeCallCount, equals(1));
+
+        await signOutController.close();
         ctx.dispose();
       });
 
@@ -517,10 +539,11 @@ class _MockPersistentCache extends PersistentCache {
 }
 
 /// A persistent cache stub that blocks [setJson] until [writeFuture] completes,
-/// and counts how many times [setJson] has been called.
+/// and counts how many times [setJson] and [remove] have been called.
 class _TrackingPersistentCache extends PersistentCache {
   final Future<void> writeFuture;
   int setJsonCallCount = 0;
+  int removeCallCount = 0;
 
   _TrackingPersistentCache(this.writeFuture);
 
@@ -535,7 +558,10 @@ class _TrackingPersistentCache extends PersistentCache {
   }
 
   @override
-  Future<bool> remove(String key) async => true;
+  Future<bool> remove(String key) async {
+    removeCallCount++;
+    return true;
+  }
 }
 
 /// A persistent cache stub that always returns corrupt JSON and records
