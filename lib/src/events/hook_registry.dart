@@ -28,20 +28,29 @@ class HookRegistry {
   /// each callback in priority order.
   ///
   /// If any registered callback returns a [Future], an assertion is thrown in
-  /// debug mode — async callbacks must use [executeAsync] instead. In release
-  /// mode the Future leaks through unchecked, so always use the correct method.
+  /// debug mode and an error is logged in all modes — the hook's output is
+  /// skipped and execution continues with the remaining hooks. Async callbacks
+  /// must use [executeAsync] instead.
   T execute<T>(String hookName, T data) {
     if (!_hooks.containsKey(hookName)) return data;
 
     dynamic result = data;
     for (final hook in _hooks[hookName]!) {
       try {
-        result = hook.callback(result);
-        assert(
-          result is! Future,
-          'Hook "$hookName" returned a Future. '
-          'Async callbacks must be registered and called via executeAsync().',
-        );
+        final returned = hook.callback(result);
+        if (returned is Future) {
+          assert(
+            false,
+            'Hook "$hookName" returned a Future. '
+            'Async callbacks must be registered and called via executeAsync().',
+          );
+          _logger.error(
+            'Hook "$hookName" returned a Future inside execute() — '
+            'skipping result. Use executeAsync() for async hooks.',
+          );
+          continue; // keep previous result, skip this hook's output
+        }
+        result = returned;
       } catch (e, stack) {
         _logger.error('Error executing hook "$hookName"', e, stack);
         // Continue executing other hooks even if one fails

@@ -162,6 +162,28 @@ void main() {
         final result = registry.execute<int>('fail.hook', 42);
         expect(result, equals(42));
       });
+
+      test('execute skips a hook that returns a Future and continues with remaining hooks', () {
+        final registry = HookRegistry();
+        var asyncHookCallCount = 0;
+
+        // Priority 10: async hook (developer mistake — should have used executeAsync)
+        registry.register('transform', (data) async {
+          asyncHookCallCount++;
+          return (data as int) * 2; // returns Future<int>, not int
+        }, priority: 10);
+
+        // Priority 5: sync hook — should still execute with original data (10), not doubled
+        registry.register('transform', (data) {
+          return (data as int) + 100;
+        }, priority: 5);
+
+        // Should NOT throw; async hook is skipped, sync hook runs: 10 + 100 = 110
+        final result = registry.execute<int>('transform', 10);
+
+        expect(result, equals(110));
+        expect(asyncHookCallCount, equals(1)); // async hook was invoked but its result skipped
+      });
     });
 
     // =========================================================================
