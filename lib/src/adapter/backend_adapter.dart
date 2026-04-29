@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:moose_core/cache.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
@@ -336,21 +338,38 @@ abstract class BackendAdapter {
       entry = entries.last;
     }
 
-    if (entry.instance != null) return entry.instance as T;
+    // Fast path: already resolved.
+    if (entry.instance is T) return entry.instance as T;
 
-    final factory = entry.factory;
-    final T instance;
-    if (factory is Future<T> Function()) {
-      final futureInstance = factory();
-      entry.instance = futureInstance; // cache Future to prevent duplicate calls
-      instance = await futureInstance;
-      entry.instance = instance; // replace Future with resolved instance
-    } else {
-      instance = (factory as T Function())();
+    // In-flight: a previous concurrent call installed a Completer — await it.
+    if (entry.instance is Completer<T>) {
+      return (entry.instance as Completer<T>).future;
     }
-    instance.initialize();
-    entry.instance = instance;
-    return instance;
+
+    // First caller: install a Completer so concurrent callers wait on it.
+    final completer = Completer<T>();
+    entry.instance = completer;
+
+    try {
+      final factory = entry.factory;
+      final T instance;
+      if (factory is Future<T> Function()) {
+        instance = await factory();
+      } else {
+        instance = (factory as T Function())();
+      }
+      if (instance is AuthRepository) {
+        instance.initTokenStorage(appContext.cache, keyPrefix: name);
+      }
+      instance.initialize();
+      entry.instance = instance;
+      completer.complete(instance);
+      return instance;
+    } catch (e, stack) {
+      entry.instance = null; // allow retry on next call
+      completer.completeError(e, stack);
+      rethrow;
+    }
   }
 
   /// Check if a factory is registered for a repository type.

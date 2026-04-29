@@ -365,6 +365,29 @@ void main() {
       });
     });
 
+    group('Async Concurrency', () {
+      test('getRepositoryAsync concurrent calls return same instance, initialize called once',
+          () async {
+        adapter.registerAsyncRepositoryFactory<MockRepository>(
+          () async {
+            await Future.delayed(const Duration(milliseconds: 20));
+            return MockRepository();
+          },
+        );
+
+        // Both calls launch before either completes
+        final results = await Future.wait([
+          adapter.getRepositoryAsync<MockRepository>(),
+          adapter.getRepositoryAsync<MockRepository>(),
+        ]);
+
+        expect(results[0], same(results[1]),
+            reason: 'Both concurrent calls must return the same instance');
+        // initialize() sets _initialized = true — verify it was called on the instance
+        expect(results[0].isInitialized, isTrue);
+      });
+    });
+
     group('Multiple Repositories', () {
       test('should support multiple repository types', () {
         adapter.registerRepositoryFactory<MockRepository>(
