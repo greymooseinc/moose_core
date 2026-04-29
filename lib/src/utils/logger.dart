@@ -25,9 +25,15 @@ class AppLogger {
   }
 
   /// Log warning messages
-  void warning(String message) {
+  void warning(String message, [Object? error, StackTrace? stackTrace]) {
     if (kDebugMode) {
-      developer.log(message, name: _name, level: 900);
+      developer.log(
+        message,
+        name: _name,
+        level: 900,
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 

@@ -364,6 +364,22 @@ void main() {
         expect(ctx.currentUser.value, isNull);
       });
 
+      test('restoreAuthState clears cache and stays unauthenticated when cached user JSON is corrupt', () async {
+        final corruptCache = _CorruptPersistentCache({'__corrupt__': true});
+        final ctx = MooseAppContext(
+          cache: CacheManager(persistent: corruptCache),
+        );
+
+        // Should NOT throw; currentUser should remain null.
+        await expectLater(ctx.restoreAuthState(), completes);
+        expect(ctx.currentUser.value, isNull);
+
+        // Corrupt entry should be removed from cache.
+        expect(corruptCache.removeCallCount, equals(1));
+
+        ctx.dispose();
+      });
+
       test('wireAuthRepository replaces previous subscription', () async {
         final ctx = MooseAppContext(cache: mockCacheManager);
         ctx.wireAuthRepository(stubRepo);
@@ -471,4 +487,25 @@ class _MockPersistentCache extends PersistentCache {
 
   @override
   Future<bool> remove(String key) async => true;
+}
+
+/// A persistent cache stub that always returns corrupt JSON and records
+/// how many times [remove] was called.
+class _CorruptPersistentCache extends PersistentCache {
+  final Map<String, dynamic> _corruptData;
+  int removeCallCount = 0;
+
+  _CorruptPersistentCache(this._corruptData);
+
+  @override
+  Future<T?> getJson<T>(String key) async => _corruptData as T?;
+
+  @override
+  Future<bool> setJson(String key, dynamic value) async => true;
+
+  @override
+  Future<bool> remove(String key) async {
+    removeCallCount++;
+    return true;
+  }
 }

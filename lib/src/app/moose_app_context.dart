@@ -433,8 +433,12 @@ class MooseAppContext {
   Future<void> restoreAuthState() async {
     final data = await cache.persistent
         .getJson<Map<String, dynamic>>(_kCurrentUserCacheKey);
-    if (data != null) {
+    if (data == null) return;
+    try {
       currentUser.value = User.fromJson(data);
+    } catch (e, stack) {
+      logger.warning('Corrupted auth cache cleared on cold start', e, stack);
+      await cache.persistent.remove(_kCurrentUserCacheKey);
     }
   }
 
