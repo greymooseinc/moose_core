@@ -72,6 +72,12 @@ abstract class AuthRepository extends CoreRepository {
     DateTime? expiresAt,
   }) async {
     final store = _sessionStorage;
+    assert(
+      store != null,
+      'saveSession() called before initTokenStorage(). '
+      'BackendAdapter.getRepository() calls initTokenStorage() automatically; '
+      'if you are using AuthRepository directly, call initTokenStorage(cache) first.',
+    );
     if (store == null) return;
     await store.persistent.setString('${_sessionKeyPrefix}_access_token', accessToken);
     if (refreshToken != null) {
