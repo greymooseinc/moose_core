@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 import '../entities/product.dart';
 import '../entities/category.dart';
 import '../entities/collection.dart';

@@ -1,17 +1,44 @@
 import '../utils/logger.dart';
 
+/// A single hook entry: callback + priority level.
 class Hook {
+  /// Execution priority — higher values run first.
   final int priority;
+
+  /// The transformation callback for this hook.
   final dynamic Function(dynamic) callback;
+
+  /// Creates a [Hook] with the given [priority] and [callback].
   Hook(this.priority, this.callback);
 }
 
+/// Registry for named synchronous and asynchronous transformation hooks.
+///
+/// Hooks let plugins modify framework data (cart items, checkout fields, etc.)
+/// without coupling to each other. Each hook is a chain of callbacks executed
+/// in priority order, each receiving the output of the previous callback.
+///
+/// Example:
+/// ```dart
+/// // Plugin A enriches cart items
+/// hookRegistry.register('cart:enrich_items', (items) {
+///   return (items as List).map((i) => {...i, 'enriched': true}).toList();
+/// }, priority: 10);
+///
+/// // Apply all hooks
+/// final enriched = hookRegistry.execute<List>('cart:enrich_items', rawItems);
+/// ```
 class HookRegistry {
+  /// Creates an independent [HookRegistry] instance.
   HookRegistry();
 
   final Map<String, List<Hook>> _hooks = {};
   final _logger = AppLogger('HookRegistry');
 
+  /// Register [callback] for [hookName] with the given [priority].
+  ///
+  /// Higher [priority] values run first. Registering the same [callback]
+  /// reference twice is a no-op — useful during config reloads.
   void register(String hookName, dynamic Function(dynamic) callback, {int priority = 1}) {
     final hooks = _hooks.putIfAbsent(hookName, () => []);
     // Deduplicate by callback identity — same closure registered twice (e.g.
@@ -89,6 +116,7 @@ class HookRegistry {
     return result as T;
   }
 
+  /// Remove a specific [callback] from [hookName]. No-op if not registered.
   void removeHook(String hookName, dynamic Function(dynamic) callback) {
     if (_hooks.containsKey(hookName)) {
       _hooks[hookName]!.removeWhere((hook) => hook.callback == callback);
@@ -103,20 +131,25 @@ class HookRegistry {
     _hooks.clear();
   }
 
+  /// Clear all hooks registered under [hookName].
   void clearHooks(String hookName) {
     _hooks[hookName]?.clear();
   }
 
+  /// Clear every registered hook across all names. Alias for [clearAll].
   void clearAllHooks() {
     _hooks.clear();
   }
 
+  /// Returns every hook name that has at least one registered callback.
   List<String> getRegisteredHooks() => _hooks.keys.toList();
 
+  /// Returns the number of callbacks registered for [hookName].
   int getHookCount(String hookName) {
     return _hooks[hookName]?.length ?? 0;
   }
 
+  /// Returns `true` when at least one callback is registered for [hookName].
   bool hasHook(String hookName) {
     return _hooks.containsKey(hookName) && _hooks[hookName]!.isNotEmpty;
   }

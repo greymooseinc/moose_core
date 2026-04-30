@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 /// Thrown by [ApiClient] when a request is intercepted by the
 /// `api:intercept_request` hook and the hook handler returns `null`.
 ///

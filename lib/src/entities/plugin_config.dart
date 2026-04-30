@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 /// Configuration for feature plugins in the application.
 ///
 /// Controls plugin activation and stores plugin-specific settings.

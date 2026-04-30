@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 /// Static helpers for canonical moose_core config path strings.
 ///
 /// Use these instead of inline string literals to ensure consistent

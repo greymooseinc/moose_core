@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 import 'package:dio/dio.dart';
 
 import '../app/moose_app_context.dart';

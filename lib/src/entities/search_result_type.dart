@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 /// Types of search results supported by the system.
 enum SearchResultType {
   product,

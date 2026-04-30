@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 import '../entities/post.dart';
 import '../entities/paginated_result.dart';
 import 'repository.dart';

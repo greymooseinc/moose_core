@@ -393,6 +393,52 @@ void main() {
     });
 
     // =========================================================================
+    // EventBus lifecycle
+    // =========================================================================
+
+    group('EventBus lifecycle', () {
+      test('destroy() cancels all active subscriptions', () async {
+        final bus = EventBus();
+        final received = <String>[];
+        bus.on('test.event', (e) => received.add(e.name));
+        await bus.destroy();
+
+        bus.fire('test.event');
+        await Future.delayed(Duration.zero);
+        expect(received, isEmpty);
+      });
+
+      test('fire-after-destroy does not throw', () async {
+        final bus = EventBus();
+        await bus.destroy();
+        expect(
+          () => bus.fire('x'),
+          returnsNormally,
+        );
+      });
+
+      test('destroy() clears all stream controllers', () async {
+        final bus = EventBus();
+        bus.on('alpha', (_) {});
+        bus.on('beta', (_) {});
+        expect(bus.controllerCount, greaterThan(0));
+
+        await bus.destroy();
+        expect(bus.controllerCount, equals(0));
+      });
+
+      test('destroy() resets active subscription count to zero', () async {
+        final bus = EventBus();
+        bus.on('ev.one', (_) {});
+        bus.on('ev.two', (_) {});
+        expect(bus.activeSubscriptionCount, equals(2));
+
+        await bus.destroy();
+        expect(bus.activeSubscriptionCount, equals(0));
+      });
+    });
+
+    // =========================================================================
     // Real-world plugin communication patterns
     // =========================================================================
 

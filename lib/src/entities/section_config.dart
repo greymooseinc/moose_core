@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 /// Configuration for product or content sections.
 class SectionConfig {
   final String name;

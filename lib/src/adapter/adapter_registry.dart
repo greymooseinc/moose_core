@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 // Central registry for managing backend adapters and their repository implementations.
 //
 // Features:

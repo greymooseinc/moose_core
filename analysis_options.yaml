@@ -12,7 +12,7 @@ linter:
   rules:
     # Disabled: many public entity fields and generated methods lack /// comments.
     # Enabling this would produce hundreds of warnings across the entities module.
-    public_member_api_docs: false
+    public_member_api_docs: true
 
     # Disabled: debug print statements are used intentionally in several places.
     avoid_print: false

@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs
 import 'package:moose_core/cache.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
