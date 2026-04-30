@@ -143,6 +143,16 @@ class PluginRegistry {
     for (final tab in tabs) {
       final existingIndex = _bottomTabs.indexWhere((t) => t.id == tab.id);
       if (existingIndex != -1) {
+        assert(
+          false,
+          'PluginRegistry: plugin "${plugin.name}" is registering a bottom tab '
+          'with id "${tab.id}" that is already registered. '
+          'The existing tab will be replaced. Ensure tab IDs are unique across plugins.',
+        );
+        _logger.warning(
+          'Duplicate bottom tab id "${tab.id}" registered by plugin "${plugin.name}" '
+          '— replacing existing entry.',
+        );
         _bottomTabs[existingIndex] = tab;
       } else {
         _bottomTabs.add(tab);

@@ -1,7 +1,41 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/app.dart';
+import 'package:moose_core/entities.dart';
 import 'package:moose_core/plugin.dart';
+
+// ---------------------------------------------------------------------------
+// Stubs for duplicate bottom-tab tests
+// ---------------------------------------------------------------------------
+
+class _TabPluginA extends FeaturePlugin {
+  @override
+  String get name => 'tab_plugin_a';
+  @override
+  String get version => '1.0.0';
+  @override
+  void onRegister() {}
+  @override
+  List<BottomTab> get bottomTabs => const [
+        BottomTab(id: 'home', label: 'Home', icon: Icons.home, route: '/home'),
+      ];
+}
+
+class _TabPluginB extends FeaturePlugin {
+  @override
+  String get name => 'tab_plugin_b';
+  @override
+  String get version => '1.0.0';
+  @override
+  void onRegister() {}
+  @override
+  List<BottomTab> get bottomTabs => const [
+        BottomTab(
+            id: 'home', label: 'Home B', icon: Icons.home, route: '/home-b'),
+      ];
+}
+
+// ---------------------------------------------------------------------------
 
 class _RecordingPlugin extends FeaturePlugin {
   _RecordingPlugin(this._id, this.log);
@@ -98,6 +132,22 @@ void main() {
           'a:lifecycle:AppLifecycleState.paused',
           'b:lifecycle:AppLifecycleState.paused',
         ]),
+      );
+    });
+  });
+
+  group('PluginRegistry bottom tab duplicate detection', () {
+    test('throws AssertionError when two plugins register the same tab id',
+        () {
+      final appContext = MooseAppContext();
+      appContext.configManager.initialize({});
+
+      appContext.pluginRegistry.register(_TabPluginA(), appContext: appContext);
+
+      expect(
+        () => appContext.pluginRegistry
+            .register(_TabPluginB(), appContext: appContext),
+        throwsA(isA<AssertionError>()),
       );
     });
   });
