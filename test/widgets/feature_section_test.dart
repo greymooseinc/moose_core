@@ -40,6 +40,22 @@ class TestFeatureSection extends FeatureSection {
   }
 }
 
+/// FeatureSection subclass that counts getDefaultSettings() invocations.
+class _CountingSection extends FeatureSection {
+  int defaultsCallCount = 0;
+
+  _CountingSection() : super(settings: null);
+
+  @override
+  Map<String, dynamic> getDefaultSettings() {
+    defaultsCallCount++;
+    return {'color': 'red', 'size': 16};
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox();
+}
+
 void main() {
   group('FeatureSection', () {
     group('Default Settings', () {
@@ -229,6 +245,16 @@ void main() {
         expect(items, isA<List>());
         expect(items.length, 3);
         expect(items[0], 'item1');
+      });
+    });
+
+    group('Settings Caching', () {
+      test('getDefaultSettings() is called at most once across multiple getSetting calls', () {
+        final section = _CountingSection();
+        section.getSetting('color');
+        section.getSetting('size');
+        section.getSetting('color');
+        expect(section.defaultsCallCount, equals(1));
       });
     });
 

@@ -124,6 +124,12 @@ import '../app/moose_scope.dart';
 /// - Use BlocBuilder to render based on state
 /// - Keep business logic in BLoC, not in the section
 ///
+// Per-instance cache for the merged settings map.
+// Expando holds values keyed by object identity without preventing garbage
+// collection, so each FeatureSection instance gets its own cached map while
+// FeatureSection itself remains const-constructible (no mutable fields).
+final _mergedSettingsCache = Expando<Map<String, dynamic>>();
+
 abstract class FeatureSection extends StatelessWidget {
   /// Optional settings/configuration for this section.
   ///
@@ -203,8 +209,11 @@ abstract class FeatureSection extends StatelessWidget {
   /// - [Exception] if the key is not found in settings or defaults
   /// - [Exception] if the value cannot be cast to type T
   T getSetting<T>(String key) {
-    // Merge defaults with provided settings (settings override defaults)
-    final config = {...getDefaultSettings(), ...(settings ?? {})};
+    // Merge defaults with provided settings (settings override defaults).
+    // The result is cached per-instance via an Expando so getDefaultSettings()
+    // is only called once regardless of how many times getSetting() is invoked.
+    final config =
+        _mergedSettingsCache[this] ??= {...getDefaultSettings(), ...(settings ?? {})};
 
     final value = config[key];
 
