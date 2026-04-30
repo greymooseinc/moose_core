@@ -1,40 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:moose_core/entities.dart';
-import 'package:moose_core/services.dart';
 
-typedef CustomActionHandler = void Function(
-  BuildContext context,
-  Map<String, dynamic>? parameters,
-);
+import 'custom_action_dispatcher.dart';
+import 'external_url_handler.dart';
+import 'navigation_handler.dart';
+
+export 'custom_action_dispatcher.dart' show CustomActionHandler;
 
 class ActionRegistry {
-  ActionRegistry();
+  ActionRegistry({
+    NavigationHandler? navigationHandler,
+    ExternalUrlHandler? externalUrlHandler,
+    CustomActionDispatcher? customActionDispatcher,
+  })  : _navigationHandler = navigationHandler ?? const NavigationHandler(),
+        _externalUrlHandler = externalUrlHandler ?? const ExternalUrlHandler(),
+        _customActionDispatcher = customActionDispatcher ?? CustomActionDispatcher();
 
-  final Map<String, CustomActionHandler> _customHandlers = {};
+  final NavigationHandler _navigationHandler;
+  final ExternalUrlHandler _externalUrlHandler;
+  final CustomActionDispatcher _customActionDispatcher;
+
+  // ---------------------------------------------------------------------------
+  // Custom handler registration — delegate to CustomActionDispatcher
+  // ---------------------------------------------------------------------------
 
   void registerCustomHandler(String actionId, CustomActionHandler handler) {
-    _customHandlers[actionId] = handler;
+    _customActionDispatcher.registerHandler(actionId, handler);
   }
 
   void registerMultipleHandlers(Map<String, CustomActionHandler> handlers) {
-    _customHandlers.addAll(handlers);
+    _customActionDispatcher.registerMultiple(handlers);
   }
 
   void unregisterCustomHandler(String actionId) {
-    _customHandlers.remove(actionId);
+    _customActionDispatcher.unregisterHandler(actionId);
   }
 
   bool hasCustomHandler(String actionId) {
-    return _customHandlers.containsKey(actionId);
+    return _customActionDispatcher.hasHandler(actionId);
   }
 
   List<String> getRegisteredHandlers() {
-    return _customHandlers.keys.toList();
+    return _customActionDispatcher.registeredHandlers();
   }
 
   void clearCustomHandlers() {
-    _customHandlers.clear();
+    _customActionDispatcher.clearHandlers();
   }
+
+  // ---------------------------------------------------------------------------
+  // Interaction dispatch
+  // ---------------------------------------------------------------------------
 
   void handleInteraction(BuildContext context, UserInteraction? interaction) {
     if (interaction == null || !interaction.isValid) {
@@ -44,85 +60,20 @@ class ActionRegistry {
 
     switch (interaction.interactionType) {
       case UserInteractionType.internal:
-        _handleInternalNavigation(context, interaction);
+        _navigationHandler.handle(context, interaction);
         break;
 
       case UserInteractionType.external:
-        _handleExternalUrl(context, interaction);
+        _externalUrlHandler.handle(context, interaction);
         break;
 
       case UserInteractionType.custom:
-        _handleCustomAction(context, interaction);
+        _customActionDispatcher.handle(context, interaction);
         break;
 
       case UserInteractionType.none:
         // Do nothing - intentional no-op
         break;
     }
-  }
-
-  void _handleInternalNavigation(BuildContext context, UserInteraction interaction) {
-    if (interaction.route == null || interaction.route!.isEmpty) {
-      return;
-    }
-
-    MooseNavigator.of(context).pushNamed(
-      interaction.route!,
-      arguments: interaction.parameters,
-    );
-  }
-
-  void _handleExternalUrl(BuildContext context, UserInteraction interaction) {
-    if (interaction.url == null || interaction.url!.isEmpty) {
-      return;
-    }
-
-    // TODO: Replace with url_launcher in production
-    // For now, show a snackbar with the URL
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('External URL: ${interaction.url}'),
-        action: SnackBarAction(
-          label: 'OK',
-          onPressed: () {},
-        ),
-      ),
-    );
-  }
-
-  void _handleCustomAction(BuildContext context, UserInteraction interaction) {
-    final actionId = interaction.customActionId;
-
-    if (actionId == null || actionId.isEmpty) {
-      _showError(context, 'Invalid custom action: missing action ID');
-      return;
-    }
-
-    final handler = _customHandlers[actionId];
-
-    if (handler == null) {
-      _showError(context, 'No handler registered for action: $actionId');
-      return;
-    }
-
-    try {
-      handler(context, interaction.parameters);
-    } catch (e) {
-      _showError(context, 'Error executing custom action "$actionId": $e');
-    }
-  }
-
-  void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[700],
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: Colors.white,
-          onPressed: () {},
-        ),
-      ),
-    );
   }
 }
