@@ -6,6 +6,7 @@ import 'package:moose_core/services.dart';
 import 'package:moose_core/widgets.dart';
 
 import '../app/moose_app_context.dart';
+import '../config/moose_config_keys.dart';
 
 /// Base class for all feature plugins in the application.
 ///
@@ -288,7 +289,7 @@ abstract class FeaturePlugin {
   /// throws a [TypeError] at the cast site — prefer always supplying a
   /// [defaultValue] or declaring a setting in [getDefaultSettings].
   T getSetting<T>(String key, {T? defaultValue}) {
-    final value = appContext.configManager.get('plugins:$name:settings:$key');
+    final value = appContext.configManager.get(MooseConfigKeys.pluginSettings(name, key));
     return (value ?? defaultValue) as T;
   }
 }

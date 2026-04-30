@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Unified app-level notifier that drives [MaterialApp] rebuilds.
 ///
@@ -37,23 +38,39 @@ class MooseAppNotifier extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   Locale _locale = const Locale('en');
 
+  bool _pendingNotify = false;
+
   /// The active [ThemeMode] — set by `ThemeManagerPlugin`.
   ThemeMode get themeMode => _themeMode;
 
   /// The active [Locale] — set by `LocaleManagerPlugin`.
   Locale get locale => _locale;
 
-  /// Updates [themeMode] and notifies listeners if the value changed.
+  /// Schedules a single [notifyListeners] call at the end of the current frame.
+  ///
+  /// Multiple setters called in the same frame coalesce into one notification,
+  /// avoiding redundant widget-tree rebuilds.
+  void _scheduleNotify() {
+    if (_pendingNotify) return;
+    _pendingNotify = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _pendingNotify = false;
+      notifyListeners();
+    });
+    SchedulerBinding.instance.scheduleFrame();
+  }
+
+  /// Updates [themeMode] and schedules a listener notification if the value changed.
   void setThemeMode(ThemeMode mode) {
     if (_themeMode == mode) return;
     _themeMode = mode;
-    notifyListeners();
+    _scheduleNotify();
   }
 
-  /// Updates [locale] and notifies listeners if the value changed.
+  /// Updates [locale] and schedules a listener notification if the value changed.
   void setLocale(Locale locale) {
     if (_locale == locale) return;
     _locale = locale;
-    notifyListeners();
+    _scheduleNotify();
   }
 }
