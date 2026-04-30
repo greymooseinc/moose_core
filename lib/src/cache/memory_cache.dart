@@ -135,6 +135,10 @@ class MemoryCache {
   // Storage - using LinkedHashMap for insertion order
   final LinkedHashMap<String, _CacheEntry> _cache = LinkedHashMap();
 
+  // LFU frequency-bucket map for O(1) eviction
+  final Map<int, Set<String>> _freqBuckets = {};
+  int _minFreq = 0;
+
   // Statistics
   int _hits = 0;
   int _misses = 0;
@@ -207,11 +211,19 @@ class MemoryCache {
   void set(String key, dynamic value, {Duration? ttl}) {
     final expiresAt = ttl != null ? DateTime.now().add(ttl) : null;
 
-    // Remove existing entry if it exists
-    _cache.remove(key);
+    // Remove existing entry if it exists (clean up its freq bucket too)
+    final existing = _cache.remove(key);
+    if (existing != null) {
+      _freqBuckets[existing.accessCount]?.remove(key);
+      if (_freqBuckets[existing.accessCount]?.isEmpty == true) {
+        _freqBuckets.remove(existing.accessCount);
+      }
+    }
 
-    // Add new entry
+    // Add new entry — new entries always start at accessCount == 0
     _cache[key] = _CacheEntry(value, expiresAt: expiresAt);
+    _freqBuckets.putIfAbsent(0, () => {}).add(key);
+    _minFreq = 0;
 
     // Enforce limits
     _enforceMaxSize();
@@ -232,14 +244,22 @@ class MemoryCache {
 
     // Check if expired
     if (entry.isExpired) {
+      _removeFromFreqBucket(key, entry.accessCount);
       _cache.remove(key);
       _expirations++;
       _misses++;
       return null;
     }
 
+    // Capture frequency before incrementing
+    final oldFreq = entry.accessCount;
+
     // Mark as accessed (for LRU/LFU)
     entry.markAccessed();
+
+    // Update LFU frequency buckets
+    _removeFromFreqBucket(key, oldFreq);
+    _freqBuckets.putIfAbsent(entry.accessCount, () => {}).add(key);
 
     // Move to end for LRU (LinkedHashMap maintains insertion order).
     // Re-use the same entry object to preserve accessCount — creating a new
@@ -301,12 +321,17 @@ class MemoryCache {
 
   /// Remove a value from cache
   void remove(String key) {
-    _cache.remove(key);
+    final entry = _cache.remove(key);
+    if (entry != null) {
+      _removeFromFreqBucket(key, entry.accessCount);
+    }
   }
 
   /// Clear all cache
   void clear() {
     _cache.clear();
+    _freqBuckets.clear();
+    _minFreq = 0;
     _resetStats();
   }
 
@@ -324,7 +349,7 @@ class MemoryCache {
   /// Remove multiple keys at once
   void removeAll(List<String> keys) {
     for (final key in keys) {
-      _cache.remove(key);
+      remove(key);
     }
   }
 
@@ -388,15 +413,16 @@ class MemoryCache {
 
   /// Remove all expired entries from cache
   void cleanExpired() {
-    final expiredKeys = <String>[];
+    final expiredEntries = <String, int>{};
     _cache.forEach((key, entry) {
       if (entry.isExpired) {
-        expiredKeys.add(key);
+        expiredEntries[key] = entry.accessCount;
       }
     });
 
-    for (final key in expiredKeys) {
-      _cache.remove(key);
+    for (final entry in expiredEntries.entries) {
+      _cache.remove(entry.key);
+      _removeFromFreqBucket(entry.key, entry.value);
       _expirations++;
     }
   }
@@ -437,14 +463,20 @@ class MemoryCache {
         break;
 
       case EvictionPolicy.lfu:
-        // Remove least frequently used
-        int minAccessCount = -1;
-        _cache.forEach((key, entry) {
-          if (minAccessCount == -1 || entry.accessCount < minAccessCount) {
-            minAccessCount = entry.accessCount;
-            keyToRemove = key;
-          }
-        });
+        // O(1): pick the first key from the minimum-frequency bucket
+        final minBucket = _freqBuckets[_minFreq];
+        if (minBucket != null && minBucket.isNotEmpty) {
+          keyToRemove = minBucket.first;
+        } else {
+          // Fallback: linear scan (should not occur in steady state)
+          int minAccessCount = -1;
+          _cache.forEach((key, entry) {
+            if (minAccessCount == -1 || entry.accessCount < minAccessCount) {
+              minAccessCount = entry.accessCount;
+              keyToRemove = key;
+            }
+          });
+        }
         break;
 
       case EvictionPolicy.fifo:
@@ -473,6 +505,16 @@ class MemoryCache {
       total += entry.estimatedSize; // Value
     });
     return total;
+  }
+
+  void _removeFromFreqBucket(String key, int freq) {
+    final bucket = _freqBuckets[freq];
+    if (bucket == null) return;
+    bucket.remove(key);
+    if (bucket.isEmpty) {
+      _freqBuckets.remove(freq);
+      if (_minFreq == freq) _minFreq++;
+    }
   }
 
   // =========================================================================

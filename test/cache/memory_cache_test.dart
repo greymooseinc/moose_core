@@ -507,6 +507,49 @@ void main() {
   });
 
   // =========================================================================
+  // MemoryCache LFU eviction (frequency-bucket map correctness)
+  // =========================================================================
+
+  group('MemoryCache LFU eviction', () {
+    test('evicts least-frequently-used entry when over capacity', () {
+      final cache = MemoryCache();
+      cache.configure(maxSize: 3, evictionPolicy: EvictionPolicy.lfu);
+
+      cache.set('a', 1);
+      cache.set('b', 2);
+      cache.set('c', 3);
+
+      // Access b and c more so 'a' has lowest frequency
+      cache.get<int>('b');
+      cache.get<int>('b');
+      cache.get<int>('c');
+
+      // Adding 'd' should evict 'a'
+      cache.set('d', 4);
+
+      expect(cache.get<int>('a'), isNull);
+      expect(cache.get<int>('b'), equals(2));
+      expect(cache.get<int>('c'), equals(3));
+      expect(cache.get<int>('d'), equals(4));
+
+      cache.dispose();
+    });
+  });
+
+  // =========================================================================
+  // MemoryCache dispose
+  // =========================================================================
+
+  group('MemoryCache dispose', () {
+    test('dispose() cancels cleanup timer without throwing', () {
+      final cache = MemoryCache();
+      expect(() => cache.dispose(), returnsNormally);
+      // Calling dispose twice should also be safe
+      expect(() => cache.dispose(), returnsNormally);
+    });
+  });
+
+  // =========================================================================
   // CacheStats
   // =========================================================================
 
