@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:moose_core/cache.dart';
 import 'package:moose_core/repositories.dart';
 import 'package:moose_core/services.dart';
 import 'package:json_schema/json_schema.dart';
 
 import '../app/moose_app_context.dart';
+import 'repository_manager.dart';
 
 /// BackendAdapter - Abstract base class for backend implementations
 ///
@@ -139,9 +138,8 @@ abstract class BackendAdapter {
   // Backward-compatible alias for existing adapters that still use cacheManager.
   CacheManager get cacheManager => cache;
 
-  /// Single unified repository store.
-  /// Key: repository Type → ordered list of registered entries (last = default).
-  final Map<Type, List<_RepoEntry>> _repos = {};
+  /// Manages factory registration and lazy instance caching for repositories.
+  final RepositoryManager _repoManager = RepositoryManager();
 
   /// Clears all registered repository factories and cached instances.
   ///
@@ -150,7 +148,7 @@ abstract class BackendAdapter {
   /// that reuses the same adapter instance). This ensures factories and cached
   /// repo instances from the previous context do not leak into the new one.
   void resetRepositories() {
-    _repos.clear();
+    _repoManager.reset();
   }
 
   /// Register a synchronous factory for a repository type.
@@ -173,7 +171,7 @@ abstract class BackendAdapter {
   void registerRepositoryFactory<T extends CoreRepository>(
     T Function() factory,
   ) {
-    _repos.putIfAbsent(T, () => []).add(_RepoEntry(provider: name, factory: factory));
+    _repoManager.registerFactory<T>(factory, provider: name);
   }
 
   /// Register an asynchronous factory for a repository type.
@@ -199,7 +197,7 @@ abstract class BackendAdapter {
   void registerAsyncRepositoryFactory<T extends CoreRepository>(
     Future<T> Function() factory,
   ) {
-    _repos.putIfAbsent(T, () => []).add(_RepoEntry(provider: name, factory: factory));
+    _repoManager.registerAsyncFactory<T>(factory, provider: name);
   }
 
   /// Get repository synchronously and call its initialize method.
@@ -239,42 +237,10 @@ abstract class BackendAdapter {
   /// );
   /// ```
   T getRepository<T extends CoreRepository>({String? provider}) {
-    final entries = _repos[T];
-    if (entries == null || entries.isEmpty) {
-      throw RepositoryNotRegisteredException(
-        'No factory registered for repository type: $T\n'
-        'Available repositories: ${_repos.keys.join(", ")}',
-      );
-    }
-
-    final _RepoEntry entry;
-    if (provider != null) {
-      entry = entries.lastWhere(
-        (e) => e.provider == provider,
-        orElse: () => throw RepositoryNotRegisteredException(
-          'No factory registered for repository type: $T with provider "$provider"\n'
-          'Available providers for $T: ${entries.map((e) => e.provider).join(", ")}',
-        ),
-      );
-    } else {
-      entry = entries.last; // last-wins
-    }
-
-    if (entry.instance != null) return entry.instance as T;
-
-    final factory = entry.factory;
-    if (factory is Future<T> Function()) {
-      throw RepositoryAsyncOnlyException(
-        'Repository $T was registered with an async factory. '
-        'Use getRepositoryAsync<$T>() instead of getRepository<$T>().',
-      );
-    }
-    final instance = (factory as T Function())();
+    final instance = _repoManager.getSync<T>(provider: provider);
     if (instance is AuthRepository) {
       instance.initTokenStorage(appContext.cache, keyPrefix: name);
     }
-    instance.initialize();
-    entry.instance = instance;
     return instance;
   }
 
@@ -319,58 +285,11 @@ abstract class BackendAdapter {
   /// }
   /// ```
   Future<T> getRepositoryAsync<T extends CoreRepository>({String? provider}) async {
-    final entries = _repos[T];
-    if (entries == null || entries.isEmpty) {
-      throw RepositoryNotRegisteredException(
-        'No factory registered for repository type: $T\n'
-        'Available repositories: ${_repos.keys.join(", ")}',
-      );
+    final instance = await _repoManager.getAsync<T>(provider: provider);
+    if (instance is AuthRepository) {
+      instance.initTokenStorage(appContext.cache, keyPrefix: name);
     }
-
-    final _RepoEntry entry;
-    if (provider != null) {
-      entry = entries.lastWhere(
-        (e) => e.provider == provider,
-        orElse: () => throw RepositoryNotRegisteredException(
-          'No factory registered for repository type: $T with provider "$provider"',
-        ),
-      );
-    } else {
-      entry = entries.last;
-    }
-
-    // Fast path: already resolved.
-    if (entry.instance is T) return entry.instance as T;
-
-    // In-flight: a previous concurrent call installed a Completer — await it.
-    if (entry.instance is Completer<T>) {
-      return (entry.instance as Completer<T>).future;
-    }
-
-    // First caller: install a Completer so concurrent callers wait on it.
-    final completer = Completer<T>();
-    entry.instance = completer;
-
-    try {
-      final factory = entry.factory;
-      final T instance;
-      if (factory is Future<T> Function()) {
-        instance = await factory();
-      } else {
-        instance = (factory as T Function())();
-      }
-      if (instance is AuthRepository) {
-        instance.initTokenStorage(appContext.cache, keyPrefix: name);
-      }
-      instance.initialize();
-      entry.instance = instance;
-      completer.complete(instance);
-      return instance;
-    } catch (e, stack) {
-      entry.instance = null; // allow retry on next call
-      completer.completeError(e, stack);
-      rethrow;
-    }
+    return instance;
   }
 
   /// Check if a factory is registered for a repository type.
@@ -391,10 +310,7 @@ abstract class BackendAdapter {
   /// }
   /// ```
   bool hasRepository<T extends CoreRepository>({String? provider}) {
-    final entries = _repos[T];
-    if (entries == null || entries.isEmpty) return false;
-    if (provider != null) return entries.any((e) => e.provider == provider);
-    return true;
+    return _repoManager.hasFactory<T>(provider: provider);
   }
 
   /// Check if a repository is currently cached.
@@ -415,12 +331,7 @@ abstract class BackendAdapter {
   /// }
   /// ```
   bool isRepositoryCached<T extends CoreRepository>({String? provider}) {
-    final entries = _repos[T];
-    if (entries == null || entries.isEmpty) return false;
-    if (provider != null) {
-      return entries.any((e) => e.provider == provider && e.instance is T);
-    }
-    return entries.last.instance is T;
+    return _repoManager.isCached<T>(provider: provider);
   }
 
   /// Clear the cache for a specific repository type.
@@ -443,17 +354,7 @@ abstract class BackendAdapter {
   /// final products = await adapter.getRepository<ProductsRepository>();
   /// ```
   void clearRepositoryCache<T extends CoreRepository>({String? provider}) {
-    final entries = _repos[T];
-    if (entries == null) return;
-    if (provider != null) {
-      for (final e in entries.where((e) => e.provider == provider)) {
-        e.instance = null;
-      }
-    } else {
-      for (final e in entries) {
-        e.instance = null;
-      }
-    }
+    _repoManager.clearCache<T>(provider: provider);
   }
 
   /// Clear all cached repository instances.
@@ -469,11 +370,7 @@ abstract class BackendAdapter {
   /// // All repositories will be recreated on next access
   /// ```
   void clearAllRepositoryCaches() {
-    for (final entries in _repos.values) {
-      for (final e in entries) {
-        e.instance = null;
-      }
-    }
+    _repoManager.clearAllCaches();
   }
 
   /// Get list of all registered repository types.
@@ -487,7 +384,7 @@ abstract class BackendAdapter {
   /// ```dart
   /// print('Registered: ${adapter.registeredRepositoryTypes}');
   /// ```
-  List<Type> get registeredRepositoryTypes => _repos.keys.toList();
+  List<Type> get registeredRepositoryTypes => _repoManager.registeredTypes;
 
   /// Get a repository by its runtime type.
   ///
@@ -509,24 +406,7 @@ abstract class BackendAdapter {
   /// final repo = adapter.getRepositoryByType(repoType);
   /// ```
   CoreRepository getRepositoryByType(Type type) {
-    final entries = _repos[type];
-    if (entries == null || entries.isEmpty) {
-      throw RepositoryNotRegisteredException(
-        'No factory registered for repository type: $type',
-      );
-    }
-    final entry = entries.last;
-    if (entry.instance != null) return entry.instance as CoreRepository;
-    final factory = entry.factory;
-    if (factory is Future Function()) {
-      throw RepositoryNotRegisteredException(
-        'Repository $type has async factory — use getRepositoryAsync.',
-      );
-    }
-    final instance = (factory as CoreRepository Function())();
-    instance.initialize();
-    entry.instance = instance;
-    return instance;
+    return _repoManager.getByType(type);
   }
 
   /// Validates configuration against the adapter's JSON schema.
@@ -715,20 +595,6 @@ abstract class BackendAdapter {
       throw Exception('Failed to initialize adapter "$name" from config: $e');
     }
   }
-}
-
-// =============================================================================
-// INTERNAL HELPERS
-// =============================================================================
-
-/// Internal entry in [BackendAdapter._repos].
-/// Every entry is tagged with the adapter's [provider] name — never null.
-class _RepoEntry {
-  final String provider;
-  final Object factory; // T Function() or Future<T> Function()
-  Object? instance;     // null until first retrieval
-
-  _RepoEntry({required this.provider, required this.factory});
 }
 
 // =============================================================================
