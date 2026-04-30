@@ -372,6 +372,27 @@ void main() {
     });
 
     // =========================================================================
+    // EventBus controller cleanup
+    // =========================================================================
+
+    group('EventBus controller cleanup', () {
+      test('controller is removed after all subscribers cancel', () async {
+        final bus = EventBus();
+        final sub1 = bus.on('user.login', (_) {});
+        final sub2 = bus.on('user.login', (_) {});
+
+        // One controller for the event
+        expect(bus.controllerCount, equals(1));
+
+        await sub1.cancel();
+        expect(bus.controllerCount, equals(1)); // sub2 still active
+
+        await sub2.cancel();
+        expect(bus.controllerCount, equals(0)); // controller removed
+      });
+    });
+
+    // =========================================================================
     // Real-world plugin communication patterns
     // =========================================================================
 

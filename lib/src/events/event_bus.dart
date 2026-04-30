@@ -126,8 +126,15 @@ class EventBus {
   // Map of event name to stream controller
   final Map<String, StreamController<Event>> _controllers = {};
 
+  // Track subscriber count per event name for controller lifecycle management
+  final Map<String, int> _subscriberCount = {};
+
   // Track all active subscriptions for cleanup
   final Set<EventSubscription> _activeSubscriptions = {};
+
+  /// Number of live stream controllers. Exposed for testing only.
+  @visibleForTesting
+  int get controllerCount => _controllers.length;
 
   /// Subscribe to events by name
   ///
@@ -168,6 +175,7 @@ class EventBus {
     );
 
     _activeSubscriptions.add(eventSubscription);
+    _subscriberCount[eventName] = (_subscriberCount[eventName] ?? 0) + 1;
 
     return eventSubscription;
   }
@@ -285,9 +293,20 @@ class EventBus {
     return controller.stream.where((event) => event.name == eventName);
   }
 
-  /// Remove a subscription from tracking
+  /// Remove a subscription from tracking and clean up the controller when
+  /// the last subscriber for that event name cancels.
   void _removeSubscription(EventSubscription subscription) {
     _activeSubscriptions.remove(subscription);
+
+    final eventName = subscription._eventName;
+    final count = (_subscriberCount[eventName] ?? 1) - 1;
+    if (count <= 0) {
+      _subscriberCount.remove(eventName);
+      final ctrl = _controllers.remove(eventName);
+      ctrl?.close();
+    } else {
+      _subscriberCount[eventName] = count;
+    }
   }
 
   /// Get or create a stream controller for the given event name
