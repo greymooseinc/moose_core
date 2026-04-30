@@ -155,14 +155,24 @@ class MooseBootstrapper {
     final failures = <String, Object>{};
 
     // Step 1: Initialize configuration.
-    appContext.configManager.initialize(config);
+    try {
+      appContext.configManager.initialize(config);
+    } catch (e) {
+      failures['bootstrap:configInit'] = e;
+      appContext.logger.error('Config initialisation failed — continuing with empty config', e);
+    }
 
     // Step 1b: Build page routes from the `pages` object in environment.json.
     //
     // Each active entry whose key is a non-empty route path maps to a PageScreen.
     // A fallback `/home` route is added when no page declares that route.
     // These routes are stored on appContext and merged into getAllRoutes().
-    _registerPagesRoutes();
+    try {
+      _registerPagesRoutes();
+    } catch (e) {
+      failures['bootstrap:pagesRoutes'] = e;
+      appContext.logger.error('Page route registration failed', e);
+    }
 
     // Step 0 (applied after config): Resolve and wire the active theme.
     //
@@ -212,19 +222,43 @@ class MooseBootstrapper {
     }
 
     // Step 6: Initialize all registered plugins (async).
+    // Per-plugin init failures are collected in a sub-map and then merged into
+    // the main failures map under "plugin:<name>" keys so callers can identify
+    // exactly which plugin failed.
+    final initFailures = <String, Object>{};
     try {
-      await appContext.pluginRegistry.initAll(timings: timings);
+      await appContext.pluginRegistry.initAll(
+        timings: timings,
+        failures: initFailures,
+      );
     } catch (e) {
       failures['plugin:initAll'] = e;
       appContext.logger.error('Plugin init phase failed', e);
     }
+    for (final entry in initFailures.entries) {
+      failures['plugin:${entry.key}'] = entry.value;
+    }
 
     // Step 7: Start all registered plugins (async).
+    // Per-plugin start failures are collected in a sub-map and merged into the
+    // main failures map. Any plugin that fails onStart is recorded under
+    // "plugin:startAll" (legacy key kept for backward compatibility) as well as
+    // "plugin:<name>" for per-plugin granularity.
+    final startFailures = <String, Object>{};
     try {
-      await appContext.pluginRegistry.startAll(timings: startTimings);
+      await appContext.pluginRegistry.startAll(
+        timings: startTimings,
+        failures: startFailures,
+      );
     } catch (e) {
       failures['plugin:startAll'] = e;
       appContext.logger.error('Plugin start phase failed', e);
+    }
+    for (final entry in startFailures.entries) {
+      failures['plugin:${entry.key}'] = entry.value;
+    }
+    if (startFailures.isNotEmpty) {
+      failures['plugin:startAll'] = startFailures.values.first;
     }
 
     sw.stop();

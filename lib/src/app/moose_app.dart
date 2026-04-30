@@ -155,6 +155,16 @@ class _MooseAppState extends State<MooseApp> {
       adapters: widget.adapters,
       plugins: widget.plugins,
     );
+    assert(() {
+      if (report.failures.isNotEmpty) {
+        debugPrint(
+          '[MooseApp] Bootstrap completed with ${report.failures.length} failure(s): '
+          '${report.failures.keys.join(', ')}. '
+          'Check your adapters and plugins for initialisation errors.',
+        );
+      }
+      return true;
+    }());
     widget.onBootstrapComplete?.call(report);
     if (setReady && mounted) setState(() => _ready = true);
   }

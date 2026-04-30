@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moose_core/app.dart';
 import 'package:moose_core/plugin.dart';
+import 'package:moose_core/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _BootstrapRecordingPlugin extends FeaturePlugin {
@@ -76,4 +77,46 @@ void main() {
       expect(report.failures.containsKey('plugin:startAll'), isTrue);
     });
   });
+
+  group('Bootstrap failure handling', () {
+    test('config init failure is recorded in BootstrapReport', () async {
+      final ctx = MooseAppContext(
+        configManager: _ThrowingConfigManager(),
+      );
+      final report = await MooseBootstrapper(appContext: ctx).run(
+        config: {},
+        adapters: [],
+        plugins: [],
+      );
+      expect(report.failures, contains('bootstrap:configInit'));
+      expect(report.succeeded, isFalse);
+    });
+
+    test('page route registration failure is recorded in BootstrapReport', () async {
+      final ctx = MooseAppContext(
+        configManager: _PagesThrowingConfigManager(),
+      );
+      final report = await MooseBootstrapper(appContext: ctx).run(
+        config: {},
+        adapters: [],
+        plugins: [],
+      );
+      expect(report.failures, contains('bootstrap:pagesRoutes'));
+    });
+  });
+}
+
+class _ThrowingConfigManager extends ConfigManager {
+  @override
+  void initialize(Map<String, dynamic> config) {
+    throw StateError('intentional config init failure');
+  }
+}
+
+class _PagesThrowingConfigManager extends ConfigManager {
+  @override
+  dynamic get(String key, {dynamic defaultValue}) {
+    if (key == 'pages') throw StateError('intentional pages failure');
+    return super.get(key, defaultValue: defaultValue);
+  }
 }
