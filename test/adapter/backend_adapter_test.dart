@@ -149,14 +149,14 @@ void main() {
         );
       });
 
-      test('should throw when getting async factory with sync method', () {
+      test('should throw RepositoryAsyncOnlyException when getting async factory with sync method', () {
         adapter.registerAsyncRepositoryFactory<AnotherMockRepository>(
           () async => AnotherMockRepository(),
         );
 
         expect(
           () => adapter.getRepository<AnotherMockRepository>(),
-          throwsA(isA<RepositoryNotRegisteredException>()),
+          throwsA(isA<RepositoryAsyncOnlyException>()),
         );
       });
 

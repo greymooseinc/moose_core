@@ -264,8 +264,9 @@ abstract class BackendAdapter {
 
     final factory = entry.factory;
     if (factory is Future<T> Function()) {
-      throw RepositoryNotRegisteredException(
-        'Repository $T has an async factory. Use getRepositoryAsync<$T>() instead.',
+      throw RepositoryAsyncOnlyException(
+        'Repository $T was registered with an async factory. '
+        'Use getRepositoryAsync<$T>() instead of getRepository<$T>().',
       );
     }
     final instance = (factory as T Function())();
@@ -762,6 +763,16 @@ class RepositoryFactoryException implements Exception {
 
   @override
   String toString() => 'RepositoryFactoryException: $message';
+}
+
+/// Thrown when [BackendAdapter.getRepository] is called for a repository whose
+/// factory was registered as async. Use [BackendAdapter.getRepositoryAsync] instead.
+class RepositoryAsyncOnlyException implements Exception {
+  final String message;
+  const RepositoryAsyncOnlyException(this.message);
+
+  @override
+  String toString() => 'RepositoryAsyncOnlyException: $message';
 }
 
 /// Exception thrown when adapter configuration validation fails.
