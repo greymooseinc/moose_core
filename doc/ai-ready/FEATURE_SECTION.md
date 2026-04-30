@@ -45,6 +45,8 @@ abstract class FeatureSection extends StatelessWidget {
 
 If the key is absent in both, `getSetting` throws immediately with a descriptive message. If the value is present but cannot be cast to `T`, it also throws. This fail-fast behaviour catches misconfiguration during development rather than silently returning wrong values.
 
+**Performance note:** The merged settings map (constructor `settings` merged over `getDefaultSettings()`) is computed once per section instance and cached via `Expando`. `getDefaultSettings()` is called at most once regardless of how many times `getSetting<T>()` is invoked on the same instance.
+
 ### Automatic type coercions in getSetting
 
 | Requested `T` | Value type | Behaviour |

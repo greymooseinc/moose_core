@@ -211,7 +211,8 @@ class BootstrapReport {
   final Duration totalTime;
   final Map<String, Duration> pluginTimings;       // onInit timings per plugin
   final Map<String, Duration> pluginStartTimings;  // onStart timings per plugin
-  final Map<String, Object> failures;              // key = 'adapter:<name>' or 'plugin:<name>'
+  // key = 'adapter:<name>' | 'plugin:<name>' | 'bootstrap:configInit' | 'bootstrap:pagesRoutes'
+  final Map<String, Object> failures;
 
   bool get succeeded => failures.isEmpty;
 
@@ -219,6 +220,8 @@ class BootstrapReport {
   String toString(); // 'BootstrapReport(OK, 3 plugins, 3 plugin starts, 0 failures, took 124ms)'
 }
 ```
+
+`MooseApp` emits a `debugPrint` warning to the console when `report.failures.isNotEmpty`.
 
 ---
 
@@ -985,7 +988,7 @@ await _sub.cancel();
 
 ### ActionRegistry
 
-Handles `UserInteraction` dispatch — routes `internal` navigations, `external` URLs, and `custom` actions.
+Thin router that dispatches `UserInteraction` to three specialized handlers. The constructor accepts optional overrides for testing.
 
 ```dart
 typedef CustomActionHandler = void Function(
@@ -994,20 +997,65 @@ typedef CustomActionHandler = void Function(
 );
 
 class ActionRegistry {
+  // Optional constructor overrides — inject mock handlers in tests.
+  ActionRegistry({
+    NavigationHandler? navigationHandler,
+    ExternalUrlHandler? externalUrlHandler,
+  });
+
+  // Custom handler registration — delegated to CustomActionDispatcher internally.
   void registerCustomHandler(String actionId, CustomActionHandler handler);
   void registerMultipleHandlers(Map<String, CustomActionHandler> handlers);
   void unregisterCustomHandler(String actionId);
 
   // Dispatches UserInteraction:
-  //   internal → MooseNavigator.of(context).pushNamed()
-  //   external → URL handling (url_launcher in production)
-  //   custom   → registered handler lookup
+  //   internal → NavigationHandler.handle()   → MooseNavigator.of(context).pushNamed()
+  //   external → ExternalUrlHandler.handle()  → shows SnackBar (replace with url_launcher in prod)
+  //   custom   → CustomActionDispatcher.handle() → registered handler lookup
   //   none     → no-op
   void handleInteraction(BuildContext context, UserInteraction? interaction);
 
   bool hasCustomHandler(String actionId);
   List<String> getRegisteredHandlers();
   void clearCustomHandlers();
+}
+```
+
+### NavigationHandler
+
+Handles `UserInteractionType.internal` by delegating to `MooseNavigator`.
+
+```dart
+class NavigationHandler {
+  const NavigationHandler();
+  void handle(BuildContext context, UserInteraction interaction);
+}
+```
+
+### ExternalUrlHandler
+
+Handles `UserInteractionType.external`. Default implementation shows a `SnackBar` with the URL — replace with `url_launcher` in production by injecting a custom subclass via `ActionRegistry(externalUrlHandler: ...)`.
+
+```dart
+class ExternalUrlHandler {
+  const ExternalUrlHandler();
+  void handle(BuildContext context, UserInteraction interaction);
+}
+```
+
+### CustomActionDispatcher
+
+Owns the registered custom action handler map. Used internally by `ActionRegistry`.
+
+```dart
+class CustomActionDispatcher {
+  void registerHandler(String actionId, CustomActionHandler handler);
+  void registerMultiple(Map<String, CustomActionHandler> handlers);
+  void unregisterHandler(String actionId);
+  bool hasHandler(String actionId);
+  List<String> registeredHandlers();
+  void clearHandlers();
+  void handle(BuildContext context, UserInteraction interaction);
 }
 ```
 
@@ -1152,7 +1200,8 @@ Manages a flat-nested config map loaded from `environment.json`. Supports dot (`
 class ConfigManager {
   void initialize(Map<String, dynamic> config);
 
-  // Get a value by dotted/colon path; falls back to plugin/adapter defaults then defaultValue
+  // Get a value by dotted/colon path; falls back to plugin/adapter defaults then defaultValue.
+  // Returns null (does not panic) for paths containing '::' or '..' (empty segment).
   dynamic get(String path, {dynamic defaultValue});
 
   Map<String, dynamic> get config; // entire raw config map
@@ -1174,6 +1223,10 @@ class ConfigManager {
 2. Registered plugin/adapter defaults
 3. Provided `defaultValue`
 
+**Robustness rules:**
+- Paths with `::` or `..` (empty segment) return `null` — no exception thrown.
+- Array values in the config are normalized safely; non-map elements inside arrays are skipped rather than causing a cast error.
+
 **Path examples:**
 
 ```dart
@@ -1182,17 +1235,65 @@ configManager.get('plugins:products:settings:cache:productsTTL', defaultValue: 3
 configManager.get('plugins:home:sections:main'); // returns List
 ```
 
+### MooseConfigKeys
+
+Static helpers that produce canonical config path strings, eliminating hard-coded string literals.
+
+```dart
+class MooseConfigKeys {
+  // plugins:<name>:settings:<key>
+  static String pluginSettings(String pluginName, String key);
+
+  // plugins:<name>
+  static String pluginRoot(String pluginName);
+
+  // adapters:<name>:settings:<key>  (note: adapters have NO 'settings' wrapper by default,
+  // but this helper is provided for adapters that store keyed values under a settings sub-map)
+  static String adapterSettings(String adapterName, String key);
+
+  // adapters:<name>
+  static String adapterRoot(String adapterName);
+
+  static const String pages = 'pages';
+  static const String theme = 'theme';
+}
+```
+
+**Usage:**
+
+```dart
+import 'package:moose_core/services.dart';
+
+configManager.get(MooseConfigKeys.pluginSettings('products', 'perPage'), defaultValue: 20);
+configManager.get(MooseConfigKeys.adapterRoot('woocommerce'));
+configManager.get(MooseConfigKeys.pages); // 'pages'
+```
+
 ---
 
 ## Logging
 
 ### AppLogger
 
-Debug-only logger backed by `dart:developer`. Silent in release builds.
+In debug mode, logs via `dart:developer` (existing behavior). In release mode, forwards to `AppLogger.releaseSink` if set; otherwise silent.
 
 ```dart
+/// Signature for a release-mode log sink.
+typedef MooseLogSink = void Function(
+  String level,
+  String tag,
+  String message, [
+  Object? error,
+  StackTrace? stack,
+]);
+
 class AppLogger {
   AppLogger(String name);
+
+  /// Set this once at startup (e.g. in main()) to forward release logs to
+  /// Crashlytics, Sentry, or any other crash-reporting service.
+  /// Null by default — release builds are silent unless this is set.
+  static MooseLogSink? releaseSink;
 
   void debug(String message);
   void info(String message);
@@ -1200,6 +1301,18 @@ class AppLogger {
   void error(String message, [Object? error, StackTrace? stackTrace]);
   void success(String message); // info with ✅ prefix
 }
+```
+
+**Release-mode forwarding example:**
+
+```dart
+// In main() before runApp():
+AppLogger.releaseSink = (level, tag, message, [error, stack]) {
+  FirebaseCrashlytics.instance.log('[$level][$tag] $message');
+  if (error != null) {
+    FirebaseCrashlytics.instance.recordError(error, stack);
+  }
+};
 ```
 
 Accessible from plugins and adapters via `logger` convenience getter on `FeaturePlugin` and `BackendAdapter`.
@@ -1212,6 +1325,7 @@ Accessible from plugins and adapters via `logger` convenience getter on `Feature
 |-----------|------------|--------|
 | `AdapterConfigValidationException` | Config fails JSON schema validation | `adapters.dart` |
 | `RepositoryNotRegisteredException` | `getRepository<T>()` called for unregistered type | `adapters.dart` |
+| `RepositoryAsyncOnlyException` | `getRepository<T>()` (sync) called when `T` was registered with an async factory — message directs caller to use `getRepositoryAsync<T>()` | `adapters.dart` |
 | `RepositoryTypeMismatchException` | Cached repo has unexpected type | `adapters.dart` |
 | `RepositoryFactoryException` | Factory has unexpected type | `adapters.dart` |
 

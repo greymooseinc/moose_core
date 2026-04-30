@@ -310,6 +310,8 @@ yield user.copyWith(
 );
 ```
 
+**Token storage initialization:** `AuthRepository` provides a `saveSession()` method for persisting auth tokens. Before calling `saveSession()`, you must call `initTokenStorage(cache, keyPrefix: 'prefix')` to configure the token store. In debug builds, `saveSession()` contains an `assert(store != null, ...)` that fires an `AssertionError` if `initTokenStorage()` was never called — catching mis-wired adapters during development.
+
 **Note:** Not all methods need to be implemented — throw `UnimplementedError` for unsupported features.
 
 ---
@@ -644,7 +646,7 @@ Future<void> initialize(Map<String, dynamic> config) async {
 
 1. **Multiple adapters, same repository type** — the last adapter registered wins (factory is overwritten; any previously resolved instance is invalidated).
 2. **Optional repositories** — use `hasRepository<T>()` before calling `getRepository<T>()` for repositories that may not be registered (e.g. `PushNotificationRepository` may not be provided by a commerce adapter).
-3. **Async factories** — if you used `registerAsyncRepositoryFactory`, you must use `getRepositoryAsync<T>()` or the request will throw.
+3. **Async factories** — if you used `registerAsyncRepositoryFactory`, you must use `getRepositoryAsync<T>()`. Calling the sync `getRepository<T>()` throws `RepositoryAsyncOnlyException` with a message directing you to use the async variant.
 4. **Not all repositories need implementing** — adapters only register the repository types they support. An adapter that doesn't provide `PostRepository` simply doesn't call `registerRepositoryFactory<PostRepository>`.
 
 ---

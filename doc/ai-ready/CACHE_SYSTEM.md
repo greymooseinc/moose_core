@@ -199,12 +199,14 @@ List<String> get keys; // snapshot of current keys
 | Policy | Description | Best For |
 |--------|-------------|----------|
 | `EvictionPolicy.lru` | Evicts least recently used | General purpose (default) |
-| `EvictionPolicy.lfu` | Evicts least frequently used | Data with a stable hot set |
+| `EvictionPolicy.lfu` | Evicts least frequently used — O(1) via frequency-bucket map | Data with a stable hot set |
 | `EvictionPolicy.fifo` | Evicts oldest inserted entry | Time-ordered data |
 
 ```dart
 memory.configure(evictionPolicy: EvictionPolicy.lfu);
 ```
+
+LFU eviction uses a `Map<int, Set<String>> _freqBuckets` internally, so the eviction step is O(1) regardless of cache size.
 
 ---
 
@@ -396,7 +398,7 @@ setUp(() async {
 
 tearDown(() {
   appContext.cache.memory.clear();
-  appContext.cache.memory.stopAutoCleanup();
+  appContext.cache.dispose(); // stops auto-cleanup timer; always call in tests and teardowns
 });
 ```
 
@@ -416,7 +418,7 @@ appContext.cache.memory.configure(
 - `CacheManager` is instantiated by `MooseAppContext`; one instance per app context — never construct it directly in production code.
 - Never store `CacheManager` in a static field. Always access through `appContext.cache` or the convenience getter on `BackendAdapter`/`FeaturePlugin`.
 - Cache keys are plain strings. Use a consistent naming convention (e.g., `<adapter>:<entity>:<id>`) to prevent collisions between adapters or plugins.
-- `MemoryCache.dispose()` is called by `CacheManager.dispose()` — do not call it directly.
+- `MemoryCache.dispose()` cancels the cleanup timer. Always call `CacheManager.dispose()` (which delegates to `MemoryCache.dispose()`) when tearing down a context — especially in tests — to prevent timer leaks. Do not call `MemoryCache.dispose()` directly from production code.
 
 ---
 

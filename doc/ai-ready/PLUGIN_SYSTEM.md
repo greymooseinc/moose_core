@@ -331,7 +331,9 @@ if (!report.succeeded) {
 - `totalTime` — wall-clock duration for the full sequence
 - `pluginTimings` — per-plugin `onInit()` durations
 - `pluginStartTimings` — per-plugin `onStart()` durations
-- `failures` — map of component key → exception
+- `failures` — map of component key → exception. Well-known keys: `"adapter:<name>"`, `"plugin:<name>"`, `"bootstrap:configInit"`, `"bootstrap:pagesRoutes"`
+
+`MooseApp` emits a `debugPrint` warning to the console when `report.failures.isNotEmpty`, so bootstrap failures are visible without additional logging setup.
 
 ---
 
@@ -467,6 +469,8 @@ Tabs are defined in the top-level `"tabs"` array. Order and visibility are confi
 ```
 
 `BottomTabsPlugin` reads the normalised map from `ConfigManager` and sorts by `"order"`. Plugin `bottomTabs` overrides are still supported but tab definitions in `environment.json` are the recommended approach.
+
+**Duplicate tab IDs:** If two plugins (or a plugin and a tab entry) register a `BottomTab` with the same `id`, a warning is logged and the later registration is ignored. The first registration wins — no silent overwriting.
 
 ### Runtime conditional tabs (using a hook)
 
@@ -943,5 +947,5 @@ hookRegistry.register('hook:name', (data) {
 
 ---
 
-**Last Updated:** 2026-03-01
-**Version:** 4.0.0
+**Last Updated:** 2026-04-30
+**Version:** 5.0.0

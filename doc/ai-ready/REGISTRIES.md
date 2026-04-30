@@ -388,6 +388,12 @@ class EventBus {
   int get registeredEventCount;
   bool hasSubscribers(String eventName);
   List<String> getRegisteredEvents();
+
+  /// Number of open StreamControllers. When the last subscriber for an event
+  /// cancels, its controller is removed and closed automatically.
+  /// Annotated @visibleForTesting — use in tests to assert subscription cleanup.
+  @visibleForTesting
+  int get controllerCount;
 }
 ```
 
@@ -1052,7 +1058,15 @@ test('on() receives fired events', () async {
   expect(received.length, equals(1));
   expect(received.first.data['key'], equals('value'));
 
-  await bus.reset();
+  await bus.destroy(); // use destroy() (or reset()) for full teardown
+});
+
+test('controller is removed after last subscriber cancels', () async {
+  final bus = EventBus();
+  final sub = bus.on('test.event', (_) {});
+  expect(bus.controllerCount, equals(1));
+  await sub.cancel();
+  expect(bus.controllerCount, equals(0)); // controller cleaned up
 });
 ```
 

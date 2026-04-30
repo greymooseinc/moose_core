@@ -184,9 +184,13 @@ final report = await MooseBootstrapper(appContext: ctx).run(
 );
 
 if (!report.succeeded) {
-  // report.failures keys: 'adapter:<name>' or 'plugin:<name>'
+  // report.failures keys: 'adapter:<name>' | 'plugin:<name>'
+  //                     | 'bootstrap:configInit' | 'bootstrap:pagesRoutes'
+  debugPrint('Bootstrap failures: ${report.failures}');
 }
 ```
+
+`MooseApp` emits a `debugPrint` warning automatically when `report.failures.isNotEmpty`.
 
 **`BootstrapReport` fields:**
 
@@ -915,9 +919,19 @@ await cache.persistent.setBool('notifications_enabled', true);
 final enabled = cache.persistent.get<bool>('notifications_enabled') ?? true;
 ```
 
+### MooseAppNotifier (theme / locale state)
+
+`MooseAppNotifier` is the internal `ChangeNotifier` that drives theme-mode and locale rebuilds for `MooseScope`. Both `setThemeMode()` and `setLocale()` batch the resulting `notifyListeners()` call via `SchedulerBinding.instance.addPostFrameCallback` + `scheduleFrame()`. If both are called within the same frame, only one rebuild is triggered — avoiding double-rebuild jank.
+
+No action is required from plugin or adapter code. This detail matters only when writing widget tests that call both methods in the same test frame: advance the frame (`await tester.pump()`) before asserting the new state.
+
+---
+
 ### ConfigManager
 
 Loaded from `environment.json` by `configManager.initialize(config)` in bootstrap step 1. Paths use `:` or `.` interchangeably.
+
+**Robustness:** `get()` with empty path segments (`::` or `..`) returns `null` — no exception. Array normalization in `_normalizeArrays()` skips non-map elements safely.
 
 **Path resolution order:**
 1. Raw config (from `environment.json`)

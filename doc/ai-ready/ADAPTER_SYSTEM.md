@@ -30,6 +30,7 @@ The Adapter System decouples business logic from backend specifics. Each backend
 |---|---|
 | `CoreRepository` | Pure lifecycle base for all repository implementations |
 | `BackendAdapter` | Abstract base that owns repository factories and exposes services |
+| `RepositoryManager` | Internal class extracted from `BackendAdapter`; owns factory registration, lazy instance caching, and `Completer`-based concurrency guard for async factories |
 | `AdapterRegistry` | Registry owned by `MooseAppContext`; resolves repositories by type |
 | `MooseBootstrapper` | Orchestrates startup: wires registries, registers adapters, boots plugins |
 
@@ -472,7 +473,7 @@ final repo = await appContext.getRepositoryAsync<ReviewRepository>();
 final repo = await appContext.getRepositoryAsync<ReviewRepository>(provider: 'woocommerce');
 ```
 
-> Calling `getRepository<T>()` (sync) on an async factory throws `RepositoryNotRegisteredException`. Always use `getRepositoryAsync<T>()` for async factories.
+> Calling `getRepository<T>()` (sync) on an async factory throws `RepositoryAsyncOnlyException`. The error message directs you to use `getRepositoryAsync<T>()` instead.
 
 > **Concurrency safety (v2.3+):** Concurrent calls to `getRepositoryAsync<T>()` for the same type are deduplicated via a `Completer<T>` guard. Only one factory call is ever made; all concurrent callers await the same result. `initialize()` is called exactly once.
 
@@ -877,7 +878,7 @@ registerRepositoryFactory<ProductsRepository>(
 
 // ❌ Do NOT use getRepository<T>() (sync) on an async factory
 registerAsyncRepositoryFactory<ReviewRepository>(() async => WooReviewRepository());
-adapter.getRepository<ReviewRepository>(); // WRONG — throws RepositoryNotRegisteredException
+adapter.getRepository<ReviewRepository>(); // WRONG — throws RepositoryAsyncOnlyException
 // CORRECT:
 await adapter.getRepositoryAsync<ReviewRepository>();
 
@@ -1151,12 +1152,5 @@ No separate named registration is needed — `registerNamedRepositoryFactory` ha
 
 ---
 
-**Last Updated:** 2026-03-12
-**Version:** 7.0.0
-
-**Changelog:**
-- **v7.0.0 (2026-03-12)**: Repository factory system redesigned. Replaced `registerNamedRepositoryFactory` + dual-registration pattern with a single `registerRepositoryFactory` call. Each call is automatically tagged with the adapter's `name` as the provider. Retrieve by provider: `appContext.getRepository<AuthRepository>('shopify')`. `NamedRepositoryEntry` and `namedRepositoryEntries` removed from `BackendAdapter`.
-- **v6.0.0 (2026-03-11)**: OAuth 2.0 PKCE adapter pattern documented. Named repository registration (`registerNamedRepositoryFactory`) explained with shared-instance rule. `getOAuthRedirectUri()` method added to `AuthRepository` base. `auth:provider:oauth2` hook contract defined.
-- **v5.0.0 (2026-03-01)**: Full rewrite against actual source. `CoreRepository` is now a pure no-arg lifecycle base — no `hookRegistry`/`eventBus` fields. `BackendAdapter` convenience getters documented (`hookRegistry`, `eventBus`, `cache`, `configManager`, `logger`, `actionRegistry`). `AdapterRegistry` API documented (`getAdapter`, `getAvailableRepositories`, `getInitializedAdapters`, `clearAll`). Repository interface catalog expanded with real method signatures. Mock testing patterns corrected. Anti-patterns and bootstrap sequence updated.
-- **v4.0.0 (2026-02-26)**: `initializeFromConfig()` requires `configManager:` named param. `AdapterRegistry` lazy factory design documented. `MooseAppContext.getRepository<T>()` shortcut added.
-- **v3.0.0 (2026-02-22)**: `CoreRepository` required `hookRegistry`/`eventBus` constructor params (now removed).
+**Last Updated:** 2026-04-30
+**Version:** 8.0.0

@@ -516,7 +516,7 @@ void main() {
   });
 
   tearDown(() async {
-    await eventBus.reset();
+    await eventBus.destroy(); // cancels all subscriptions and closes all controllers
   });
 
   test('should receive event', () async {
@@ -533,6 +533,15 @@ void main() {
     await Future.delayed(Duration.zero);
 
     expect(eventReceived, isTrue);
+  });
+
+  test('controller count decreases after last subscriber cancels', () async {
+    // @visibleForTesting
+    final sub = eventBus.on('some.event', (_) {});
+    expect(eventBus.controllerCount, greaterThan(0));
+    await sub.cancel();
+    // StreamController is removed and closed once the last subscriber cancels
+    expect(eventBus.controllerCount, equals(0));
   });
 }
 ```
@@ -589,6 +598,14 @@ class MyBloc extends Bloc {
 
 ---
 
+## EventBus Lifecycle Notes
+
+- When the **last subscriber** for an event name calls `cancel()`, the underlying `StreamController` is automatically removed from the internal map and closed. This prevents controller leaks in long-running apps with dynamic subscriptions.
+- `@visibleForTesting int get controllerCount` — the number of open stream controllers. Use this in tests to assert that cancellation is working correctly.
+- `destroy()` — cancels all active subscriptions and closes all stream controllers. Call in `tearDown()` for full cleanup. `reset()` is an alias.
+
+---
+
 **Remember:** EventBus is for **fire-and-forget** notifications. If you need a return value, use HookRegistry instead!
 
 **See Also:**
@@ -598,5 +615,5 @@ class MyBloc extends Bloc {
 
 ---
 
-**Last Updated:** 2025-11-09
-**Version:** 2.0.0 (String-based events only)
+**Last Updated:** 2026-04-30
+**Version:** 3.0.0

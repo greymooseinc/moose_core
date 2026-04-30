@@ -775,7 +775,70 @@ try {
 }
 ```
 
-### ❌ ANTI-PATTERN 21: Registering an Async Hook with execute() Instead of executeAsync()
+### ❌ ANTI-PATTERN 21A: Calling saveSession() Before initTokenStorage()
+
+**Why it's wrong:**
+- `saveSession()` has an `assert(store != null, ...)` guard in debug builds.
+- Forgetting `initTokenStorage()` fires an `AssertionError` in debug mode, crashing the session-save path.
+
+**Wrong:**
+```dart
+// Adapter initialize() — forgot to call initTokenStorage
+final authRepo = WooAuthRepository(_client);
+registerRepositoryFactory<AuthRepository>(() => authRepo);
+// ... later, saveSession() throws AssertionError in debug
+```
+
+**Correct:**
+```dart
+final authRepo = WooAuthRepository(_client);
+authRepo.initTokenStorage(cache, keyPrefix: 'woocommerce');
+registerRepositoryFactory<AuthRepository>(() => authRepo);
+```
+
+### ❌ ANTI-PATTERN 21B: Not Calling dispose() on MemoryCache / CacheManager in Tests
+
+**Why it's wrong:**
+- `MemoryCache` starts a periodic cleanup timer.
+- Tests that create a `MooseAppContext` and never call `cache.dispose()` leave dangling `Timer` instances.
+- This triggers "A Timer is still pending" errors and can cause test-order-dependent failures.
+
+**Wrong:**
+```dart
+setUp(() { ctx = MooseAppContext(); });
+tearDown(() { ctx.pluginRegistry.clearAll(); }); // ❌ Timer still running
+```
+
+**Correct:**
+```dart
+setUp(() { ctx = MooseAppContext(); });
+tearDown(() {
+  ctx.cache.dispose(); // ✅ stops cleanup timer
+  ctx.pluginRegistry.clearAll();
+});
+```
+
+### ❌ ANTI-PATTERN 22: Using Hardcoded Config Path Strings Instead of MooseConfigKeys
+
+**Why it's wrong:**
+- Inline strings like `'plugins:products:settings:perPage'` are typo-prone.
+- There is no compile-time check — a wrong key silently returns `null`.
+
+**Wrong:**
+```dart
+configManager.get('plugins:products:settings:perPage', defaultValue: 20);
+configManager.get('adapters:woocommerce:settings:baseUrl');
+```
+
+**Correct:**
+```dart
+import 'package:moose_core/services.dart';
+
+configManager.get(MooseConfigKeys.pluginSettings('products', 'perPage'), defaultValue: 20);
+configManager.get(MooseConfigKeys.adapterSettings('woocommerce', 'baseUrl'));
+```
+
+### ❌ ANTI-PATTERN 24: Registering an Async Hook with execute() Instead of executeAsync()
 
 **Why it's wrong:**
 - Pre-v2.3: the Future leaked through and downstream code received a `Future<T>` instead of `T`.
@@ -827,7 +890,10 @@ Before committing code, check:
 - [ ] ✅ All cache access via `appContext.cache` or `context.moose.cache`
 - [ ] ✅ No `CacheManager.memoryCacheInstance()` / `persistentCacheInstance()` (removed)
 - [ ] ✅ No direct `MemoryCache()` / `PersistentCache()` construction outside tests
-- [ ] ✅ Dispose `appContext.cache` when tearing down a context in tests
+- [ ] ✅ Call `appContext.cache.dispose()` in `tearDown()` to cancel the cleanup timer
+
+**AuthRepository:**
+- [ ] ✅ Call `initTokenStorage(cache, keyPrefix: ...)` before `saveSession()` in adapters
 
 **Plugin:**
 - [ ] ✅ Extend FeaturePlugin
@@ -847,6 +913,6 @@ Before committing code, check:
 
 ---
 
-**Last Updated:** 2025-11-03
-**Version:** 1.0.0
+**Last Updated:** 2026-04-30
+**Version:** 2.0.0
 
