@@ -49,19 +49,27 @@ class ConfigManager {
     // adapters: [ { "id": "woocommerce", ... } ] → { "woocommerce": { ... } }
     final adapters = _config['adapters'];
     if (adapters is List) {
-      _config['adapters'] = <String, dynamic>{
-        for (final raw in adapters.cast<Map>())
-          (raw['id'] as String): (Map<String, dynamic>.from(raw)..remove('id')),
-      };
+      final Map<String, dynamic> adapterMap = {};
+      for (final item in adapters) {
+        if (item is! Map) continue;
+        final id = item['id'];
+        if (id == null || id is! String || id.isEmpty) continue;
+        adapterMap[id] = Map<String, dynamic>.from(item)..remove('id');
+      }
+      _config['adapters'] = adapterMap;
     }
 
     // plugins: [ { "id": "products", ... } ] → { "products": { ... } }
     final plugins = _config['plugins'];
     if (plugins is List) {
-      _config['plugins'] = <String, dynamic>{
-        for (final raw in plugins.cast<Map>())
-          (raw['id'] as String): (Map<String, dynamic>.from(raw)..remove('id')),
-      };
+      final Map<String, dynamic> pluginMap = {};
+      for (final item in plugins) {
+        if (item is! Map) continue;
+        final id = item['id'];
+        if (id == null || id is! String || id.isEmpty) continue;
+        pluginMap[id] = Map<String, dynamic>.from(item)..remove('id');
+      }
+      _config['plugins'] = pluginMap;
     }
 
     // pages:
@@ -70,9 +78,11 @@ class ConfigManager {
     final pages = _config['pages'];
     if (pages is List) {
       final map = <String, dynamic>{};
-      for (final raw in pages.cast<Map>()) {
-        final entry = Map<String, dynamic>.from(raw);
-        final route = entry.remove('route') as String;
+      for (final item in pages) {
+        if (item is! Map) continue;
+        final entry = Map<String, dynamic>.from(item);
+        final route = entry.remove('route');
+        if (route == null || route is! String || route.isEmpty) continue;
         final plugin = entry.remove('plugin') as String?;
         final key = plugin != null ? 'plugin:$plugin:$route' : route;
         map[key] = entry;
@@ -83,10 +93,14 @@ class ConfigManager {
     // tabs: [ { "id": "home", ... } ] → { "home": { ... } }
     final tabs = _config['tabs'];
     if (tabs is List) {
-      _config['tabs'] = <String, dynamic>{
-        for (final raw in tabs.cast<Map>())
-          (raw['id'] as String): (Map<String, dynamic>.from(raw)..remove('id')),
-      };
+      final Map<String, dynamic> tabMap = {};
+      for (final item in tabs) {
+        if (item is! Map) continue;
+        final id = item['id'];
+        if (id == null || id is! String || id.isEmpty) continue;
+        tabMap[id] = Map<String, dynamic>.from(item)..remove('id');
+      }
+      _config['tabs'] = tabMap;
     }
   }
 
@@ -149,7 +163,10 @@ class ConfigManager {
   }
 
   dynamic _getNestedValue(String key) {
-    final parts = key.split(RegExp(r'[.:]'));
+    final rawParts = key.split(RegExp(r'[.:]'));
+    // Adjacent separators (e.g. 'a::b') produce empty segments — treat as invalid path.
+    if (rawParts.any((p) => p.isEmpty)) return null;
+    final parts = rawParts;
     dynamic current = _config;
 
     for (final part in parts) {
