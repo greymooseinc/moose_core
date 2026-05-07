@@ -19,3 +19,4 @@ export 'src/app/moose_lifecycle_observer.dart';
 export 'src/app/moose_app.dart';
 export 'src/theme/moose_theme.dart';
 export 'src/app/page_screen.dart';
+export 'src/app/config_loader.dart';
