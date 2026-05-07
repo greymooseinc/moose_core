@@ -55,6 +55,7 @@ class MooseAppBar extends FeatureSection {
       'pinned': true,
       'elevation': 0.0,
       'actionsEndSpacing': 8.0,
+      'transparent': false,
     };
   }
 
@@ -72,13 +73,16 @@ class MooseAppBar extends FeatureSection {
     final colorScheme = Theme.of(context).colorScheme;
     final bgSetting = _getColorOrNull('backgroundColor');
     final fgSetting = _getColorOrNull('foregroundColor');
+    final isTransparent = getSetting<bool>('transparent');
     return SliverAppBar(
       expandedHeight: getSetting<double>('expandedHeight'),
       floating: getSetting<bool>('floating'),
       pinned: getSetting<bool>('pinned'),
-      backgroundColor: bgSetting ?? colorScheme.surface,
+      backgroundColor: isTransparent ? Colors.transparent : (bgSetting ?? colorScheme.surface),
       foregroundColor: fgSetting ?? colorScheme.onSurface,
       elevation: getSetting<double>('elevation'),
+      surfaceTintColor: isTransparent ? Colors.transparent : null,
+      forceMaterialTransparency: isTransparent,
       title: _buildTitle(context),
       leadingWidth: leftActions.isEmpty ? null : (leftActions.length * 56.0),
       leading: leftActions.isEmpty

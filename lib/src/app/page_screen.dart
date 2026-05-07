@@ -56,6 +56,42 @@ import 'moose_scope.dart';
 /// each holding widget-registry entries (`name`, `settings`, `active`).
 /// Those entries are resolved via [WidgetRegistry] and passed to [MooseAppBar]
 /// as [leftActions] / [rightActions].
+///
+/// ## App bar extension slot — `moose.core.slot.page_screen:app_bar`
+///
+/// Register a widget under this slot key to replace the default [MooseAppBar]
+/// on any [PageScreen] that has an `appBar` config. The default [MooseAppBar]
+/// is used as fallback when no registration is found.
+///
+/// The slot receives the following `data` keys:
+///
+/// | Key | Type | Description |
+/// |---|---|---|
+/// | `appBarConfig` | `Map<String, dynamic>` | Raw `appBar` object from the page config (title, floating, pinned, transparent, etc.) |
+/// | `leftActions` | `List<Widget>` | Pre-built left action widgets resolved from `buttonsLeft` |
+/// | `rightActions` | `List<Widget>` | Pre-built right action widgets resolved from `buttonsRight` |
+/// | `pageConfig` | `Map<String, dynamic>` | Full page config for the current screen |
+///
+/// The builder must return a sliver widget (e.g. [SliverAppBar]) because it is
+/// placed directly in a [CustomScrollView]'s slivers list.
+///
+/// ### Example — custom animated app bar
+///
+/// ```dart
+/// widgetRegistry.registerWidget(
+///   'moose.core.slot.page_screen:app_bar',
+///   (context, {data, onEvent}) {
+///     final config = data?['appBarConfig'] as Map<String, dynamic>? ?? {};
+///     final left = data?['leftActions'] as List<Widget>? ?? [];
+///     final right = data?['rightActions'] as List<Widget>? ?? [];
+///     return MyCustomSliverAppBar(
+///       settings: config,
+///       leftActions: left,
+///       rightActions: right,
+///     );
+///   },
+/// );
+/// ```
 class PageScreen extends StatelessWidget {
   final Map<String, dynamic> pageConfig;
 
@@ -121,10 +157,23 @@ class PageScreen extends StatelessWidget {
         return results;
       }
 
-      appBarWidget = MooseAppBar(
-        settings: appBarConfig,
-        leftActions: buildButtons('buttonsLeft'),
-        rightActions: buildButtons('buttonsRight'),
+      final leftActions = buildButtons('buttonsLeft');
+      final rightActions = buildButtons('buttonsRight');
+
+      appBarWidget = widgetRegistry.build(
+        'moose.core.slot.page_screen:app_bar',
+        context,
+        data: {
+          'appBarConfig': appBarConfig,
+          'leftActions': leftActions,
+          'rightActions': rightActions,
+          'pageConfig': pageConfig,
+        },
+        fallback: MooseAppBar(
+          settings: appBarConfig,
+          leftActions: leftActions,
+          rightActions: rightActions,
+        ),
       );
     }
 
@@ -148,9 +197,11 @@ class PageScreen extends StatelessWidget {
       }
     }
 
+    final isTransparentAppBar = appBarConfig?['transparent'] == true;
+
     final scrollView = CustomScrollView(
       slivers: [
-        if (appBarWidget != null) appBarWidget,
+        if (appBarWidget != null && !isTransparentAppBar) appBarWidget,
         SliverToBoxAdapter(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,10 +217,48 @@ class PageScreen extends StatelessWidget {
       ],
     );
 
-    return Scaffold(
+    Widget body = AppBackgroundStyles.screenWidget(context, child: scrollView);
+
+    // Transparent app bar: overlay buttons above the scroll content so the
+    // first section starts at position 0 instead of below the app bar.
+    // The overlay is capped to kToolbarHeight + status bar so touches below
+    // the button area fall through to the scrollable content.
+    if (isTransparentAppBar && appBarWidget != null) {
+      body = Stack(
+        children: [
+          body,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).padding.top + kToolbarHeight,
+            child: CustomScrollView(
+              slivers: [appBarWidget],
+              physics: const NeverScrollableScrollPhysics(),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final scaffold = Scaffold(
       backgroundColor: Colors.transparent,
-      body: AppBackgroundStyles.screenWidget(context, child: scrollView),
+      body: body,
       bottomNavigationBar: bottomBarWidget,
     );
+
+    // When using a transparent overlay app bar, remove the top MediaQuery
+    // padding before Scaffold sees it so the body is laid out from y=0.
+    // Scaffold uses MediaQuery.padding.top to inset the body below the
+    // status bar; stripping it here lets content start at the screen edge.
+    if (isTransparentAppBar) {
+      return MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          padding: MediaQuery.of(context).padding.copyWith(top: 0),
+        ),
+        child: scaffold,
+      );
+    }
+    return scaffold;
   }
 }
